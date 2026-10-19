@@ -1,0 +1,18 @@
+<header class="top-bar">
+  <a class="brand" routerLink="/peninsula">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <strong>IgnisLab</strong>
+  </a>
+
+  <nav class="scopes" aria-label="Àmbit geogràfic">
+    @for (scope of scopes; track scope.id) {
+      <a
+        [routerLink]="'/' + scope.id"
+        routerLinkActive="is-active"
+        #link="routerLinkActive"
+        [attr.aria-current]="link.isActive ? 'page' : null"
+        >{{ scope.label }}</a
+      >
+    }
+  </nav>
+</header>

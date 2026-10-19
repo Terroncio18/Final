@@ -6,7 +6,8 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "data:regions": "node scripts/fetch-regions.mjs"
   },
   "private": true,
   "packageManager": "npm@10.9.8",

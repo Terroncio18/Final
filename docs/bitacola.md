@@ -163,6 +163,28 @@ meteorologia.
 
 **Estat.** Oberta — vegeu 3.2.
 
+### 2.8. Navegació per rutes
+
+**Decisió.** Cada nivell de la jerarquia és un segment de la URL: `/peninsula`,
+i més endavant `/peninsula/catalunya/sant-celoni`. Els tres àmbits comparteixen
+una sola ruta `:scope`, no tres rutes literals.
+
+**Motiu.** Que la URL identifiqui la vista permet compartir un enllaç que obre
+exactament on eres, cosa que en una eina divulgativa és una funció i no un detall.
+
+Una sola ruta amb paràmetre és el que fa que el router **reutilitzi** el
+component en canviar d’àmbit. Amb tres rutes literals, Angular destruiria i
+tornaria a crear el component a cada clic, i com que el component crea el mapa
+en muntar-se, cada canvi significaria llençar el context WebGL i reconstruir-ho
+tot. Amb el paràmetre, només es mou la càmera.
+
+`withComponentInputBinding()` lliura el paràmetre com un *input* del component,
+de manera que no cal subscriure's a `ActivatedRoute` ni gestionar cap
+subscripció. Un `computed` valida que el valor sigui un dels tres coneguts i,
+si no, recau en el per defecte: la ruta accepta qualsevol text.
+
+**Estat.** Tancada. Falten els nivells de comunitat i municipi.
+
 ---
 
 ## 3. Decisions pendents
@@ -252,6 +274,13 @@ perquè l'esdeveniment `load` no arriba a disparar-se.
 bona estona creient que era de l'aplicació. Al navegador de l'usuari la pàgina
 carregava en un segon i sense cap avís: el problema era de l’entorn des del
 qual es revisava, no del codi.
+
+**El vigilant de fitxers del servidor de desenvolupament es pot encallar.** Amb
+molts canvis seguits, `ng serve` pot quedar-se amb un error de compilació antic
+i continuar servint el *bundle* anterior, de manera que els canvis no apareixen
+i l'error que mostra ja no es correspon amb el codi del disc. Si `ng build`
+compila però el navegador no reflecteix els canvis, reinicia el servidor abans
+de buscar el problema al codi.
 
 ## 5. Fonts de dades
 

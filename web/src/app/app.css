@@ -1,0 +1,13 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
+.workspace {
+  position: relative;
+  flex: 1;
+  /* Without this a flex child refuses to shrink below its content, and the map
+     pushes the layout past the viewport instead of filling what is left. */
+  min-height: 0;
+}

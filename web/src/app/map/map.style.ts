@@ -12,9 +12,12 @@ export const LAYERS = {
   background: 'background',
   satellite: 'basemap-satellite',
   hillshade: 'hillshade',
+  regionsFill: 'regions-fill',
+  regionsLine: 'regions-line',
 } as const;
 
 export const DEM_SOURCE = 'terrain-dem';
+export const REGIONS_SOURCE = 'regions';
 
 /**
  * A flat map with relief read off the DEM, rather than a 3D terrain mesh.
@@ -42,6 +45,11 @@ export function buildStyle(): StyleSpecification {
         maxzoom: 19,
         attribution: IMAGERY_ATTRIBUTION,
       },
+      [REGIONS_SOURCE]: {
+        type: 'geojson',
+        data: 'data/regions.geojson',
+        attribution: 'Límits: Eurostat GISCO, NUTS 2024',
+      },
     },
     layers: [
       {
@@ -66,6 +74,24 @@ export function buildStyle(): StyleSpecification {
           'hillshade-shadow-color': '#0a1016',
           'hillshade-highlight-color': '#ffffff',
           'hillshade-accent-color': '#3a4a56',
+        },
+      },
+            {
+        // Nearly invisible, but it is what makes a region pickable: a line alone
+        // would only respond on the border itself.
+        id: LAYERS.regionsFill,
+        type: 'fill',
+        source: REGIONS_SOURCE,
+        paint: { 'fill-color': '#9fb4c4', 'fill-opacity': 0.06 },
+      },
+      {
+        id: LAYERS.regionsLine,
+        type: 'line',
+        source: REGIONS_SOURCE,
+        paint: {
+          'line-color': '#b9cddb',
+          'line-width': 1,
+          'line-opacity': 0.55,
         },
       },
     ],

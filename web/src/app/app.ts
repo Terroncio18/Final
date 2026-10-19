@@ -1,9 +1,10 @@
 import { Component } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
 
-import { MapView } from './map/map-view';
+import { TopBar } from './top-bar/top-bar';
 
 @Component({
-  imports: [MapView],
+  imports: [RouterOutlet, TopBar],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',
