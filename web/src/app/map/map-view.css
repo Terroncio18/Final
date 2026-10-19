@@ -1,0 +1,69 @@
+.map-view {
+  position: relative;
+  height: 100dvh;
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.map-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  /* Opaque on purpose: a half-drawn map underneath reads as a glitch. */
+  background: var(--bg);
+  background-image: radial-gradient(circle at 50% 42%, #18222d 0%, var(--bg) 62%);
+  transition:
+    opacity 0.45s ease,
+    visibility 0s linear 0.45s;
+}
+
+.map-loading.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.map-loading p {
+  margin: 0;
+  color: var(--text);
+}
+
+.map-loading small {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.map-loading-ring {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgb(255 122 60 / 0.16);
+  border-top-color: var(--accent);
+  animation: map-loading-spin 0.9s linear infinite;
+}
+
+@keyframes map-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* A spinning ring is a vestibular trigger for some people; pulse instead. */
+@media (prefers-reduced-motion: reduce) {
+  .map-loading-ring {
+    animation: map-loading-pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes map-loading-pulse {
+    50% {
+      opacity: 0.3;
+    }
+  }
+}

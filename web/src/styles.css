@@ -1,1 +1,44 @@
 /* You can add global styles to this file, and also import other style files */
+@import 'maplibre-gl/dist/maplibre-gl.css';
+
+:root {
+  --bg: #0c1116;
+  --panel: #161d25;
+  --line: #262f3a;
+  --text: #e6eaee;
+  --muted: #8d99a6;
+  --accent: #ff7a3c;
+
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* MapLibre's controls ship a light theme; match the application chrome. */
+.maplibregl-ctrl-scale {
+  background: rgb(12 17 22 / 0.8);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.maplibregl-ctrl-attrib {
+  background: rgb(12 17 22 / 0.8) !important;
+  color: var(--muted);
+}
+
+.maplibregl-ctrl-attrib a {
+  color: var(--muted);
+}

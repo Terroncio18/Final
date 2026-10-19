@@ -1,12 +1,11 @@
-import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Component } from '@angular/core';
+
+import { MapView } from './map/map-view';
 
 @Component({
-  imports: [RouterOutlet],
+  imports: [MapView],
   selector: 'app-root',
   styleUrl: './app.css',
   templateUrl: './app.html',
 })
-export class App {
-  protected readonly title = signal('web');
-}
+export class App {}
