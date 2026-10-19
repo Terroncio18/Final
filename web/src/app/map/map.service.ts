@@ -10,7 +10,7 @@ import { buildStyle } from './map.style';
  * angular.json copies the file out of node_modules as a static asset and this
  * points MapLibre at it, which works the same in development and in a build.
  */
-setWorkerUrl('maplibre-gl-worker.mjs');
+setWorkerUrl(new URL('maplibre-gl-worker.mjs', document.baseURI).href);
 
 /**
  * Owns the MapLibre instance.
@@ -61,10 +61,16 @@ export class MapService {
       console.error('[mapa]', event.error?.message ?? event.error);
     });
 
-    map.once('load', () => {
+        map.once('styledata', () => {
       map.fitBounds(VIEWS[INITIAL_VIEW].bounds, { padding: 24, duration: 0 });
-      this.ready.set(true);
     });
+
+    // Revealing the map must not hang on a single event. `load` is the clean
+    // signal, but a worker that fails to start stops it firing at all, even
+    // though tiles stream in and the map renders. `idle` covers that case.
+    const reveal = () => this.ready.set(true);
+    map.once('load', reveal);
+    map.once('idle', reveal);
 
     this.instance = map;
   }

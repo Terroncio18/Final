@@ -233,6 +233,26 @@ que `127.0.0.1` rebutja la connexió. Convé fixar `host: '127.0.0.1'`.
 
 ---
 
+**No lligar la interfície a un sol esdeveniment del mapa.** L'indicador de
+càrrega es va lligar a l'esdeveniment `load` de MapLibre, i `load` no arriba a
+disparar-se si algun *worker* falla en arrencar, encara que les tessel·les es
+descarreguin i el mapa renderitzi perfectament. Resultat: un vel opac tapant un
+mapa que funciona. Ara es retira amb el primer de `load` o `idle`, i `fitBounds`
+penja de `styledata`, que és el que realment necessita.
+
+**El *worker* de MapLibre i els navegadors encastats.** MapLibre intenta
+`new Worker(url, {type:'module'})` i, si el constructor falla, recau en un
+worker clàssic. Com que el fitxer que distribueix és un mòdul ES, aquest segon
+intent peta amb `Unexpected token 'export'`. Als navegadors normals el primer
+intent funciona i no es veu res; en navegadors encastats sense suport de
+*module workers* apareix aquest error, el mapa funciona igual però més lent,
+perquè l'esdeveniment `load` no arriba a disparar-se.
+
+**Verificar sempre al navegador real.** Aquest error es va perseguir durant una
+bona estona creient que era de l'aplicació. Al navegador de l'usuari la pàgina
+carregava en un segon i sense cap avís: el problema era de l’entorn des del
+qual es revisava, no del codi.
+
 ## 5. Fonts de dades
 
 | Font | Dada | Cobertura | Estat |
