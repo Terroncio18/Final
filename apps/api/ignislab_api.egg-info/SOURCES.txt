@@ -1,6 +1,0 @@
-pyproject.toml
-ignislab_api.egg-info/PKG-INFO
-ignislab_api.egg-info/SOURCES.txt
-ignislab_api.egg-info/dependency_links.txt
-ignislab_api.egg-info/requires.txt
-ignislab_api.egg-info/top_level.txt
