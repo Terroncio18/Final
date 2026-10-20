@@ -30,11 +30,15 @@ const OUTPUT = resolve(
 /** Outside the study area: Atlantic archipelagos and the autonomous cities. */
 const EXCLUDED = new Set(['PT20', 'PT30', 'ES63', 'ES64']);
 
-/** Which fixed scope each region belongs to; everything else is the mainland. */
-const SCOPE_BY_ID = new Map([
-  ['ES53', 'balears'],
-  ['ES70', 'canaries'],
-]);
+/**
+ * Which framing each region is drawn in; everything else belongs to the
+ * mainland one.
+ *
+ * The Balearic Islands are deliberately absent: they fit inside the peninsular
+ * framing at no cost in zoom, so they are part of it rather than a scope of
+ * their own. Only the Canaries, 1.400 km southwest, still need their own.
+ */
+const SCOPE_BY_ID = new Map([['ES70', 'canaries']]);
 
 async function main() {
   process.stdout.write('Descarregant NUTS 2 de GISCO…\n');

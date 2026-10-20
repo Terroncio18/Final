@@ -48,7 +48,14 @@ export class MapService {
       center: [-3.7, 40.0],
       zoom: 4.5,
       pitch: 0,
-      maxZoom: 17,
+      // The overview is a picture to click on, not a map to explore: at this
+      // scale there is no detail worth panning to, and the fixed framing is what
+      // the hotspot layer will be drawn against. This one option leaves every
+      // gesture handler disabled —pan, scroll zoom, box zoom, double click,
+      // keyboard, rotation and touch pitch— while `click` and `mousemove` keep
+      // firing, because MapLibre registers those regardless of the flag. A zoom
+      // range would be inert here, so there is none.
+      interactive: false,
       attributionControl: false,
     });
 

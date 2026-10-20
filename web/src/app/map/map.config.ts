@@ -20,12 +20,15 @@ export interface NamedView {
 }
 
 /**
- * The study area is not contiguous: the Canaries sit some 1.400 km southwest of
- * the peninsula, so one fitted view would be mostly ocean. Each gets its own.
+ * The study area is not contiguous, but it does not need three framings.
+ *
+ * The Balearic Islands reach 4,4° east and sit inside the peninsular latitudes,
+ * so they come along at no cost in zoom: a wide window is framed by latitude,
+ * which they do not change. The Canaries do change it —they double the latitude
+ * span and leave a frame that is mostly ocean— so they keep one of their own.
  */
 export const VIEWS = {
-  peninsula: { label: 'Península', bounds: [-9.9, 35.8, 3.5, 44.0] },
-  balears: { label: 'Illes Balears', bounds: [1.1, 38.6, 4.4, 40.2] },
+  peninsula: { label: 'Península i Balears', bounds: [-9.9, 35.8, 4.4, 44.0] },
   canaries: { label: 'Illes Canàries', bounds: [-18.3, 27.5, -13.3, 29.5] },
 } as const satisfies Record<string, NamedView>;
 
