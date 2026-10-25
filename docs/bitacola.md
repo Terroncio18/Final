@@ -3,7 +3,7 @@
 Registre de **decisions preses**: què s'ha decidit i per quins motius. Material
 de base per a la memòria del TFG.
 
-Darrera actualització: 20 d'octubre de 2026.
+Darrera actualització: 25 d'octubre de 2026.
 
 ---
 
@@ -155,14 +155,87 @@ Motius:
 - `withComponentInputBinding()` lliura el paràmetre com un *input*, de manera que
   no cal subscriure's a `ActivatedRoute`.
 
+### 2.12. Llenguatge i marc del backend
+
+Node amb Fastify i TypeScript, no Python amb FastAPI. Tanca la pendent 3.1.
+Motius:
+
+- El que fa el servidor és demanar sis CSV, ajuntar-los i guardar-los deu
+  minuts. En una feina així cap dels dos llenguatges aporta res que l'altre no
+  tingui.
+- L'argument a favor de Python era el preprocessament de cartografia
+  (`rasterio`, `geopandas`), i això és feina per lots que ja viu en scripts a
+  part, com `web/scripts/fetch-regions.mjs`. Quan calgui, un script de Python hi
+  cabrà igualment sense que l'API hi tingui res a veure.
+- Un sol llenguatge als dos projectes: la forma de la resposta s'escriu un cop i
+  el navegador l'entén sense traduir-la.
+
+### 2.13. Com es demanen les deteccions
+
+Les tres plataformes VIIRS sobre dues caixes, sis peticions en paral·lel, i una
+resposta parcial es dona per bona. Motius:
+
+- Les tres plataformes donen 375 m i passen a hores diferents, de manera que un
+  mateix foc el solen veure més d'una: són observacions, no incendis (§2.16).
+- L'API d'àrea pren una caixa per petició i l'àmbit no és continu, així que són
+  dues: península amb Balears, i Canàries.
+- Amb `Promise.allSettled`, si una plataforma falla la resta se serveix igual i
+  la fallada queda al registre. Només un error complet llença.
+- La caixa peninsular baixa fins als 35,8° i hi entren el nord del Marroc i
+  d'Algèria. Què se'n fa és la pendent 3.10.
+
+### 2.14. Finestra temporal d'un dia
+
+Es demana un dia de deteccions, no els cinc que admet l'API. Motius:
+
+- La portada respon «què crema ara», no «què ha cremat aquesta setmana». En un
+  acumulat, un incendi apagat dimarts es veu igual que un que crema ara.
+- Mesurat el 25/10/2026 sobre l'àmbit sencer: un dia dona 195 deteccions i cinc
+  en donen 1.002. A l'escala de la portada, el segon número és confeti.
+- Els cinc dies queden com a sostre conegut per si més endavant hi ha una vista
+  d'episodi, on seguir un incendi uns quants dies sí que té sentit.
+- Revertir-ho és barat: el servidor accepta `?days=` i el client ho té en un sol
+  número, `HOTSPOT_DAYS`.
+
+### 2.15. Memòria cau de deu minuts, i dades velles abans que un mapa buit
+
+Motius:
+
+- VIIRS només canvia quan passa un satèl·lit, que sobre Ibèria són un grapat de
+  vegades al dia, i les deteccions NRT apareixen hores després del pas.
+  Preguntar-ho a cada càrrega de pàgina seria gastar quota per rebre el mateix.
+- La clau admet 5.000 peticions cada deu minuts, i cada visita en consumiria sis.
+- Si FIRMS falla i hi ha resposta anterior, se serveix aquella marcada amb
+  `x-stale: true`. Un mapa buit es llegeix com «no crema res», i això és el
+  pitjor que aquesta pantalla pot arribar a dir.
+- En memòria i no en disc: la dada és pública, és barata de refer i no val res al
+  cap d'una estona; persistir-la només afegiria una peça que es pot espatllar.
+
+### 2.16. Una marca per detecció, i el FRP mana
+
+Cada detecció és un cercle, i la potència radiativa en decideix la mida i el
+color alhora. Motius:
+
+- FIRMS no agrupa les deteccions en incendis, i aquí tampoc: ajuntar-les és una
+  decisió metodològica pròpia i és la pendent 3.7. Fins que es prengui, el que es
+  pinta és el que s'ha observat.
+- La mida i el color porten el mateix valor a propòsit: una lectura que depengués
+  només del color es perdria en una impressió en blanc i negre i per a qui no els
+  distingeix.
+- Les parades pugen per desenes (1, 10, 100 i 1.000 MW) perquè la potència
+  s'escampa per ordres de magnitud: amb parades regulars, tot allò que no fos un
+  gran incendi quedaria del mateix color.
+- L'anella fosca és el que separa la marca de la imatgeria: sobre sorra o núvol,
+  un punt ambre tot sol es dissol.
+- `circle-sort-key` pel FRP, de manera que en un encavalcament guanya la marca
+  més potent i no la que el servidor hagi enviat l'última.
+
 ---
 
 ## 3. Decisions pendents
 
-- **3.1. Llenguatge del backend.** L'API és igual de senzilla en qualsevol; la
-  diferència real és el preprocessament de cartografia, on Python té `rasterio` i
-  `geopandas`. Ho desbloqueja que el preprocessament és feina per lots i pot ser
-  un script de Python encara que l'API no ho sigui.
+- ~~**3.1. Llenguatge del backend.**~~ Resolta el 25/10/2026: Node amb Fastify
+  (§2.12).
 - **3.2. Model digital d'elevacions.** Terrarium per comoditat; l'estat de l'art
   cita el Copernicus DEM GLO-30, de més qualitat.
 - **3.3. Polígons sense model de combustible.** `MODCOMB = 0` són 5.471 d'11.654
@@ -173,7 +246,9 @@ Motius:
   —amb què treballa l'ICNF— no hi surten.
 - **3.5. Cremes agrícoles i incendis.** Com no presentar una detecció de 0,5 MW
   com si fos un incendi forestal: llindar de FRP, etiqueta per potència, o totes
-  dues.
+  dues. Les dades del 25/10/2026 diuen que no és un cas de vora: de 195
+  deteccions, 147 queden per sota dels 5 MW i la mediana és de 2,1 MW, amb un
+  màxim de 56,7. Tres quartes parts del que avui mostra la portada són rostolls.
 - **3.6. Terreny 3D a la vista de simulació.** Activable i no obligatori, perquè
   drapejar el `CustomLayer` sobre una malla de terreny és més feina que pintar-lo
   sobre un pla.
@@ -181,6 +256,15 @@ Motius:
   deteccions de 375 m solapades i FIRMS no les agrupa en incendis.
 - **3.8. Pressupost de *bundle*.** MapLibre sol ja passa del límit per defecte
   d'Angular (1,29 MB en cru, 300 kB per la xarxa) i `ng build` falla per això.
+- **3.9. L'antiguitat de les dades no arriba a la pantalla.** El servidor
+  publica `x-fetched-at` i `x-stale`, però la font GeoJSON la descarrega
+  MapLibre pel seu compte i ningú llegeix les capçaleres. Amb deteccions NRT la
+  pantalla ha de dir de quan són, i també què passa si l'API no respon: ara el
+  mapa surt buit, que és justament el que §2.15 volia evitar.
+- **3.10. Deteccions fora de l'àmbit.** La caixa peninsular arriba al nord del
+  Marroc i d'Algèria: 24 de les 195 deteccions del 25/10/2026. Són focus reals,
+  de manera que les opcions són deixar-les, retallar la caixa al servidor o
+  filtrar-les al navegador contra els polígons NUTS, que ja hi són.
 
 ---
 
@@ -230,6 +314,12 @@ Coses que han costat temps i convé no redescobrir.
   navegador no ho reflecteix, reinicia el servidor abans de buscar-ho al codi.
 - **Verificar sempre al navegador real.** Un error perseguit durant una estona
   resulta ser de l'entorn des del qual es revisa, no del codi.
+- **FIRMS contesta els errors amb un 200 i en text pla**, una clau invàlida
+  inclosa, de manera que el codi d'estat no prova res. El que es comprova és que
+  la capçalera del CSV porti els noms de les columnes.
+- **L'hora de FIRMS ve a part de la data i sense zero inicial**: `912` són les
+  09:12, i sempre en UTC. Ajuntar data i hora un sol cop, en entrar, estalvia la
+  feina a tot el que ve després.
 
 ---
 
@@ -241,7 +331,7 @@ Coses que han costat temps i convé no redescobrir.
 | Mapzen Terrain Tiles | Elevació (Terrarium) | Global | En ús |
 | Eurostat GISCO — NUTS 2024 | Regions i províncies | UE | En ús (nivell 2) |
 | Eurostat GISCO — LAU 2024 | Municipis | UE | Pendent |
-| NASA FIRMS (VIIRS 375 m) | Focus actius | Global | Investigada |
+| NASA FIRMS (VIIRS 375 m) | Focus actius | Global | En ús (1 dia) |
 | IDEIB — IV Inventari Forestal | Model de combustible | Balears | Investigada |
 | MFE25 (MITECO) | Espècies i estructura | Espanya | Pendent |
 | COS (DGT) | Ús i ocupació del sòl | Portugal | Pendent |
@@ -250,9 +340,10 @@ Coses que han costat temps i convé no redescobrir.
 
 **FIRMS.** L'API d'àrea és `/api/area/csv/[MAP_KEY]/[FONT]/[o,s,e,n]/[DIES]`, amb
 un màxim de cinc dies per consulta i 5.000 transaccions cada deu minuts per clau.
-Les tres plataformes VIIRS donen 375 m, la millor resolució operativa. A l'octubre
-les deteccions peninsulars tenen potències de 0,4 a 19 MW: crema agrícola, no
-incendi forestal.
+Les tres plataformes VIIRS donen 375 m, la millor resolució operativa.
+Mesurat el 25/10/2026, un dia de deteccions a l'àmbit en dona 195, amb
+potències d'entre 0,39 i 56,7 MW i una mediana de 2,1: a l'octubre el que crema són
+majoritàriament rostolls, no bosc (§3.5).
 
 **IDEIB.** Publica `MODCOMB` amb el model d'Anderson 13 ja assignat pels autors de
 l'inventari, de manera que el simulador hereta una classificació oficial i no una
