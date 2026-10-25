@@ -1,0 +1,18 @@
+{
+  "name": "ignislabs-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node --env-file=.env dist/server.js",
+    "dev": "tsc --watch --preserveWatchOutput & node --env-file=.env --watch dist/server.js"
+  },
+  "dependencies": {
+    "fastify": "^5.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "~6.0.2"
+  }
+}

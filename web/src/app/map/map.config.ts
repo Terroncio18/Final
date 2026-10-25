@@ -14,6 +14,17 @@ export const DEM_MAX_ZOOM = 15;
 export const DEM_ATTRIBUTION =
   '<a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noreferrer">Mapzen Terrain Tiles</a>';
 
+/**
+ * Active fire detections, served by our own API.
+ *
+ * FIRMS cannot be called from the browser: the key would travel with the page
+ * and there is no CORS header. The server holds the key, asks the three VIIRS
+ * platforms and caches the answer, which matters because the data only changes
+ * when a satellite passes over.
+ */
+export const HOTSPOT_DAYS = 1;
+export const HOTSPOTS_URL = `/api/hotspots?days=${HOTSPOT_DAYS}`;
+
 export interface NamedView {
   readonly label: string;
   readonly bounds: LngLatBoundsLike;

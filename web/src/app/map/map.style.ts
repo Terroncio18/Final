@@ -3,6 +3,7 @@ import {
   DEM_ATTRIBUTION,
   DEM_MAX_ZOOM,
   DEM_TILES,
+  HOTSPOTS_URL,
   IMAGERY_ATTRIBUTION,
   IMAGERY_TILES,
 } from './map.config';
@@ -14,10 +15,12 @@ export const LAYERS = {
   hillshade: 'hillshade',
   regionsFill: 'regions-fill',
   regionsLine: 'regions-line',
+  hotspots: 'hotspots',
 } as const;
 
 export const DEM_SOURCE = 'terrain-dem';
 export const REGIONS_SOURCE = 'regions';
+export const HOTSPOTS_SOURCE = 'hotspots';
 
 /**
  * A flat map with relief read off the DEM, rather than a 3D terrain mesh.
@@ -49,6 +52,11 @@ export function buildStyle(): StyleSpecification {
         type: 'geojson',
         data: 'data/regions.geojson',
         attribution: 'Límits: Eurostat GISCO, NUTS 2024',
+      },
+      [HOTSPOTS_SOURCE]: {
+        type: 'geojson',
+        data: HOTSPOTS_URL,
+        attribution: 'Focus: NASA FIRMS (VIIRS 375 m)',
       },
     },
     layers: [
@@ -92,6 +100,45 @@ export function buildStyle(): StyleSpecification {
           'line-color': '#b9cddb',
           'line-width': 1,
           'line-opacity': 0.55,
+        },
+      },
+      {
+        // One mark per detection, not per fire: the three VIIRS platforms see
+        // the same fire on different passes and nothing merges them.
+        //
+        // Radiative power spans orders of magnitude —stubble sits near 1 MW and
+        // a running wildfire passes 1.000— so the stops climb by tens instead of
+        // evenly. Size and colour carry the same value on purpose: a reading
+        // that depended on colour alone would be lost on a photograph.
+        id: LAYERS.hotspots,
+        type: 'circle',
+        source: HOTSPOTS_SOURCE,
+        layout: {
+          // Which mark wins an overlap should be the fiercest one, not
+          // whichever the server happened to send last.
+          'circle-sort-key': ['get', 'frp'],
+        },
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['get', 'frp'], 1, 3.5, 10, 6, 100, 10, 1000, 15],
+          'circle-color': [
+            'interpolate',
+            ['linear'],
+            ['get', 'frp'],
+            1,
+            '#b06a12',
+            10,
+            '#e08b1e',
+            100,
+            '#ffb13c',
+            1000,
+            '#ffe3ad',
+          ],
+          'circle-opacity': 0.9,
+          // The dark ring is what detaches the mark from the imagery: over sand
+          // or cloud an amber dot on its own dissolves.
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#2b1403',
+          'circle-stroke-opacity': 0.8,
         },
       },
     ],
