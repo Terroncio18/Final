@@ -262,9 +262,25 @@ color alhora. Motius:
   pantalla ha de dir de quan són, i també què passa si l'API no respon: ara el
   mapa surt buit, que és justament el que §2.15 volia evitar.
 - **3.10. Deteccions fora de l'àmbit.** La caixa peninsular arriba al nord del
-  Marroc i d'Algèria: 24 de les 195 deteccions del 25/10/2026. Són focus reals,
-  de manera que les opcions són deixar-les, retallar la caixa al servidor o
-  filtrar-les al navegador contra els polígons NUTS, que ja hi són.
+  Marroc i d'Algèria: 65 de les 196 deteccions del 25/10/2026, un terç del que
+  es veu a la portada. Ajornada com a millora, no com a dubte: la via és clara i
+  el que falta és fer-la.
+  - Retallar la caixa per latitud no serveix: 41 d'aquestes 65 queden per sobre
+    del paral·lel de Tarifa, perquè la costa argelina entre Alger i Dellys va
+    dels 36,1° als 36,8°, més al nord que Màlaga.
+  - La via és punt-dins-de-polígon contra `regions.geojson`, que el navegador
+    ja té carregat, amb un marge d'uns 3 km. Amb el polígon cru hi cauen
+    deteccions reals de la costa —el 25/10/2026, dues al Rincón de la
+    Victoria— perquè GISCO a 1:3 M retalla la línia de costa. El marge no
+    deixa entrar res africà: Ceuta i Melilla no són al fitxer i l'Estret fa
+    14 km.
+  - Etiquetar i no descartar: una propietat `region` a cada detecció i un
+    `filter: ['has', 'region']` a la capa. Tornar a mostrar-les és una línia,
+    es pot dir quantes se'n descarten, i el nom de la regió és justament el que
+    la barra lateral haurà d'escriure (§2.9).
+  - Implica que el navegador es descarregui ell mateix la resposta en lloc de
+    donar-ne la URL a MapLibre, cosa que de passada posa les capçaleres a l'abast
+    i desencalla la 3.9.
 
 ---
 

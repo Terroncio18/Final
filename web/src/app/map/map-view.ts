@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 
+import { HotspotPanel } from '../hotspot-panel/hotspot-panel';
 import { INITIAL_VIEW, VIEWS, type ViewId } from './map.config';
 import { MapService } from './map.service';
 
@@ -22,6 +23,7 @@ import { MapService } from './map.service';
  */
 @Component({
   selector: 'app-map-view',
+  imports: [HotspotPanel],
   templateUrl: './map-view.html',
   styleUrl: './map-view.css',
 })
@@ -41,6 +43,7 @@ export class MapView {
   });
 
   protected readonly ready = this.maps.ready;
+  protected readonly selected = this.maps.selected;
 
   constructor() {
     // The first value is handled by create(), which frames it without animating.
@@ -61,5 +64,9 @@ export class MapView {
     afterNextRender(() => this.maps.create(this.container().nativeElement, this.view()));
 
     inject(DestroyRef).onDestroy(() => this.maps.destroy());
+  }
+
+  protected clearSelection(): void {
+    this.maps.clearSelection();
   }
 }

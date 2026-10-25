@@ -1,0 +1,29 @@
+<aside class="hotspot-panel" role="complementary" aria-label="Detecció seleccionada">
+  <header>
+    <h2>Detecció</h2>
+    <button type="button" class="close" (click)="closed.emit()" aria-label="Tancar">×</button>
+  </header>
+
+  <p class="frp"><strong>{{ hotspot().frp }}</strong> MW</p>
+  <p class="frp-note">Potència radiativa del foc</p>
+
+  <dl>
+    <dt>Observació</dt>
+    <dd>{{ observed() }}</dd>
+
+    <dt>Plataforma</dt>
+    <dd>{{ platform() }}</dd>
+
+    <dt>Confiança</dt>
+    <dd>{{ confidence() }}</dd>
+
+    <dt>Moment</dt>
+    <dd>{{ moment() }}</dd>
+
+    <dt>Coordenades</dt>
+    <dd>{{ coordinates() }}</dd>
+  </dl>
+
+  <button type="button" class="simulate" disabled>Crear-hi una simulació</button>
+  <p class="note">El flux de simulació encara no existeix.</p>
+</aside>

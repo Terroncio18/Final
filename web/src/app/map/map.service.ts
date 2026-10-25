@@ -1,6 +1,14 @@
 import { Injectable, signal } from '@angular/core';
-import { AttributionControl, MapLibreMap, ScaleControl, setWorkerUrl } from 'maplibre-gl';
+import {
+  AttributionControl,
+  MapLibreMap,
+  ScaleControl,
+  setWorkerUrl,
+  type MapGeoJSONFeature,
+  type MapMouseEvent,
+} from 'maplibre-gl';
 
+import type { Hotspot } from './hotspot';
 import { VIEWS, type ViewId } from './map.config';
 import { buildStyle, LAYERS } from './map.style';
 
@@ -14,6 +22,20 @@ setWorkerUrl(new URL('maplibre-gl-worker.mjs', document.baseURI).href);
 
 /** Framing is the same at every level; only the animation changes. */
 const FIT = { padding: 24 } as const;
+
+/** Half the side of the click target, in pixels. */
+const HIT_SLOP = 2;
+
+function frpOf(feature: MapGeoJSONFeature): number {
+  return Number(feature.properties['frp'] ?? 0);
+}
+
+/** The position lives in the geometry; the panel should not have to parse GeoJSON. */
+function toHotspot(feature: MapGeoJSONFeature): Hotspot {
+  const { coordinates } = feature.geometry as { coordinates: [number, number] };
+  const [lon, lat] = coordinates;
+  return { ...(feature.properties as Omit<Hotspot, 'lon' | 'lat'>), lon, lat };
+}
 
 /**
  * Owns the MapLibre instance.
@@ -31,6 +53,14 @@ export class MapService {
 
   /** False until the style has loaded and the first view is framed. */
   readonly ready = signal(false);
+
+  /**
+   * The detection the panel is showing, or nothing.
+   *
+   * A signal because the application is zoneless: a MapLibre click happens
+   * outside Angular and nothing would redraw on its own.
+   */
+  readonly selected = signal<Hotspot | null>(null);
 
   get map(): MapLibreMap | null {
     return this.instance;
@@ -62,13 +92,36 @@ export class MapService {
     map.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
     map.addControl(
       new AttributionControl({ compact: true, customAttribution: 'IgnisLab · TFG UOC' }),
-      'bottom-right',
+      // Bottom left, stacked over the scale: the detection panel covers the
+      // right edge and the imagery and elevation credits have to stay visible.
+      'bottom-left',
     );
 
     // A style that fails to load leaves a blank map and a camera frozen at its
     // initial pose, which is easy to mistake for a slow network. Say so instead.
     map.on('error', (event) => {
       console.error('[mapa]', event.error?.message ?? event.error);
+    });
+
+    // `interactive: false` leaves the gesture handlers off but keeps `click` and
+    // `mousemove` firing, which is what makes a fixed map clickable at all.
+    //
+    // One handler for the whole canvas rather than one scoped to the layer: a
+    // click on a mark and a click on empty sea both need an answer, and asking
+    // the renderer what lies under the pointer gives both at once.
+    map.on('click', (event) => {
+      const feature = this.featureAt(event);
+      this.selected.set(feature ? toHotspot(feature) : null);
+    });
+
+    // Without this the marks read as decoration. Only written when it changes:
+    // mousemove fires for every pixel the pointer crosses.
+    let overMark = false;
+    map.on('mousemove', (event) => {
+      const over = this.featureAt(event) !== null;
+      if (over === overMark) return;
+      overMark = over;
+      map.getCanvas().style.cursor = over ? 'pointer' : '';
     });
 
     // The opening frame is not an animation: there is nothing to travel from.
@@ -105,9 +158,37 @@ export class MapService {
     map.setFilter(LAYERS.regionsLine, filter);
   }
 
+  clearSelection(): void {
+    this.selected.set(null);
+  }
+
+  /**
+   * The detection under the pointer, if there is one.
+   *
+   * Queried over a small box and not a single pixel: the smallest mark is 3,5 px
+   * across and hitting it exactly with a mouse is luck. When the box catches
+   * more than one the fiercest wins, which is the rule the layer already uses
+   * to decide what gets drawn on top.
+   */
+  private featureAt(event: MapMouseEvent): MapGeoJSONFeature | null {
+    const map = this.instance;
+    if (!map || !map.getLayer(LAYERS.hotspots)) return null;
+
+    const { x, y } = event.point;
+    const box: [[number, number], [number, number]] = [
+      [x - HIT_SLOP, y - HIT_SLOP],
+      [x + HIT_SLOP, y + HIT_SLOP],
+    ];
+    const hits = map.queryRenderedFeatures(box, { layers: [LAYERS.hotspots] });
+    if (!hits.length) return null;
+
+    return hits.reduce((best, hit) => (frpOf(hit) > frpOf(best) ? hit : best));
+  }
+
   destroy(): void {
     this.instance?.remove();
     this.instance = null;
     this.ready.set(false);
+    this.selected.set(null);
   }
 }
