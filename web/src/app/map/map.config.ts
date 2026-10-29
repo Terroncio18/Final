@@ -25,6 +25,17 @@ export const DEM_ATTRIBUTION =
 export const HOTSPOT_DAYS = 1;
 export const HOTSPOTS_URL = `/api/hotspots?days=${HOTSPOT_DAYS}`;
 
+/**
+ * Administrative boundaries, preprocessed from Eurostat GISCO NUTS 2024.
+ *
+ * Both the map and the form read this one file: the layer draws the borders and
+ * the first step of the form lists the names, so a label and a border cannot
+ * disagree. Relative on purpose —the application may be served from a
+ * subdirectory— which means it has to be resolved against the document and not
+ * against the current URL.
+ */
+export const REGIONS_URL = 'data/regions.geojson';
+
 export interface NamedView {
   readonly label: string;
   readonly bounds: LngLatBoundsLike;

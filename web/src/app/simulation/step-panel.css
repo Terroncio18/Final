@@ -1,0 +1,130 @@
+/* Shared by every step of the form: one panel that changes its contents, not a
+   different panel per level. Same place and same width as the detection panel,
+   so the two ways into a simulation look like the same application. */
+.step-panel {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  padding: 16px 18px;
+  overflow-y: auto;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+}
+
+header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.step {
+  margin: 0 0 2px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+h3 {
+  margin: 22px 0 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.close {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-content: center;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+}
+
+.close:hover {
+  color: var(--text);
+  background: #1d252e;
+}
+
+.choices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.choices a {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.choices a:hover {
+  background: #1d252e;
+}
+
+/* The code is shown because it is what the URL carries: seeing ES51 next to
+   Cataluña is what makes the address bar readable. */
+.choices small {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.code {
+  margin: 16px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.pending,
+.waiting,
+.warning {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.warning {
+  color: #e8a87c;
+}
+
+.back {
+  display: inline-block;
+  margin-top: 22px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--text);
+}
+
+.close:focus-visible,
+.back:focus-visible,
+.choices a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

@@ -1,0 +1,21 @@
+<aside class="step-panel" role="complementary" aria-label="Simulació nova">
+  <header>
+    <div>
+      <p class="step">Pas 2 de 3</p>
+      <h2>{{ chosen()?.name ?? 'Regió desconeguda' }}</h2>
+    </div>
+    <a class="close" routerLink="/peninsula" aria-label="Sortir del formulari">×</a>
+  </header>
+
+  @if (chosen(); as region) {
+    <p class="code">{{ region.id }}</p>
+    <p class="pending">
+      El pas següent demana les províncies i les illes (NUTS 3), i aquestes dades
+      encara no s'han preparat. El mapa ja enquadra la regió triada.
+    </p>
+  } @else {
+    <p class="warning">«{{ region() }}» no és cap codi de regió.</p>
+  }
+
+  <a class="back" routerLink="/simulacio">← Tornar a les regions</a>
+</aside>

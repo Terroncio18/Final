@@ -1,0 +1,11 @@
+<div class="map-shell">
+  <div #container class="map-canvas" role="application" aria-label="Mapa"></div>
+
+  <div class="map-loading" [class.is-hidden]="ready()" role="status" aria-live="polite">
+    <span class="map-loading-ring" aria-hidden="true"></span>
+    <p>Carregant el mapa…</p>
+    <small>Imatgeria d'Esri · relleu de Mapzen</small>
+  </div>
+
+  <router-outlet />
+</div>

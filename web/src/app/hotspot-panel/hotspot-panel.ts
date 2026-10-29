@@ -16,6 +16,20 @@ const CONFIDENCE: Record<string, string> = {
 };
 
 /**
+ * Where the power bands fall, in megawatts.
+ *
+ * Chosen here and nowhere else: there is no standard threshold of radiative
+ * power that separates a wildfire from a stubble burn, because the measurement
+ * does not know what is burning. They describe the reading and claim nothing
+ * about the fire, which is why the labels name the power and not the kind.
+ *
+ * Provisional: an October sample tops out below 60 MW, which is too narrow to
+ * calibrate the upper band. Worth revisiting against a summer one.
+ */
+const MODERATE_MW = 5;
+const HIGH_MW = 50;
+
+/**
  * What a single detection says.
  *
  * One detection, not one fire: the three VIIRS platforms see the same fire on
@@ -57,6 +71,18 @@ export class HotspotPanel {
   });
 
   protected readonly moment = computed(() => (this.hotspot().daynight === 'N' ? 'nit' : 'dia'));
+
+  /** One decimal: FIRMS reports two, and the second claims a precision the measurement has not got. */
+  protected readonly power = computed(() =>
+    new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 }).format(this.hotspot().frp),
+  );
+
+  protected readonly band = computed(() => {
+    const frp = this.hotspot().frp;
+    if (frp >= HIGH_MW) return 'alta';
+    if (frp >= MODERATE_MW) return 'moderada';
+    return 'baixa';
+  });
 
   /** Five decimals is about a metre: more would pretend to a precision the 375 m pixel does not have. */
   protected readonly coordinates = computed(() => {

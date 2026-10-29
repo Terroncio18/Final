@@ -4,8 +4,14 @@
     <button type="button" class="close" (click)="closed.emit()" aria-label="Tancar">×</button>
   </header>
 
-  <p class="frp"><strong>{{ hotspot().frp }}</strong> MW</p>
-  <p class="frp-note">Potència radiativa del foc</p>
+  <p class="frp">
+    <strong>{{ power() }}</strong> MW <span class="band">· potència {{ band() }}</span>
+  </p>
+  <p class="frp-note">
+    Potència radiativa: l'energia que el foc emet com a radiació en el moment en què el
+    satèl·lit hi passa. Indica la intensitat del foc en aquest píxel de 375 m, no la seva
+    extensió, i no diu què és el que crema.
+  </p>
 
   <dl>
     <dt>Observació</dt>
@@ -25,5 +31,5 @@
   </dl>
 
   <button type="button" class="simulate" disabled>Crear-hi una simulació</button>
-  <p class="note">El flux de simulació encara no existeix.</p>
+  <p class="note">Caldrà el municipi de la detecció, que encara no hi és.</p>
 </aside>

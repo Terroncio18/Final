@@ -1,0 +1,37 @@
+<aside class="step-panel" role="complementary" aria-label="Simulació nova">
+  <header>
+    <div>
+      <p class="step">Pas 1 de 3</p>
+      <h2>Tria una regió</h2>
+    </div>
+    <a class="close" routerLink="/peninsula" aria-label="Sortir del formulari">×</a>
+  </header>
+
+  @if (failed()) {
+    <p class="warning">No s'han pogut llegir els límits administratius.</p>
+  } @else if (!groups().length) {
+    <p class="waiting">Carregant les regions…</p>
+  } @else {
+    <!-- The outline is cleared on leaving the whole list and not each row, so
+         moving between rows never blinks through an empty frame. -->
+    <div (mouseleave)="focus(null)">
+      @for (group of groups(); track group.code) {
+        <h3>{{ group.label }}</h3>
+        <ul class="choices">
+          @for (region of group.regions; track region.id) {
+            <li>
+              <a
+                [routerLink]="['/simulacio', region.id]"
+                (mouseenter)="focus(region.id)"
+                (focus)="focus(region.id)"
+              >
+                <span>{{ region.name }}</span>
+                <small>{{ region.id }}</small>
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  }
+</aside>

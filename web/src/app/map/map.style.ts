@@ -6,6 +6,7 @@ import {
   HOTSPOTS_URL,
   IMAGERY_ATTRIBUTION,
   IMAGERY_TILES,
+  REGIONS_URL,
 } from './map.config';
 
 /** Layer ids the rest of the app refers to. Later layers are inserted above these. */
@@ -15,6 +16,8 @@ export const LAYERS = {
   hillshade: 'hillshade',
   regionsFill: 'regions-fill',
   regionsLine: 'regions-line',
+  regionFocusFill: 'region-focus-fill',
+  regionFocusLine: 'region-focus-line',
   hotspots: 'hotspots',
 } as const;
 
@@ -50,7 +53,7 @@ export function buildStyle(): StyleSpecification {
       },
       [REGIONS_SOURCE]: {
         type: 'geojson',
-        data: 'data/regions.geojson',
+        data: REGIONS_URL,
         attribution: 'Límits: Eurostat GISCO, NUTS 2024',
       },
       [HOTSPOTS_SOURCE]: {
@@ -100,6 +103,37 @@ export function buildStyle(): StyleSpecification {
           'line-color': '#b9cddb',
           'line-width': 1,
           'line-opacity': 0.55,
+        },
+      },
+      {
+        // The region under the pointer, or the one already chosen.
+        //
+        // Its own pair of layers instead of an expression over the ones above:
+        // swapping a filter is among the cheapest things MapLibre does, which
+        // is what lets the outline follow a pointer down a list of 24 without
+        // stuttering, and it leaves the paint a constant that reads at a glance.
+        //
+        // White and not the accent: over the imagery orange means fire, and a
+        // border that borrows that colour would say something it does not mean.
+        id: LAYERS.regionFocusFill,
+        type: 'fill',
+        source: REGIONS_SOURCE,
+        // An empty code matches no feature: this is how «nothing» is drawn.
+        filter: ['==', ['get', 'id'], ''],
+        paint: { 'fill-color': '#e6eaee', 'fill-opacity': 0.1 },
+      },
+      {
+        // The outline carries the weight, not the fill. A fill bright enough to
+        // be noticed would wash out the terrain underneath, which is the one
+        // thing the user is here to look at.
+        id: LAYERS.regionFocusLine,
+        type: 'line',
+        source: REGIONS_SOURCE,
+        filter: ['==', ['get', 'id'], ''],
+        paint: {
+          'line-color': '#f4f8fb',
+          'line-width': 2.5,
+          'line-opacity': 0.95,
         },
       },
       {

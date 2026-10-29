@@ -4,12 +4,13 @@ import {
   MapLibreMap,
   ScaleControl,
   setWorkerUrl,
+  type LngLatBoundsLike,
   type MapGeoJSONFeature,
   type MapMouseEvent,
 } from 'maplibre-gl';
 
 import type { Hotspot } from './hotspot';
-import { VIEWS, type ViewId } from './map.config';
+import { INITIAL_VIEW, VIEWS, type ViewId } from './map.config';
 import { buildStyle, LAYERS } from './map.style';
 
 /**
@@ -22,6 +23,17 @@ setWorkerUrl(new URL('maplibre-gl-worker.mjs', document.baseURI).href);
 
 /** Framing is the same at every level; only the animation changes. */
 const FIT = { padding: 24 } as const;
+
+/**
+ * The same framing with the side panel taken into account.
+ *
+ * The canvas fills the window and the panel sits over it, so a plain fit
+ * centres what it frames under the panel and hides a third of it. 320 px is the
+ * panel's width in the stylesheets, plus the usual margin.
+ */
+const FIT_BESIDE_PANEL = {
+  padding: { top: 24, right: 320 + 24, bottom: 24, left: 24 },
+} as const;
 
 /** Half the side of the click target, in pixels. */
 const HIT_SLOP = 2;
@@ -51,6 +63,19 @@ function toHotspot(feature: MapGeoJSONFeature): Hotspot {
 export class MapService {
   private instance: MapLibreMap | null = null;
 
+  /**
+   * Work that needs the map and its loaded style, kept until both exist.
+   *
+   * The order is awkward and not accidental: MapShell creates the map in
+   * afterNextRender, which Angular runs *after* the first change detection, so
+   * a child's effect asking for a framing arrives before there is a map to
+   * frame. Queueing it here is simpler than making every caller wait.
+   */
+  private readonly queued: ((map: MapLibreMap) => void)[] = [];
+
+  /** Whether the camera has been placed yet. See goToBounds and create(). */
+  private framed = false;
+
   /** False until the style has loaded and the first view is framed. */
   readonly ready = signal(false);
 
@@ -62,11 +87,20 @@ export class MapService {
    */
   readonly selected = signal<Hotspot | null>(null);
 
+  /**
+   * The scope the camera is on.
+   *
+   * The form reads it so that opening it does not change territory: the user
+   * has already said which map they are looking at with the header's toggle,
+   * and asking again would be the step §2.18 does away with.
+   */
+  readonly scope = signal<ViewId>(INITIAL_VIEW);
+
   get map(): MapLibreMap | null {
     return this.instance;
   }
 
-  create(container: HTMLElement, initialView: ViewId): void {
+  create(container: HTMLElement): void {
     if (this.instance) return;
 
     const map = new MapLibreMap({
@@ -124,10 +158,18 @@ export class MapService {
       map.getCanvas().style.cursor = over ? 'pointer' : '';
     });
 
-    // The opening frame is not an animation: there is nothing to travel from.
+    // Framing and filtering both need the layers to exist, so nothing that was
+    // queued can run before this point.
     map.once('styledata', () => {
-      map.fitBounds(VIEWS[initialView].bounds, { ...FIT, duration: 0 });
-      this.showRegionsFor(initialView);
+      // The borders start on the default scope and whoever is on screen may
+      // then narrow them, which is why this goes first and the queue second.
+      this.showRegionsFor(INITIAL_VIEW);
+      for (const run of this.queued.splice(0)) run(map);
+
+      // The camera is decided by whoever is on screen. A view that decides
+      // nothing —the first step of the form, opened directly— would be left on
+      // the placeholder camera above, so it falls back to the default framing.
+      if (!this.framed) this.goToView(INITIAL_VIEW);
     });
 
     const reveal = () => this.ready.set(true);
@@ -139,9 +181,28 @@ export class MapService {
     this.instance = map;
   }
 
-  /** Moves to one of the fixed scope framings. Ignored until the map exists. */
-  goToView(view: ViewId): void {
-    this.instance?.fitBounds(VIEWS[view].bounds, { ...FIT, duration: 900 });
+  /** Frames one of the two fixed scope views. */
+  goToView(view: ViewId, clearOfPanel = false): void {
+    this.scope.set(view);
+    this.goToBounds(VIEWS[view].bounds, clearOfPanel);
+  }
+
+  /**
+   * Frames any extent: a scope, a region, later a province or a municipality.
+   *
+   * The first framing is instant and the rest animate. On opening there is
+   * nothing to travel from and a flight out of the placeholder camera reads as
+   * a glitch, while later on the movement is what makes the change legible.
+   *
+   * `clearOfPanel` is for the steps of the form, which always have a panel
+   * open over the right of the canvas.
+   */
+  goToBounds(bounds: LngLatBoundsLike, clearOfPanel = false): void {
+    this.withStyle((map) => {
+      const fit = clearOfPanel ? FIT_BESIDE_PANEL : FIT;
+      map.fitBounds(bounds, { ...fit, duration: this.framed ? 900 : 0 });
+      this.framed = true;
+    });
   }
 
   /**
@@ -151,15 +212,59 @@ export class MapService {
    * data, so switching scope costs nothing: no refetch, no new source.
    */
   showRegionsFor(scope: ViewId): void {
-    const map = this.instance;
-    if (!map) return;
-    const filter = ['==', ['get', 'scope'], scope] as never;
-    map.setFilter(LAYERS.regionsFill, filter);
-    map.setFilter(LAYERS.regionsLine, filter);
+    this.withStyle((map) => {
+      const filter = ['==', ['get', 'scope'], scope] as never;
+      map.setFilter(LAYERS.regionsFill, filter);
+      map.setFilter(LAYERS.regionsLine, filter);
+    });
+  }
+
+  /**
+   * Picks out one region, or none.
+   *
+   * A filter and nothing else, because the focus layers carry fixed paint. That
+   * is what makes it cheap enough to follow a pointer down a list: no paint
+   * property is recomputed and no expression is rebuilt.
+   */
+  focusRegion(id: string | null): void {
+    this.withStyle((map) => {
+      const filter = ['==', ['get', 'id'], id ?? ''] as never;
+      map.setFilter(LAYERS.regionFocusFill, filter);
+      map.setFilter(LAYERS.regionFocusLine, filter);
+    });
+  }
+
+  /**
+   * Hides the detections, or brings them back.
+   *
+   * Hiding also stops them being clickable, with no second code path:
+   * `queryRenderedFeatures` does not return features from a hidden layer, so
+   * featureAt() finds nothing and no panel can open behind the form.
+   */
+  setHotspotsVisible(visible: boolean): void {
+    this.withStyle((map) =>
+      map.setLayoutProperty(LAYERS.hotspots, 'visibility', visible ? 'visible' : 'none'),
+    );
   }
 
   clearSelection(): void {
     this.selected.set(null);
+  }
+
+  /**
+   * Runs work that needs the map and its style, now or as soon as it can.
+   *
+   * `fitBounds` against a container the layout has not sized yet, and
+   * `setFilter` against a layer that does not exist, both fail quietly, so
+   * everything that touches the style goes through here.
+   */
+  private withStyle(run: (map: MapLibreMap) => void): void {
+    const map = this.instance;
+    if (map?.isStyleLoaded()) {
+      run(map);
+      return;
+    }
+    this.queued.push(run);
   }
 
   /**
@@ -188,6 +293,8 @@ export class MapService {
   destroy(): void {
     this.instance?.remove();
     this.instance = null;
+    this.queued.length = 0;
+    this.framed = false;
     this.ready.set(false);
     this.selected.set(null);
   }

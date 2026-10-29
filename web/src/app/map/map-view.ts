@@ -1,37 +1,23 @@
-import {
-  afterNextRender,
-  Component,
-  computed,
-  DestroyRef,
-  effect,
-  ElementRef,
-  inject,
-  input,
-  viewChild,
-} from '@angular/core';
+import { Component, computed, effect, inject, input } from '@angular/core';
 
 import { HotspotPanel } from '../hotspot-panel/hotspot-panel';
 import { INITIAL_VIEW, VIEWS, type ViewId } from './map.config';
 import { MapService } from './map.service';
 
 /**
- * The map surface.
+ * The overview: active detections over a fixed framing.
  *
- * The component owns only the container element and the camera's connection to
- * the URL. Creating and destroying the map belongs to MapService, so later
- * views can reach the same instance.
+ * The map itself belongs to MapShell, which outlives this component. All this
+ * one does is tie the `:scope` segment to the camera and show the panel of
+ * whichever detection has been clicked.
  */
 @Component({
   selector: 'app-map-view',
   imports: [HotspotPanel],
   templateUrl: './map-view.html',
-  styleUrl: './map-view.css',
 })
 export class MapView {
   private readonly maps = inject(MapService);
-
-  // The element MapLibre takes over. Required: the template always renders it.
-  private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
   // The `:scope` route parameter, bound by withComponentInputBinding().
   readonly scope = input<string>();
@@ -42,28 +28,16 @@ export class MapView {
     return raw !== undefined && raw in VIEWS ? (raw as ViewId) : INITIAL_VIEW;
   });
 
-  protected readonly ready = this.maps.ready;
   protected readonly selected = this.maps.selected;
 
   constructor() {
-    // The first value is handled by create(), which frames it without animating.
-    let opening = true;
-
+    // Runs before the map exists on a cold load, which is why MapService keeps
+    // the work and replays it once the style is in.
     effect(() => {
       const view = this.view();
-      if (opening) {
-        opening = false;
-        return;
-      }
       this.maps.goToView(view);
       this.maps.showRegionsFor(view);
     });
-
-    // afterNextRender runs once the DOM exists, and only in the browser, which
-    // is exactly what MapLibre needs. A plain constructor would be too early.
-    afterNextRender(() => this.maps.create(this.container().nativeElement, this.view()));
-
-    inject(DestroyRef).onDestroy(() => this.maps.destroy());
   }
 
   protected clearSelection(): void {

@@ -3,7 +3,7 @@
 Registre de **decisions preses**: què s'ha decidit i per quins motius. Material
 de base per a la memòria del TFG.
 
-Darrera actualització: 25 d'octubre de 2026.
+Darrera actualització: 29 d'octubre de 2026.
 
 ---
 
@@ -230,6 +230,140 @@ color alhora. Motius:
 - `circle-sort-key` pel FRP, de manera que en un encavalcament guanya la marca
   més potent i no la que el servidor hagi enviat l'última.
 
+### 2.17. La potència es presenta per trams, i no es diu què crema
+
+El panell d'una detecció escriu «1,2 MW · potència baixa» i explica què és
+aquesta xifra. En cap cas diu si allò que crema és un rostoll o un bosc. Motius:
+
+- La potència radiativa mesura l'energia que el foc emet **com a radiació**, que
+  és una fracció de la que allibera la combustió, dins d'un píxel de 375 m i en
+  l'instant del pas del satèl·lit. És una mesura d'intensitat, no de mida.
+- I sobretot no sap què crema: un rostoll i una pineda que emetin igual es
+  llegeixen igual. Etiquetar un focus de 2 MW com a «crema agrícola» seria una
+  inferència treta de l'època de l'any disfressada de mesura. Això ho dirà la
+  coberta del sòl (MFE25, COS); fins llavors, no es diu.
+- Per això l'etiqueta anomena la potència —baixa, moderada, alta— i el text del
+  costat diu què indica i què no.
+- Els talls, 5 i 50 MW, són de presentació i els fixa aquest treball: **no hi ha
+  cap llindar normalitzat de FRP** que separi un incendi forestal d'una crema
+  agrícola, precisament perquè la mesura no distingeix el combustible.
+- El tram alt està mal calibrat i se sap: les mostres de tardor no hi arriben.
+  El 25/10/2026 el màxim de l'àmbit van ser 56,7 MW i el 29/10/2026, amb 96
+  deteccions, cap no va passar de 4,21. Cal revisar-ho contra una mostra d'estiu.
+
+---
+
+### 2.18. La jerarquia és única i la donen els NUTS
+
+Els tres passos de §2.10 valen per a tot l'àmbit: **regió** (NUTS 2) →
+**província o illa** (NUTS 3) → **municipi** (LAU). Península, Balears i Canàries
+no són un primer pas, i Espanya i Portugal tampoc: el país és un encapçalament
+dins la llista i l'enquadrament es deriva del que s'ha triat. Motius:
+
+- Al nivell 3, Balears i Canàries ja són illes (§2.7), de manera que «illa i
+  municipi» i «NUTS 3 i municipi» són el mateix pas amb dos noms.
+- Triar «Illes Balears» ja fixa país i comunitat: preguntar-ho abans són dos
+  passos que només existeixen per saltar-se'ls.
+- Una sola forma és un sol joc de components i un sol conjunt de rutes. Amb
+  branques de fondària diferent n'hi hauria dues per mantenir.
+- El commutador Península / Illes Canàries de la capçalera ja diu quin mapa mira
+  l'usuari quan obre el formulari, de manera que tornar a preguntar el territori
+  seria repetir una tria ja feta.
+
+Descartada l'alternativa plantejada el 25/10/2026: primer Península Ibèrica,
+Balears o Canàries, i per la banda peninsular Espanya o Portugal → comunitat →
+província → municipi. Guanyava una primera pantalla de tres botons en lloc d'una
+llista de 24 entrades i deixava l'àmbit ibèric dit en veu alta, però a canvi de
+cinc nivells per una banda i tres per l'altra, i duplicava informació que el codi
+NUTS ja porta a dins.
+
+### 2.19. La jerarquia viatja a la URL, i amb codis
+
+Un segment per pas, i el punt d'ignició al final:
+`/simulacio/ES51/ES511/08193/@2.47,41.68`. Motius:
+
+- Una simulació sencera és un enllaç: es pot compartir, desar i obrir on eres.
+  Davant d'un tribunal això es demostra en deu segons.
+- El botó enrere desfà un pas en lloc de treure't del formulari sencer.
+- El codi és la clau amb què s'uneixen les dades i és estable; el nom llegible
+  va a la interfície. A més, no pren cap posició sobre com s'han d'anomenar els
+  nivells portuguesos, de manera que la pendent 3.4 no bloqueja la navegació.
+- El punt d'ignició anirà en ordre longitud-latitud, el de GeoJSON i el de
+  MapLibre. Barrejar els dos ordres dins d'un mateix projecte és d'on surten
+  els errors de coordenades invertides.
+
+Descartat guardar l'estat al component amb una sola ruta `/simulacio`. És més
+barat d'escriure, però no hi ha res compartible, el botó enrere se salta tot el
+formulari i es perd l'argument de §2.11.
+
+### 2.20. El mapa viu per sobre de les rutes
+
+`MapShell` ocupa una ruta de camí buit, que casa amb qualsevol URL de sota, i
+és l'únic lloc on es crea el mapa. Els passos són fills seus i només hi dibuixen
+el panell a sobre. Motius:
+
+- El mapa és un context WebGL i un estil amb quatre fonts. Refer-lo a cada pas
+  deixaria la pantalla en blanc un segon cada vegada. §2.11 ho deia per als
+  àmbits; amb la jerarquia a la URL val per a tots els nivells.
+- Els passos són germans i no niats: cada un és un panell diferent, no un
+  panell a dins d'un altre.
+- L'enquadrament dels passos reserva l'amplada del panell. El llenç ocupa tota
+  la finestra i el panell hi va a sobre, de manera que sense aquesta reserva un
+  terç del que s'enquadra queda amagat.
+
+Parany que ha calgut resoldre: el mapa es crea a `afterNextRender`, que Angular
+executa *després* de la primera detecció de canvis, i un fill que demana
+enquadrament hi arriba abans que hi hagi mapa. `MapService` guarda la feina i la
+repeteix quan l'estil hi és.
+
+### 2.21. Durant el formulari, els focus s'apaguen
+
+Mentre es prepara una simulació la capa de deteccions no es dibuixa, i torna en
+sortir del formulari: pel botó de tancar, pel botó enrere del navegador o
+perquè s'ha acabat. Motius:
+
+- Durant el formulari el mapa respon una altra pregunta. Ensenya límits
+  administratius i el que es tria és un territori, no on crema.
+- Les marques convidaven a clicar una cosa que el formulari no sap contestar,
+  perquè el panell de detecció només existeix a la portada: era la pendent 3.12.
+- Amagar la capa també apaga els clics sense cap segon camí de codi:
+  `queryRenderedFeatures` no retorna res d'una capa amagada.
+- Ho governa un sol component, `SimulationFlow`, que no dibuixa res i existeix
+  precisament per tenir una vida pròpia: apaga en néixer i encén en morir, de
+  manera que cap pas se n'ha de recordar ni pot deixar-s'ho.
+
+Descartat deixar-los visibles, que és com es va escriure primer. Ensenyar on hi
+ha foc mentre es tria la regió és informatiu, però la contrapartida és un mapa
+que crida enmig d'un formulari i un clic que no fa res.
+
+### 2.22. La regió es ressalta en assenyalar-la, i no parpelleja
+
+Assenyalar una fila de la llista —amb el rató o amb el tabulador— dibuixa el
+contorn de la regió al mapa a l'instant, i es queda mentre s'hi assenyali.
+Sense transició i sense pampallugues. Motius:
+
+- En un mapa d'incendis, el que parpelleja vol dir foc. El parpelleig és
+  vocabulari d'alarma, i donar-lo a un gest de navegació diria una cosa que no
+  és, just amb el llenguatge que la portada fa servir per a una altra.
+- Contradiria una decisió ja presa: l'anell de càrrega respecta
+  `prefers-reduced-motion` perquè girar és un disparador vestibular per a
+  algunes persones. La WCAG, a més, limita el que destella i exigeix poder-ho
+  aturar.
+- La sensació de resposta directa la dona la immediatesa, no el moviment. Una
+  fosa de 150 ms en un `hover` es percep com a lentitud; el canvi sec es percep
+  com que el mapa obeeix.
+- El teclat fa exactament el mateix que el rató. El `canvas` és
+  `tabindex="-1"` per `interactive: false` (§4), de manera que la llista és
+  l'única via que queda a qui no fa servir ratolí.
+
+Com està fet: una parella de capes pròpies amb un filtre que no casa amb res
+fins que hi ha regió. Canviar un filtre és de les operacions més barates de
+MapLibre, i això és el que permet seguir el punter per una llista de 24 sense
+entrebancs. El contorn és blanc i no del color d'accent, perquè sobre
+imatgeria el taronja vol dir foc. I el pes el porta la línia: un farciment prou
+viu per notar-se taparia el terreny, que és justament el que s'ha vingut a
+mirar.
+
 ---
 
 ## 3. Decisions pendents
@@ -244,11 +378,9 @@ color alhora. Motius:
 - **3.4. Com anomenar la jerarquia a Portugal.** Els NUTS 2 i 3 portuguesos són
   regions estadístiques, no comunitats ni províncies, i els seus 18 districtes
   —amb què treballa l'ICNF— no hi surten.
-- **3.5. Cremes agrícoles i incendis.** Com no presentar una detecció de 0,5 MW
-  com si fos un incendi forestal: llindar de FRP, etiqueta per potència, o totes
-  dues. Les dades del 25/10/2026 diuen que no és un cas de vora: de 195
-  deteccions, 147 queden per sota dels 5 MW i la mediana és de 2,1 MW, amb un
-  màxim de 56,7. Tres quartes parts del que avui mostra la portada són rostolls.
+- ~~**3.5. Cremes agrícoles i incendis.**~~ Resolta el 29/10/2026: etiqueta per
+  potència i cap afirmació sobre què crema (§2.17). Res no es filtra. Distingir
+  rostoll de bosc queda per quan hi hagi coberta del sòl (MFE25, COS).
 - **3.6. Terreny 3D a la vista de simulació.** Activable i no obligatori, perquè
   drapejar el `CustomLayer` sobre una malla de terreny és més feina que pintar-lo
   sobre un pla.
@@ -274,6 +406,13 @@ color alhora. Motius:
     Victoria— perquè GISCO a 1:3 M retalla la línia de costa. El marge no
     deixa entrar res africà: Ceuta i Melilla no són al fitxer i l'Estret fa
     14 km.
+- **3.11. La llengua dels noms de regió.** GISCO dona el nom oficial de cada
+  regió, de manera que una interfície en català llista «Cataluña», «País Vasco»
+  i «Illes Balears» de cop. Germana de la 3.4.
+- ~~**3.12. Clicar una detecció amb el formulari obert.**~~ Resolta el
+  29/10/2026: durant el formulari la capa s'apaga i no hi ha clic possible
+  (§2.21). Que una detecció porti directament al seu municipi —la unió entre
+  els dos camins cap a la simulació— passa a ser una millora, no un forat.
   - Etiquetar i no descartar: una propietat `region` a cada detecció i un
     `filter: ['has', 'region']` a la capa. Tornar a mostrar-les és una línia,
     es pot dir quantes se'n descarten, i el nom de la regió és justament el que
