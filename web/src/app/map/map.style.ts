@@ -1,5 +1,7 @@
-import type { StyleSpecification } from 'maplibre-gl';
+import type { FeatureCollection } from 'geojson';
+import type { FilterSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl';
 import {
+  BOUNDARIES_ATTRIBUTION,
   DEM_ATTRIBUTION,
   DEM_MAX_ZOOM,
   DEM_TILES,
@@ -18,12 +20,116 @@ export const LAYERS = {
   regionsLine: 'regions-line',
   regionFocusFill: 'region-focus-fill',
   regionFocusLine: 'region-focus-line',
+  provincesLine: 'provinces-line',
+  provinceFocusFill: 'province-focus-fill',
+  provinceFocusLine: 'province-focus-line',
+  municipalitiesLine: 'municipalities-line',
+  municipalityFocusFill: 'municipality-focus-fill',
+  municipalityFocusLine: 'municipality-focus-line',
   hotspots: 'hotspots',
+  ignitionHalo: 'ignition-halo',
+  ignitionDot: 'ignition-dot',
 } as const;
 
 export const DEM_SOURCE = 'terrain-dem';
 export const REGIONS_SOURCE = 'regions';
+export const PROVINCES_SOURCE = 'provinces';
+export const MUNICIPALITIES_SOURCE = 'municipalities';
+export const IGNITION_SOURCE = 'ignition';
+
+/** No point yet. The source has to exist from the start to be drawn into. */
+const NO_POINT: FeatureCollection = { type: 'FeatureCollection', features: [] };
 export const HOTSPOTS_SOURCE = 'hotspots';
+
+/** An empty code matches no feature: this is how «nothing focused» is drawn. */
+const NOTHING: FilterSpecification = ['==', ['get', 'id'], ''];
+
+/**
+ * The outline of whatever is being pointed at, shared by both steps so they
+ * cannot drift apart.
+ *
+ * White and not the accent: over the imagery orange means fire, and a border
+ * that borrowed that colour would say something it does not mean. The line
+ * carries the weight, because a fill bright enough to be noticed would wash out
+ * the terrain, which is the one thing the user is here to look at.
+ */
+const FOCUS_FILL = { 'fill-color': '#e6eaee', 'fill-opacity': 0.1 } as const;
+const FOCUS_LINE = {
+  'line-color': '#f4f8fb',
+  'line-width': 2.5,
+  'line-opacity': 0.95,
+} as const;
+
+/** The borders of the level below, drawn as faintly as the regions above them. */
+const SUBDIVISION_LINE = {
+  'line-color': '#b9cddb',
+  'line-width': 1,
+  'line-opacity': 0.55,
+} as const;
+
+/**
+ * The province layers, added to the style the first time a step needs them.
+ *
+ * Built here and not in the service so that every layer of the map is declared
+ * in one file, whether it opens with the style or arrives later.
+ */
+/**
+ * The municipality layers, added the first time a step needs them.
+ *
+ * Unlike the provinces, the source holds one province's worth at a time and is
+ * swapped with setData, so the border layer needs no filter: everything in the
+ * source belongs to the province on screen.
+ */
+export function buildMunicipalityLayers(): LayerSpecification[] {
+  return [
+    {
+      id: LAYERS.municipalitiesLine,
+      type: 'line',
+      source: MUNICIPALITIES_SOURCE,
+      paint: { ...SUBDIVISION_LINE },
+    },
+    {
+      id: LAYERS.municipalityFocusFill,
+      type: 'fill',
+      source: MUNICIPALITIES_SOURCE,
+      filter: NOTHING,
+      paint: { ...FOCUS_FILL },
+    },
+    {
+      id: LAYERS.municipalityFocusLine,
+      type: 'line',
+      source: MUNICIPALITIES_SOURCE,
+      filter: NOTHING,
+      paint: { ...FOCUS_LINE },
+    },
+  ];
+}
+
+export function buildProvinceLayers(): LayerSpecification[] {
+  return [
+    {
+      id: LAYERS.provincesLine,
+      type: 'line',
+      source: PROVINCES_SOURCE,
+      filter: NOTHING,
+      paint: { ...SUBDIVISION_LINE },
+    },
+    {
+      id: LAYERS.provinceFocusFill,
+      type: 'fill',
+      source: PROVINCES_SOURCE,
+      filter: NOTHING,
+      paint: { ...FOCUS_FILL },
+    },
+    {
+      id: LAYERS.provinceFocusLine,
+      type: 'line',
+      source: PROVINCES_SOURCE,
+      filter: NOTHING,
+      paint: { ...FOCUS_LINE },
+    },
+  ];
+}
 
 /**
  * A flat map with relief read off the DEM, rather than a 3D terrain mesh.
@@ -54,13 +160,14 @@ export function buildStyle(): StyleSpecification {
       [REGIONS_SOURCE]: {
         type: 'geojson',
         data: REGIONS_URL,
-        attribution: 'Límits: Eurostat GISCO, NUTS 2024',
+        attribution: BOUNDARIES_ATTRIBUTION,
       },
       [HOTSPOTS_SOURCE]: {
         type: 'geojson',
         data: HOTSPOTS_URL,
         attribution: 'Focus: NASA FIRMS (VIIRS 375 m)',
       },
+      [IGNITION_SOURCE]: { type: 'geojson', data: NO_POINT },
     },
     layers: [
       {
@@ -99,42 +206,27 @@ export function buildStyle(): StyleSpecification {
         id: LAYERS.regionsLine,
         type: 'line',
         source: REGIONS_SOURCE,
-        paint: {
-          'line-color': '#b9cddb',
-          'line-width': 1,
-          'line-opacity': 0.55,
-        },
+        paint: { ...SUBDIVISION_LINE },
       },
       {
-        // The region under the pointer, or the one already chosen.
+        // The region under the pointer.
         //
         // Its own pair of layers instead of an expression over the ones above:
         // swapping a filter is among the cheapest things MapLibre does, which
         // is what lets the outline follow a pointer down a list of 24 without
         // stuttering, and it leaves the paint a constant that reads at a glance.
-        //
-        // White and not the accent: over the imagery orange means fire, and a
-        // border that borrows that colour would say something it does not mean.
         id: LAYERS.regionFocusFill,
         type: 'fill',
         source: REGIONS_SOURCE,
-        // An empty code matches no feature: this is how «nothing» is drawn.
-        filter: ['==', ['get', 'id'], ''],
-        paint: { 'fill-color': '#e6eaee', 'fill-opacity': 0.1 },
+        filter: NOTHING,
+        paint: { ...FOCUS_FILL },
       },
       {
-        // The outline carries the weight, not the fill. A fill bright enough to
-        // be noticed would wash out the terrain underneath, which is the one
-        // thing the user is here to look at.
         id: LAYERS.regionFocusLine,
         type: 'line',
         source: REGIONS_SOURCE,
-        filter: ['==', ['get', 'id'], ''],
-        paint: {
-          'line-color': '#f4f8fb',
-          'line-width': 2.5,
-          'line-opacity': 0.95,
-        },
+        filter: NOTHING,
+        paint: { ...FOCUS_LINE },
       },
       {
         // One mark per detection, not per fire: the three VIIRS platforms see
@@ -173,6 +265,32 @@ export function buildStyle(): StyleSpecification {
           'circle-stroke-width': 1,
           'circle-stroke-color': '#2b1403',
           'circle-stroke-opacity': 0.8,
+        },
+      },
+      {
+        // The ignition point, last of all so nothing can cover it. Two layers
+        // because one dot is hard to find again over a photograph: the ring
+        // says where to look and the dot says exactly where.
+        id: LAYERS.ignitionHalo,
+        type: 'circle',
+        source: IGNITION_SOURCE,
+        paint: {
+          'circle-radius': 13,
+          'circle-color': 'transparent',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ff7a3c',
+          'circle-stroke-opacity': 0.85,
+        },
+      },
+      {
+        id: LAYERS.ignitionDot,
+        type: 'circle',
+        source: IGNITION_SOURCE,
+        paint: {
+          'circle-radius': 4,
+          'circle-color': '#ff7a3c',
+          'circle-stroke-width': 1.5,
+          'circle-stroke-color': '#2b1403',
         },
       },
     ],

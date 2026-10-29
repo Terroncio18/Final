@@ -1,0 +1,33 @@
+<aside class="step-panel" role="complementary" aria-label="Simulació nova">
+  <div class="panel-head">
+    <a class="back" [routerLink]="['/simulacio', region(), province()]">← Nivell anterior</a>
+
+    <header>
+      <div>
+        <p class="step">Punt d'ignició</p>
+        <h2>{{ chosen()?.name ?? 'Municipi desconegut' }}</h2>
+      </div>
+      <a class="close" routerLink="/peninsula" aria-label="Sortir del formulari">×</a>
+    </header>
+  </div>
+
+  <div class="panel-body">
+    @if (ignition()) {
+      <p class="code">{{ coordinates() }}</p>
+      <p class="pending">
+        Latitud i longitud, en graus decimals. Són al final de l'adreça, de manera
+        que aquest enllaç torna a obrir exactament aquest punt.
+      </p>
+
+      <button type="button" class="simulate" disabled>Obrir la simulació</button>
+      <p class="note">El simulador encara no existeix.</p>
+
+      <p class="pending">Torna a fer clic al mapa per moure el punt.</p>
+    } @else {
+      <p class="pending">
+        Fes clic al mapa per marcar on comença el foc. Al voltant d'aquest punt
+        es retallarà el domini de la simulació.
+      </p>
+    }
+  </div>
+</aside>

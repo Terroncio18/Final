@@ -29,6 +29,12 @@ export class SimulationFlow {
     inject(DestroyRef).onDestroy(() => {
       maps.setHotspotsVisible(true);
       maps.focusRegion(null);
+      maps.focusProvince(null);
+      maps.showProvincesOf(null);
+      maps.focusMunicipality(null);
+      maps.setMunicipalities(null);
+      maps.setPicking(false);
+      maps.setIgnition(null);
     });
   }
 }

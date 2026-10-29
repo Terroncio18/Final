@@ -47,3 +47,6 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Baixades grans de GISCO: no van al repositori
+scripts/.cache/

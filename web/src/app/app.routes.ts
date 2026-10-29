@@ -2,6 +2,8 @@ import { Routes } from '@angular/router';
 
 import { MapShell } from './map/map-shell';
 import { MapView } from './map/map-view';
+import { IgnitionStep } from './simulation/ignition-step';
+import { MunicipalityStep } from './simulation/municipality-step';
 import { ProvinceStep } from './simulation/province-step';
 import { RegionStep } from './simulation/region-step';
 import { SimulationFlow } from './simulation/simulation-flow';
@@ -14,6 +16,9 @@ import { SimulationFlow } from './simulation/simulation-flow';
  *   /simulacio              pick a region        (NUTS 2)
  *   /simulacio/ES51         pick a province or island (NUTS 3)
  *   /simulacio/ES51/ES511   pick a municipality  (LAU, to come)
+ *
+ * A parameter matches one segment, so `:region` and `:region/:province` are
+ * told apart by how many there are.
  *
  * MapShell carries an empty path, so it matches every URL under it and the
  * router never destroys it: the MapLibre instance and its WebGL context survive
@@ -38,6 +43,9 @@ export const routes: Routes = [
         children: [
           { path: '', component: RegionStep },
           { path: ':region', component: ProvinceStep },
+          { path: ':region/:province', component: MunicipalityStep },
+          { path: ':region/:province/:municipality', component: IgnitionStep },
+          { path: ':region/:province/:municipality/:point', component: IgnitionStep },
         ],
       },
       { path: ':scope', component: MapView },

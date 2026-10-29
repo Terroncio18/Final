@@ -277,6 +277,12 @@ llista de 24 entrades i deixava l'àmbit ibèric dit en veu alta, però a canvi 
 cinc nivells per una banda i tres per l'altra, i duplicava informació que el codi
 NUTS ja porta a dins.
 
+A la pantalla cada país és un desplegable tancat —un `<details>` del navegador,
+amb el nombre de regions al costat—, de manera que el primer pas són dues files
+i no una llista de vint-i-quatre amb scroll. Cap dels dos s'obre per defecte:
+obrir Espanya i deixar Portugal tancat diria en silenci de quin dels dos va
+l'aplicació, i l'àmbit ibèric és part de l'aportació (§1).
+
 ### 2.19. La jerarquia viatja a la URL, i amb codis
 
 Un segment per pas, i el punt d'ignició al final:
@@ -331,6 +337,10 @@ perquè s'ha acabat. Motius:
 - Ho governa un sol component, `SimulationFlow`, que no dibuixa res i existeix
   precisament per tenir una vida pròpia: apaga en néixer i encén en morir, de
   manera que cap pas se n'ha de recordar ni pot deixar-s'ho.
+- Sortir pel botó de tancar torna sempre a l'enquadrament per defecte,
+  Península i Balears, i no al d'on es venia. Si la càmera es quedés on l'havia
+  deixat el formulari, el commutador de la capçalera i el mapa dirien coses
+  diferents.
 
 Descartat deixar-los visibles, que és com es va escriure primer. Ensenyar on hi
 ha foc mentre es tria la regió és informatiu, però la contrapartida és un mapa
@@ -357,12 +367,146 @@ Sense transició i sense pampallugues. Motius:
   l'única via que queda a qui no fa servir ratolí.
 
 Com està fet: una parella de capes pròpies amb un filtre que no casa amb res
-fins que hi ha regió. Canviar un filtre és de les operacions més barates de
+fins que hi ha regió. El contorn és del primer pas i prou: en triar la regió
+s'apaga, perquè al pas següent la càmera ja l'enquadra i dibuixar-ne la vora
+només repetiria el que omple la pantalla. Canviar un filtre és de les
+operacions més barates de
 MapLibre, i això és el que permet seguir el punter per una llista de 24 sense
 entrebancs. El contorn és blanc i no del color d'accent, perquè sobre
 imatgeria el taronja vol dir foc. I el pes el porta la línia: un farciment prou
 viu per notar-se taparia el terreny, que és justament el que s'ha vingut a
 mirar.
+
+### 2.23. Les províncies arriben quan calen, no amb la portada
+
+El fitxer de NUTS 3 són 81 províncies i illes i 380 kB, i no entra a l'estil
+inicial del mapa: es baixa el primer cop que un pas el demana. Motius:
+
+- La portada és la pantalla que ha d'obrir-se de pressa (§2.9) i no dibuixa
+  cap província. Carregar-les-hi seria pagar 380 kB i una anàlisi de JSON al
+  fil principal just quan es veu l'aplicació per primera vegada.
+- El fitxer es baixa i s'analitza **una sola vegada per a dos usos**: qui
+  necessita la llista passa la col·lecció ja analitzada al mapa, en lloc de
+  donar-li una URL i deixar que MapLibre la torni a demanar.
+- La regió pare no es busca enlloc: un codi NUTS 3 és el seu NUTS 2 més un
+  caràcter, de manera que ES511 pertany a ES51 per construcció. Cap taula de
+  correspondències.
+
+Nou de les vint-i-quatre regions tenen una sola NUTS 3 —Madrid, Navarra,
+Astúries, Cantàbria, la Rioja, Múrcia, l'Algarve, Grande Lisboa i Setúbal—, de
+manera que el pas de vegades és una llista d'un element. Es mostra igualment i
+no se salta: una redirecció automàtica convertiria el botó enrere en una
+trampa, perquè tornar al pas el tornaria a llançar endavant tot seguit. El
+títol ho diu: «província única».
+
+A Balears i Canàries el pas dona illes —Mallorca, Menorca, Eivissa i
+Formentera; set a Canàries— que és exactament el que §2.7 buscava en triar
+NUTS 3 en lloc de províncies.
+
+Parany trobat en fer-ho: el pas demana les vores de les províncies abans que
+el fitxer que les porta hagi arribat, de manera que el filtre s'aplicava a unes
+capes que encara no existien i no feia res. El servei recorda què s'ha demanat
+i ho aplica en afegir-les, igual que fa amb la visibilitat dels focus.
+
+### 2.24. La marca ve d'un conjunt d'icones publicat
+
+La flama de la capçalera és **Material Symbols Outlined «mode_heat»**, de
+Google, amb llicència Apache 2.0, amb els eixos FILL 0, wght 400, GRAD 0 i
+opsz 24. No és una icona dibuixada per a aquest treball. Motius:
+
+- Un recurs publicat se cita: té nom, variant, llicència i URL. Una
+  il·lustració pròpia s'hauria de defensar com a part del treball, i el dibuix
+  vectorial no n'és el tema.
+- No s'instal·la `@angular/material` per una icona: el paquet porta
+  components, temes i tipografia, i el pressupost de *bundle* ja no es compleix
+  (§3.8). Tampoc `material-symbols`, que distribueix la font variable sencera.
+- El que s'incrusta al component és el traçat SVG oficial amb la citació al
+  costat. Cap dependència i la mateixa icona.
+- El color és nostre i la forma és d'ells: s'aplica l'accent pla, sense cap
+  degradat, i el traçat no es toca.
+- A la pestanya del navegador hi va la variant plena (FILL 1). A 16 px el
+  contorn buit s'omple i la silueta es perd.
+
+### 2.25. Els municipis: un fitxer per província, i a Portugal freguesies
+
+El tercer pas llegeix `data/municipalities/<NUTS3>.geojson`. Vuitanta-un
+fitxers, 13 MB en total; el més gran és Burgos amb 372 municipis i 438 kB, i el
+més petit El Hierro amb 3 i 4,7 kB. Mai es carreguen tots: quan s'obre el pas
+ja se sap quina província cal.
+
+Tres coses del fitxer de GISCO han decidit la resta:
+
+- Es publica en **un sol fitxer de 150 MB per a tota Europa**, a una sola
+  escala i sense descàrrega per país. Es baixa un cop a una memòria cau local
+  que no va al repositori; el que es commiteja és la sortida partida.
+- **No porta codi NUTS.** Els atributs són `GISCO_ID`, `CNTR_CODE`,
+  `LAU_NAME`, població, àrea i any. A Espanya el codi delataria la província
+  —ES_08193 comença pel número INE— però a Portugal el codi és districte,
+  concelho i freguesia, i les NUTS 3 portugueses no segueixen els districtes.
+  Per això els dos països es resolen igual: punt dins de polígon contra els
+  NUTS 3, amb la prova feta contra el fitxer d'1:1 M i no contra el d'1:3 M que
+  dibuixa l'aplicació, perquè les LAU també són 1:1 M i fer coincidir les
+  escales és el que evita que les unitats costaneres caiguin fora.
+- De 11.224 unitats: **11.012 assignades directament, 2 per proximitat i 212
+  fora de l'àmbit**. Les dues de proximitat —Pájara a Fuerteventura i les Valls
+  de Valira a Lleida— queden a menys de 100 m de la seva província. Les 212 són
+  exactament Açores (prefixos PT_41 a PT_49), Madeira (PT_31 i PT_32), Ceuta i
+  Melilla.
+
+Parany que va fer visible aquest darrer número: la primera versió assignava «la
+província més propera» sense cap límit, i va repartir les freguesies açorianes
+a La Palma i Ceuta a Cadis. El límit és de 0,05°, uns 5 km: prou per perdonar
+un desajust de generalització i insuficient per travessar l'Atlàntic.
+
+**LAU no és la mateixa unitat als dos països.** Espanya declara el municipi:
+8.132. Portugal declara la **freguesia**, la parròquia civil: 3.092, que
+s'agrupen en els 308 concelhos pels quatre primers dígits del codi. Es pren la
+unitat tal com la publica la font i la interfície l'anomena pel seu nom —«Tria
+un municipi» a Espanya, «Tria una freguesia» a Portugal—, perquè dir-ne
+municipi a totes dues seria afirmar una cosa falsa de mitja llista. Descartat:
+
+- Dissoldre freguesies en concelhos. GISCO no en publica el contorn i caldria
+  una unió de polígons, amb els errors de topologia que arrossega i una
+  dependència nova.
+- Agafar la CAOP de la DGT per a Portugal: dues fonts, dos criteris de
+  generalització i dues dates, just el que §2.7 evitava.
+
+La unitat administrativa serveix aquí per **trobar un lloc**, no per acotar la
+simulació: el domini es dibuixa al voltant del punt d'ignició i no segueix cap
+frontera. Que a Portugal sigui més fina no fa cap mal.
+
+### 2.26. El punt d'ignició viu a la URL
+
+Un clic al mapa escriu `@0.40354,41.63850` al final de l'adreça, i amb això es
+tanca el que §2.19 buscava: **una simulació sencera és un enllaç**. Motius i
+conseqüències:
+
+- La URL és l'únic lloc on hi ha el punt. El component no en guarda cap còpia:
+  dibuixa el que diu l'adreça. Així, obrir un enllaç i marcar-lo a mà donen
+  exactament el mateix estat, sense cap camí de codi que els pugui separar.
+- Cinc decimals, aproximadament un metre. És molt més fi que la cel·la de 30 m,
+  però costa cinc caràcters i evita que reobrir un enllaç compartit caigui en
+  una cel·la diferent de la que es va marcar.
+- No ha calgut tocar els gestos del mapa. `interactive: false` deixa passar
+  `click` igualment (§2.9), de manera que l'única diferència entre triar un
+  punt i no fer-ho és què fa el gestor amb l'esdeveniment.
+- Moure el punt **substitueix** l'entrada de l'historial en lloc d'apilar-ne
+  una: altrament el botó enrere recorreria el rastre de tots els intents en
+  lloc de tornar a la llista. La primera vegada sí que n'apila una, perquè
+  enrere ha de desfer la tria.
+- La marca són dues capes: un anell per trobar-la sobre una fotografia i un
+  punt per dir exactament on és.
+
+Dues coses que es deixen com estan, a propòsit:
+
+- **El clic no es limita al polígon del municipi.** El municipi és com s'ha
+  trobat el lloc, no una frontera de la simulació: el domini es retalla al
+  voltant del punt i no segueix cap línia administrativa (§2.25). Un clic just
+  a l'altre costat del límit, al bosc del municipi veí, sol ser el bo.
+- **No s'hi pot fer zoom.** A l'enquadrament d'un municipi un píxel són uns
+  18 m, per sota de la cel·la de 30 m, de manera que la precisió del clic no és
+  el factor que mana. Si algun dia ho és, la palanca és activar el zoom només
+  en aquest pas, no a la portada.
 
 ---
 
@@ -377,7 +521,10 @@ mirar.
   convertiria mitja illa en tallafocs.
 - **3.4. Com anomenar la jerarquia a Portugal.** Els NUTS 2 i 3 portuguesos són
   regions estadístiques, no comunitats ni províncies, i els seus 18 districtes
-  —amb què treballa l'ICNF— no hi surten.
+  —amb què treballa l'ICNF— no hi surten. El tercer nivell ja no hi entra:
+  confirmat el 29/10/2026 que a Portugal es treballa amb freguesies i que la
+  interfície les anomena pel seu nom (§2.25). Queda obert només com anomenar
+  els dos nivells de dalt, que ara la interfície escriu «regió» i «província».
 - ~~**3.5. Cremes agrícoles i incendis.**~~ Resolta el 29/10/2026: etiqueta per
   potència i cap afirmació sobre què crema (§2.17). Res no es filtra. Distingir
   rostoll de bosc queda per quan hi hagi coberta del sòl (MFE25, COS).
@@ -386,8 +533,17 @@ mirar.
   sobre un pla.
 - **3.7. Què és «un focus» en clicar.** Un episodi real dona centenars de
   deteccions de 375 m solapades i FIRMS no les agrupa en incendis.
-- **3.8. Pressupost de *bundle*.** MapLibre sol ja passa del límit per defecte
-  d'Angular (1,29 MB en cru, 300 kB per la xarxa) i `ng build` falla per això.
+- ~~**3.8. Pressupost de *bundle*.**~~ Resolta el 29/10/2026: els límits
+  passen a 1,5 MB d'avís i 1,75 MB d'error, i `ng build` ja no falla.
+  - La mesura del dia: **1,40 MB en cru i 314 kB per la xarxa**. El sòl és
+    MapLibre, uns 1,29 MB, que no depèn de res del que s'escrigui aquí; els
+    tres passos del formulari sencers van costar uns 110 kB crus i menys de
+    15 kB comprimits.
+  - Els límits nous no són un xec en blanc: encara detecten un creixement propi
+    d'uns 100 kB (avís) o 350 kB (error), que és el que es vol vigilar.
+  - El pressupost mira la mida crua i qui pateix és la comprimida, i 314 kB per
+    a una aplicació de mapes és normal. Carregar MapLibre a part queda per si
+    algun dia es mesura que l'espera de la portada molesta de debò.
 - **3.9. L'antiguitat de les dades no arriba a la pantalla.** El servidor
   publica `x-fetched-at` i `x-stale`, però la font GeoJSON la descarrega
   MapLibre pel seu compte i ningú llegeix les capçaleres. Amb deteccions NRT la
@@ -417,6 +573,11 @@ mirar.
     `filter: ['has', 'region']` a la capa. Tornar a mostrar-les és una línia,
     es pot dir quantes se'n descarten, i el nom de la regió és justament el que
     la barra lateral haurà d'escriure (§2.9).
+- ~~**3.13. L'atribució del mapa no és completa.**~~ Resolta el 29/10/2026:
+  les tres cadenes diuen ara el que demana cada proveïdor (§6). Preu que es
+  paga: els crèdits ocupen tres línies a baix a l'esquerra. Es podrien amagar
+  darrere del botó plegable, però GISCO demana que la nota sigui **visible**,
+  de manera que es queden a la vista.
   - Implica que el navegador es descarregui ell mateix la resposta en lloc de
     donar-ne la URL a MapLibre, cosa que de passada posa les capçaleres a l'abast
     i desencalla la 3.9.
@@ -435,6 +596,14 @@ Coses que han costat temps i convé no redescobrir.
   estàtic i apuntar-hi amb `setWorkerUrl()`, o el mapa no carrega res.
 - **El cel no es pot declarar dins de l'estil.** MapLibre 6 rebutja el membre
   `sky` i en rebutjar-lo tomba l'estil sencer sense avisar. Va amb `map.setSky()`.
+- **`isStyleLoaded()` no vol dir «l'estil ja hi és».** Torna fals cada vegada
+  que l'estil té canvis pendents, de manera que un `setFilter` o un
+  `setLayoutProperty` el deixen fals uns instants. Fer-lo servir per decidir si
+  el mapa està llest feia que un `fitBounds` disparat just després —sortir del
+  formulari, que apaga el ressaltat i torna els focus— es prengués per «encara
+  no hi ha mapa», s'encolés i no s'executés mai: el mapa es quedava a Canàries
+  amb la URL i el botó dient Península. La pregunta bona és si l'estil s'ha
+  carregat **alguna vegada**, i això demana una bandera pròpia.
 - **Un gestor d'`error` al mapa** val el minut que costa: totes aquestes fallades
   es manifesten igual, amb un mapa negre.
 - **Amb terreny 3D, una capa `background` no pinta el terra**, que és la malla.
@@ -484,8 +653,8 @@ Coses que han costat temps i convé no redescobrir.
 | --- | --- | --- | --- |
 | Esri World Imagery | Imatgeria | Global | En ús |
 | Mapzen Terrain Tiles | Elevació (Terrarium) | Global | En ús |
-| Eurostat GISCO — NUTS 2024 | Regions i províncies | UE | En ús (nivell 2) |
-| Eurostat GISCO — LAU 2024 | Municipis | UE | Pendent |
+| Eurostat GISCO — NUTS 2024 | Regions i províncies | UE | En ús (nivells 2 i 3) |
+| Eurostat GISCO — LAU 2024 | Municipis i freguesies | UE | En ús |
 | NASA FIRMS (VIIRS 375 m) | Focus actius | Global | En ús (1 dia) |
 | IDEIB — IV Inventari Forestal | Model de combustible | Balears | Investigada |
 | MFE25 (MITECO) | Espècies i estructura | Espanya | Pendent |
@@ -509,7 +678,60 @@ l'espècie i l'estructura, i serà la part metodològicament més discutible.
 
 ---
 
-## 6. Canvis de rumb
+## 6. Recursos de tercers i llicències
+
+Comprovat el 29/10/2026. Les llicències del programari surten del `package.json`
+instal·lat; les de les dades, de la pàgina de cada proveïdor. El que no diu la
+font es marca **per confirmar** en lloc d'endevinar-ho.
+
+| Recurs | Versió | Llicència |
+| --- | --- | --- |
+| Angular | 22.2.3 | MIT |
+| MapLibre GL JS | 6.15.0 | BSD-3-Clause |
+| RxJS | 7.8.2 | Apache-2.0 |
+| tslib | 2.8.1 | 0BSD |
+| TypeScript | 6.0.3 | Apache-2.0 |
+| Fastify | 5.12.7 | MIT |
+| pino | 10.4.0 | MIT |
+| @types/geojson | 7946.0.16 | MIT |
+| Material Symbols «mode_heat» | — | Apache-2.0 |
+
+Les dades no tenen cap llicència amb nom, i això és una troballa:
+
+| Font | Condicions | Atribució que demanen |
+| --- | --- | --- |
+| Eurostat GISCO (NUTS) | Gratuïta, ús no comercial, citant la font | Per confirmar (vegeu sota) |
+| Esri World Imagery | Esri Master License Agreement | «Esri, Vantor, Earthstar Geographics, and the GIS User Community» |
+| Mapzen / AWS Terrain Tiles | Cap llicència conjunta: cada font té la seva | Per font; a Europa, Copernicus EU-DEM |
+| NASA FIRMS | Cap llicència amb nom; dades obertes | Text d'agraïment publicat (vegeu sota) |
+
+**GISCO.** La nota de copyright «© EuroGeographics for the administrative
+boundaries» i la clàusula explícita de no comercial són a la pàgina d'*unitats
+administratives*, no a la de *NUTS*, que és d'on surten `regions.geojson` i
+`provinces.geojson`. La pàgina de NUTS no publica cap condició pròpia i la que
+hi enllaçava dona 404. Per a un TFG, que no és comercial i cita la font, no hi
+ha problema; però com que el repositori redistribueix geometria derivada, la
+via segura és afegir la nota d'EuroGeographics a l'atribució del mapa encara
+que la pàgina de NUTS no l'exigeixi.
+
+**El que diu el mapa.** Corregit el 29/10/2026 (pendent 3.13). L'atribució
+d'Esri deia «Imatgeria © Esri, Vantor, Earthstar Geographics» i es menjava el
+«and the GIS User Community» del crèdit publicat; la del relleu deia només
+«Mapzen Terrain Tiles» quan el que les fonts demanen és esmentar Copernicus
+EU-DEM i l'USGS; i la de GISCO no duia la nota d'EuroGeographics. Les tres
+cadenes viuen ara a `map.config.ts`, cadascuna amb la seva citació al costat.
+
+**FIRMS.** No hi ha llicència: NASA publica les dades obertament i demana
+aquest agraïment, que haurà d'anar a la memòria —aquí sense les URL que
+l'original hi intercala—: «We acknowledge the use of
+data and/or imagery from NASA's Fire Information for Resource Management
+System (FIRMS), part of NASA's Land, Atmosphere Near real-time Capability for
+Earth observations (LANCE) and NASA's Earth Science Data and Information
+System (ESDIS).»
+
+---
+
+## 7. Canvis de rumb
 
 | Data | De | A | Motiu |
 | --- | --- | --- | --- |

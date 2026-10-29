@@ -17,11 +17,16 @@
   text-decoration: none;
 }
 
+/* A flame, and not a rounded square with a gradient: the mark should say what
+   the application is about before the name is read. Taken from a published
+   icon set rather than drawn here, so it can be cited like any other
+   dependency. Flat accent and no gradient: the colour is ours, the shape is
+   theirs, and the two should not be confused. */
 .brand-mark {
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  background: linear-gradient(145deg, var(--accent), #d6452c);
+  width: 22px;
+  height: 22px;
+  display: block;
+  fill: var(--accent);
 }
 
 .scopes {

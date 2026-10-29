@@ -4,14 +4,25 @@ import {
   MapLibreMap,
   ScaleControl,
   setWorkerUrl,
+  type GeoJSONSource,
   type LngLatBoundsLike,
   type MapGeoJSONFeature,
   type MapMouseEvent,
 } from 'maplibre-gl';
 
+import type { FeatureCollection, Point } from 'geojson';
+
 import type { Hotspot } from './hotspot';
-import { INITIAL_VIEW, VIEWS, type ViewId } from './map.config';
-import { buildStyle, LAYERS } from './map.style';
+import { BOUNDARIES_ATTRIBUTION, INITIAL_VIEW, VIEWS, type ViewId } from './map.config';
+import {
+  buildMunicipalityLayers,
+  buildProvinceLayers,
+  buildStyle,
+  IGNITION_SOURCE,
+  LAYERS,
+  MUNICIPALITIES_SOURCE,
+  PROVINCES_SOURCE,
+} from './map.style';
 
 /**
  * MapLibre picks its worker file name at runtime, which neither Vite nor esbuild
@@ -44,8 +55,9 @@ function frpOf(feature: MapGeoJSONFeature): number {
 
 /** The position lives in the geometry; the panel should not have to parse GeoJSON. */
 function toHotspot(feature: MapGeoJSONFeature): Hotspot {
-  const { coordinates } = feature.geometry as { coordinates: [number, number] };
-  const [lon, lat] = coordinates;
+  // Narrowed to a point because the layer it comes from is a circle layer:
+  // there is nothing else it could be.
+  const [lon, lat] = (feature.geometry as Point).coordinates as [number, number];
   return { ...(feature.properties as Omit<Hotspot, 'lon' | 'lat'>), lon, lat };
 }
 
@@ -75,6 +87,27 @@ export class MapService {
 
   /** Whether the camera has been placed yet. See goToBounds and create(). */
   private framed = false;
+
+  /** True while a step is waiting for a click on the map rather than on a mark. */
+  private picking = false;
+
+  /**
+   * Where the last click while picking landed, as [lon, lat].
+   *
+   * A fresh array every time, so clicking the same place twice still counts as
+   * two answers: the value is what changed, not where it is.
+   */
+  readonly picked = signal<[number, number] | null>(null);
+
+  /** Whether the style has loaded once, which is when the layers start existing. */
+  private styled = false;
+
+  /**
+   * Whose provinces should be drawn, remembered rather than applied and
+   * forgotten: the step asks for them before the file that carries them has
+   * arrived, so the answer has to survive until the layers exist.
+   */
+  private provincesOf: string | null = null;
 
   /** False until the style has loaded and the first view is framed. */
   readonly ready = signal(false);
@@ -144,6 +177,10 @@ export class MapService {
     // click on a mark and a click on empty sea both need an answer, and asking
     // the renderer what lies under the pointer gives both at once.
     map.on('click', (event) => {
+      if (this.picking) {
+        this.picked.set([event.lngLat.lng, event.lngLat.lat]);
+        return;
+      }
       const feature = this.featureAt(event);
       this.selected.set(feature ? toHotspot(feature) : null);
     });
@@ -152,6 +189,9 @@ export class MapService {
     // mousemove fires for every pixel the pointer crosses.
     let overMark = false;
     map.on('mousemove', (event) => {
+      // While picking the whole canvas is the target, so the pointer must not
+      // keep flickering between a hand and a crosshair over the marks.
+      if (this.picking) return;
       const over = this.featureAt(event) !== null;
       if (over === overMark) return;
       overMark = over;
@@ -161,6 +201,8 @@ export class MapService {
     // Framing and filtering both need the layers to exist, so nothing that was
     // queued can run before this point.
     map.once('styledata', () => {
+      this.styled = true;
+
       // The borders start on the default scope and whoever is on screen may
       // then narrow them, which is why this goes first and the queue second.
       this.showRegionsFor(INITIAL_VIEW);
@@ -227,10 +269,95 @@ export class MapService {
    * property is recomputed and no expression is rebuilt.
    */
   focusRegion(id: string | null): void {
+    this.setFocus(LAYERS.regionFocusFill, LAYERS.regionFocusLine, id);
+  }
+
+  /** The same, one level down. Does nothing until the provinces have arrived. */
+  focusProvince(id: string | null): void {
+    this.setFocus(LAYERS.provinceFocusFill, LAYERS.provinceFocusLine, id);
+  }
+
+  /** And one further down still. */
+  focusMunicipality(id: string | null): void {
+    this.setFocus(LAYERS.municipalityFocusFill, LAYERS.municipalityFocusLine, id);
+  }
+
+  /**
+   * Puts one province's municipalities on the map, or takes them off.
+   *
+   * The source is swapped rather than added again: there is only ever one
+   * province on screen, and `setData` is what MapLibre is built for. Passing
+   * nothing hides the layers, which also stops them being drawn over the levels
+   * above when the form moves back up.
+   */
+  setMunicipalities(data: FeatureCollection | null): void {
     this.withStyle((map) => {
+      if (!map.getSource(MUNICIPALITIES_SOURCE)) {
+        if (!data) return;
+        map.addSource(MUNICIPALITIES_SOURCE, {
+          type: 'geojson',
+          data,
+          attribution: BOUNDARIES_ATTRIBUTION,
+        });
+        for (const layer of buildMunicipalityLayers()) map.addLayer(layer, LAYERS.hotspots);
+        return;
+      }
+
+      const visibility = data ? 'visible' : 'none';
+      for (const id of [
+        LAYERS.municipalitiesLine,
+        LAYERS.municipalityFocusFill,
+        LAYERS.municipalityFocusLine,
+      ]) {
+        map.setLayoutProperty(id, 'visibility', visibility);
+      }
+
+      if (!data) return;
+      const source = map.getSource(MUNICIPALITIES_SOURCE) as GeoJSONSource | undefined;
+      source?.setData(data);
+    });
+  }
+
+  /**
+   * Adds the provinces to the style, once.
+   *
+   * They are not in the opening style —380 kB the portada never draws— and they
+   * arrive as an already parsed collection rather than a URL, so the file is
+   * downloaded and parsed exactly once for both the list and the map.
+   */
+  addProvinces(data: FeatureCollection): void {
+    this.withStyle((map) => {
+      if (map.getSource(PROVINCES_SOURCE)) return;
+      map.addSource(PROVINCES_SOURCE, {
+        type: 'geojson',
+        data,
+        // Same provider as the regions, and MapLibre shows one credit for both.
+        attribution: BOUNDARIES_ATTRIBUTION,
+      });
+      // Under the detections, which stay the topmost thing on the map.
+      for (const layer of buildProvinceLayers()) map.addLayer(layer, LAYERS.hotspots);
+      this.applyProvinces(map);
+    });
+  }
+
+  /** Shows the borders of one region's provinces, or of none. */
+  showProvincesOf(region: string | null): void {
+    this.provincesOf = region;
+    this.withStyle((map) => this.applyProvinces(map));
+  }
+
+  private applyProvinces(map: MapLibreMap): void {
+    if (!map.getLayer(LAYERS.provincesLine)) return;
+    const filter = ['==', ['get', 'region'], this.provincesOf ?? ''] as never;
+    map.setFilter(LAYERS.provincesLine, filter);
+  }
+
+  private setFocus(fill: string, line: string, id: string | null): void {
+    this.withStyle((map) => {
+      if (!map.getLayer(fill)) return;
       const filter = ['==', ['get', 'id'], id ?? ''] as never;
-      map.setFilter(LAYERS.regionFocusFill, filter);
-      map.setFilter(LAYERS.regionFocusLine, filter);
+      map.setFilter(fill, filter);
+      map.setFilter(line, filter);
     });
   }
 
@@ -247,6 +374,33 @@ export class MapService {
     );
   }
 
+  /**
+   * Turns the map into something to click on, or back.
+   *
+   * `interactive: false` leaves `click` firing (§2.9), which is what makes
+   * this possible without touching the gesture handlers: the only difference
+   * between picking and not is what the handler does with the event.
+   */
+  setPicking(on: boolean): void {
+    this.picking = on;
+    if (!on) this.picked.set(null);
+    const canvas = this.instance?.getCanvas();
+    if (canvas) canvas.style.cursor = on ? 'crosshair' : '';
+  }
+
+  /** Draws the ignition point, or takes it off. */
+  setIgnition(point: readonly [number, number] | null): void {
+    this.withStyle((map) => {
+      const source = map.getSource(IGNITION_SOURCE) as GeoJSONSource | undefined;
+      source?.setData({
+        type: 'FeatureCollection',
+        features: point
+          ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [...point] } }]
+          : [],
+      });
+    });
+  }
+
   clearSelection(): void {
     this.selected.set(null);
   }
@@ -257,10 +411,16 @@ export class MapService {
    * `fitBounds` against a container the layout has not sized yet, and
    * `setFilter` against a layer that does not exist, both fail quietly, so
    * everything that touches the style goes through here.
+   *
+   * The test is «has the style ever loaded» and deliberately not
+   * `isStyleLoaded()`, which answers a different question: it goes false again
+   * whenever the style has pending changes. Asking it meant that a camera move
+   * right after a `setFilter` —leaving the form, say— was mistaken for «the map
+   * is not ready», queued, and never run, because the queue drains once.
    */
   private withStyle(run: (map: MapLibreMap) => void): void {
     const map = this.instance;
-    if (map?.isStyleLoaded()) {
+    if (map && this.styled) {
       run(map);
       return;
     }
@@ -295,6 +455,9 @@ export class MapService {
     this.instance = null;
     this.queued.length = 0;
     this.framed = false;
+    this.styled = false;
+    this.picking = false;
+    this.picked.set(null);
     this.ready.set(false);
     this.selected.set(null);
   }
