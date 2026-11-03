@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { MapService } from '../map/map.service';
+import { LevelsService } from './levels.service';
 import { MunicipalitiesService } from './municipalities.service';
 import { ProvincesService } from './provinces.service';
 
@@ -22,6 +23,7 @@ export class MunicipalityStep {
   private readonly provinces = inject(ProvincesService);
   private readonly municipalities = inject(MunicipalitiesService);
   private readonly maps = inject(MapService);
+  private readonly levels = inject(LevelsService);
 
   /** The two segments above, bound by withComponentInputBinding(). */
   readonly region = input.required<string>();
@@ -52,9 +54,8 @@ export class MunicipalityStep {
       const chosen = this.chosen();
       if (!chosen) return;
 
-      this.municipalities.load(chosen.id);
+      this.levels.show('municipality', { province: chosen.id });
       this.maps.goToBounds(chosen.bounds, true);
-      this.maps.focusProvince(null);
     });
   }
 

@@ -27,6 +27,8 @@ export const LAYERS = {
   municipalityFocusFill: 'municipality-focus-fill',
   municipalityFocusLine: 'municipality-focus-line',
   hotspots: 'hotspots',
+  domainFill: 'domain-fill',
+  domainLine: 'domain-line',
   ignitionHalo: 'ignition-halo',
   ignitionDot: 'ignition-dot',
 } as const;
@@ -36,6 +38,7 @@ export const REGIONS_SOURCE = 'regions';
 export const PROVINCES_SOURCE = 'provinces';
 export const MUNICIPALITIES_SOURCE = 'municipalities';
 export const IGNITION_SOURCE = 'ignition';
+export const DOMAIN_SOURCE = 'domain';
 
 /** No point yet. The source has to exist from the start to be drawn into. */
 const NO_POINT: FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -167,6 +170,7 @@ export function buildStyle(): StyleSpecification {
         data: HOTSPOTS_URL,
         attribution: 'Focus: NASA FIRMS (VIIRS 375 m)',
       },
+      [DOMAIN_SOURCE]: { type: 'geojson', data: NO_POINT },
       [IGNITION_SOURCE]: { type: 'geojson', data: NO_POINT },
     },
     layers: [
@@ -194,7 +198,7 @@ export function buildStyle(): StyleSpecification {
           'hillshade-accent-color': '#3a4a56',
         },
       },
-            {
+      {
         // Nearly invisible, but it is what makes a region pickable: a line alone
         // would only respond on the border itself.
         id: LAYERS.regionsFill,
@@ -245,7 +249,19 @@ export function buildStyle(): StyleSpecification {
           'circle-sort-key': ['get', 'frp'],
         },
         paint: {
-          'circle-radius': ['interpolate', ['linear'], ['get', 'frp'], 1, 3.5, 10, 6, 100, 10, 1000, 15],
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['get', 'frp'],
+            1,
+            3.5,
+            10,
+            6,
+            100,
+            10,
+            1000,
+            15,
+          ],
           'circle-color': [
             'interpolate',
             ['linear'],
@@ -265,6 +281,26 @@ export function buildStyle(): StyleSpecification {
           'circle-stroke-width': 1,
           'circle-stroke-color': '#2b1403',
           'circle-stroke-opacity': 0.8,
+        },
+      },
+      {
+        // The simulation domain. Dashed, and that is the whole distinction:
+        // the solid white outlines are administrative and come from a
+        // register, while this one is computed and exists only here.
+        id: LAYERS.domainFill,
+        type: 'fill',
+        source: DOMAIN_SOURCE,
+        paint: { 'fill-color': '#f4f8fb', 'fill-opacity': 0.05 },
+      },
+      {
+        id: LAYERS.domainLine,
+        type: 'line',
+        source: DOMAIN_SOURCE,
+        paint: {
+          'line-color': '#f4f8fb',
+          'line-width': 1.5,
+          'line-opacity': 0.9,
+          'line-dasharray': [4, 3],
         },
       },
       {

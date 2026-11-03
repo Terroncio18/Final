@@ -1,0 +1,12 @@
+# Final de línia LF a tot arreu, també al Windows.
+#
+# Git ja guarda LF a l'índex —`core.autocrlf` ho normalitza en commitejar— i
+# Prettier, per defecte, també demana LF. El que trencava la parella era la
+# còpia de treball: amb `autocrlf=true` el Windows la rep amb CRLF, de manera
+# que `prettier --check` suspenia 46 fitxers dels quals només 17 tenien res a
+# arreglar; els altres 29 només tenien el final de línia «equivocat».
+#
+# `eol=lf` mana per sobre d'`autocrlf` i deixa la còpia de treball igual que
+# l'índex, que és el que fa que la comprovació digui la veritat aquí i a
+# qualsevol altra màquina. Res del que es commiteja canvia.
+* text=auto eol=lf

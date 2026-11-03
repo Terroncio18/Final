@@ -81,6 +81,8 @@ polígon del municipi. Motius:
 
 Conseqüència a comunicar a la interfície: el domini pot ser més gran que el
 municipi des del qual s'hi entra, i s'ha d'explicar perquè no sembli un error.
+Fet el 29/10/2026: el panell del punt d'ignició ho diu amb una línia, i el
+quadrat es veu dibuixat amb el municipi a dins (§2.27).
 
 ### 2.6. Cartografia base i relleu
 
@@ -508,14 +510,151 @@ Dues coses que es deixen com estan, a propòsit:
   el factor que mana. Si algun dia ho és, la palanca és activar el zoom només
   en aquest pas, no a la portada.
 
+### 2.27. El domini es dibuixa, i són tres números lligats
+
+En marcar el punt apareix el quadrat del domini i la càmera l'enquadra. És
+**1024 × 1024 cel·les de 30 m, és a dir 30,72 km de costat**. Precisions sobre
+§2.5:
+
+- El número rodó no és el costat sinó la graella. 1024 és una potència de dos
+  perquè és el que la GPU guarda com a textura; els 30,72 km en surten. Dir
+  «30 × 30 km» és la versió per explicar-ho, no la mida exacta.
+- Els tres números són **una sola decisió**: graella × cel·la = costat. Canviar
+  el costat vol dir canviar un dels altres dos, i cadascun costa una cosa
+  distinta:
+  - 1024² de 30 m → 30,7 km de costat. El que hi ha.
+  - 512² de 30 m → 15,4 km de costat, amb una quarta part de la feina.
+  - 1024² de 15 m → 15,4 km de costat, la mateixa feina i cel·les més fines,
+    però no hi ha dades de combustible a 15 m que ho justifiquin.
+- **Un quadrat a terra no és un quadrat en graus.** Un grau de longitud
+  s'escurça amb el cosinus de la latitud, de manera que les dues semi-amplades
+  es calculen per separat. Ignorar-ho estiraria el quadrat un 34% a latituds
+  ibèriques.
+- El contorn va **de ratlles**, i aquesta és tota la distinció: els contorns
+  blancs continus són administratius i surten d'un registre, i aquest és
+  calculat i només existeix aquí. Una sola paleta i una sola diferència.
+
+Descartat baixar a 15 km, plantejat el 25/10/2026 i tancat el 29/10/2026 un cop
+el quadrat es va poder veure dibuixat amb un municipi a dins. La justificació
+que se'n donava —que hi ha incendis que abasten diversos termes municipals, i
+que cal poder-ho tenir en compte— demana un domini **més gran**, no més petit.
+I la via de mantenir la graella escurçant la cel·la a 15 m no se sosté: no hi
+ha cartografia de combustible a aquesta resolució, de manera que seria
+interpolar per fingir un detall que les dades no tenen.
+
+### 2.28. L'elevació es llegeix al navegador
+
+En marcar el punt, l'aplicació baixa les tessel·les Terrarium que cobreixen el
+domini, les descodifica i en mostreja la graella de 1024², i en treu la pendent
+per diferències centrades. Motius:
+
+- **Al navegador i no al servidor.** Les tessel·les són públiques i obertes a
+  CORS, i el mapa ja les baixa per al relleu ombrejat. Un servidor pel mig
+  només seria un intermediari, i la simulació acabarà corrent a la GPU del
+  navegador: la dada ha d'acabar allà de totes maneres.
+- **Zoom 12.** Un píxel Terrarium cobreix 156.543 · cos(latitud) / 2^z metres,
+  o sigui 27 m al nord de la península i 34 a Canàries: just a banda i banda de
+  la cel·la de 30 m. El zoom 13 serien quatre vegades les tessel·les per a un
+  detall que la font no té, perquè a sota hi ha SRTM i EU-DEM, tots dos fets
+  al voltant dels 30 m.
+- **La pendent és el que es busca**, no l'altitud: és un dels tres factors de
+  Rothermel. Al model no li importa com de alt és el terreny, sinó com
+  s'inclina.
+- La graella és regular en longitud i latitud, no en metres. Al llarg de 30 km
+  el cosinus de la latitud canvia un 0,4%, de manera que una cel·la fa entre
+  29,94 i 30,07 m en comptes de 30 exactes: menys d'una dècima de metre, que no
+  és res comparat amb el que sap un model d'elevacions de 30 m.
+
+El panell en dibuixa l'ombrejat, i això no és decoració: els números sols no
+atraparien un error de mostreig, perquè una graella desplaçada una tessel·la
+encara té un mínim i un màxim versemblants. Un relleu, no: o s'assembla a la
+vall que hi ha al costat o no s'hi assembla.
+
+Comprovat el 29/10/2026 amb dos dominis oposats:
+
+| Punt | Altitud | Pendent màx. | Pendent mitjana | Tessel·les |
+| --- | --- | --- | --- | --- |
+| Alcarràs (pla del Segrià) | 90–388 m | 32,2° | 2,7° | 30 |
+| Alt Àneu (Pallars Sobirà) | 536–2.904 m | 69,8° | 25,8° | 25 |
+
+El contrast és la prova: una lectura que tornés qualsevol cosa genèrica no
+donaria 2,7° en un pla i 25,8° al Pirineu.
+
+### 2.29. Un sol nivell de vores a la vegada, en baixar i en pujar
+
+En baixar per la jerarquia el mapa anava afegint vores: les regions, després
+les províncies de la regió triada, després els municipis de la província. Les
+afegia i no en treia cap, i això donava dos defectes alhora.
+
+El primer, en pujar: tornar dels municipis deixava les seves vores dibuixades
+sobre la llista de províncies, i tornar de les províncies deixava les seves
+sobre la llista de regions. El contorn del quart pas tampoc no s'apagava, de
+manera que el municipi ja triat seguia ressaltat mentre se'n triava un altre.
+
+El segon, en baixar: **el contorn d'una regió és la vora exterior de les seves
+províncies**, i el d'una província la vora exterior dels seus municipis.
+Dibuixar el nivell de sobre per sota del que s'està triant repetia cada línia
+compartida —la mateixa frontera dues vegades, un punt més gruixuda que la resta
+i desplaçada pel poc que les dues generalitzacions no coincideixen— i el mapa
+semblava tenir les vores doblades.
+
+La causa del primer no era cap oblit puntual sinó on vivia la regla. Cada pas
+apagava el ressaltat del nivell de sobre —§2.22— però ningú apagava el de sota,
+i l'única neteja completa era la de `SimulationFlow` en sortir del formulari,
+que no corre quan només es canvia de pas.
+
+Decidit: un sol servei, `LevelsService`, que sap quines vores toquen a cada
+nivell i les posa totes en l'estat correcte d'un cop, amb la regla reduïda a
+una frase: **exactament un nivell de vores visible, el del pas on s'és**. Cada
+pas el crida una vegada en arribar, amb el seu nivell i els codis dels seus
+avantpassats. Són **quatre nivells i no tres**, un per profunditat de ruta,
+perquè el pas d'ignició és l'únic que manté el municipi ressaltat: amb tres, el
+darrer pas hauria d'esborrar el contorn i tornar-lo a posar dins del mateix
+efecte.
+
+Per què un servei i no dues línies a cada pas, que costava menys: **la
+duplicació ja hi era**. La sortida de `SimulationFlow` portava la llista sencera
+de capes escrita a mà, i el que feien els passos era una segona còpia incompleta
+de la mateixa regla; repartir-la pels quatre passos n'hauria fet tres. Ara
+sortir del formulari és `levels.clear()`, que és exactament l'estat del primer
+pas.
+
+El servei no toca la càmera —cada pas enquadra la seva extensió (§2.8)— ni el
+punt d'ignició ni el domini, que són del darrer pas. I es crida **en arribar a
+un pas i mai en marxar-ne**: un pas que demana el que vol no es pot saltar, i un
+pas que recull després d'ell mateix és una cosa més de la qual depèn el següent,
+amb un ordre que no triem nosaltres —l'encaminador destrueix abans de crear,
+però el botó enrere del navegador pot caure a qualsevol nivell.
+
+Les regions s'apaguen amb la **visibilitat** de la capa i no amb el seu filtre,
+que respon una altra pregunta: el filtre diu de quin àmbit són —Península o
+Canàries— i ha de sobreviure al formulari, mentre que la visibilitat diu si el
+nivell és a la pantalla. Escriure-hi les dues coses voldria dir que en sortir
+del formulari calgués recordar un àmbit que el formulari no ha triat mai. El
+farciment gairebé invisible de les regions s'apaga amb la línia: és el que les
+faria clicables, i no és res a oferir mentre es tria dos nivells més avall.
+
+La primera versió d'aquesta decisió, del mateix dia, només netejava cap avall.
+Les vores duplicades es veien de seguida en mirar el tercer pas de prop, i la
+regla bona resulta ser més curta que la que la substitueix.
+
+Comprovat el 3/11/2026 al navegador, amb els enllaços del panell i amb el botó
+enrere: ES51 → ES511 → Abrera i tornant amunt, baixant-hi un segon cop —que és
+el cas de la memòria cau—, i sortint del formulari i commutant a Canàries per
+veure que les regions hi tornen.
+
 ---
 
 ## 3. Decisions pendents
 
 - ~~**3.1. Llenguatge del backend.**~~ Resolta el 25/10/2026: Node amb Fastify
   (§2.12).
-- **3.2. Model digital d'elevacions.** Terrarium per comoditat; l'estat de l'art
-  cita el Copernicus DEM GLO-30, de més qualitat.
+- **3.2. Model digital d'elevacions.** Terrarium per comoditat; l'estat de
+  l'art cita el Copernicus DEM GLO-30, de més qualitat. Des del 29/10/2026
+  Terrarium ja no és només el relleu ombrejat: és la font de la pendent que
+  alimentarà el model (§2.28), de manera que la pendent pesa més. Canviar-lo
+  voldria dir servir les tessel·les nosaltres, perquè el GLO-30 no es
+  distribueix com a tessel·les obertes.
 - **3.3. Polígons sense model de combustible.** `MODCOMB = 0` són 5.471 d'11.654
   polígons a l'inventari balear. Confondre'ls amb terreny no combustible
   convertiria mitja illa en tallafocs.
@@ -644,6 +783,28 @@ Coses que han costat temps i convé no redescobrir.
 - **L'hora de FIRMS ve a part de la data i sense zero inicial**: `912` són les
   09:12, i sempre en UTC. Ajuntar data i hora un sol cop, en entrar, estalvia la
   feina a tot el que ve després.
+- **Amagar una capa no és el mateix que descarregar-la.** El servei de municipis
+  es guarda de carregar dues vegades la mateixa província amb un camp `asked`;
+  treure-li la capa de la pantalla sense dir-li-ho feia que tornar a baixar a una
+  província ja vista no dibuixés res, perquè `load()` sortia per la porta del
+  darrere. Per això el nivell l'allibera (`release()`) en lloc d'amagar-la. El
+  mètode ja existia i no el cridava ningú des que es va escriure.
+- **`prettier --check` suspèn tot un projecte de Windows sense que hi hagi res
+  mal format.** Git guarda LF a l'índex i `core.autocrlf` torna CRLF en treure
+  els fitxers, mentre que Prettier demana LF per defecte: dels 46 fitxers que
+  suspenien, 29 només tenien el final de línia «equivocat». La parella es torna
+  a lligar amb un `.gitattributes` amb `* text=auto eol=lf`, que mana per sobre
+  d'`autocrlf` i no canvia res del que es commiteja. Sense això la comprovació
+  no distingeix un fitxer descuidat d'un fitxer acabat de treure del repositori.
+  Parany que ve de regal: en posar-lo, els fitxers que només havien canviat de
+  final de línia queden marcats com a modificats amb un `git diff` buit.
+  `git add --renormalize` els torna a lloc i no prepara res per al commit,
+  perquè el contingut normalitzat ja era el mateix.
+- **El `--write` de Prettier arriba al GeoJSON.** Reconeix l'extensió i
+  reescriuria els 83 fitxers de `public/data`, que es publiquen minificats a
+  propòsit: el que es baixa el navegador es multiplicaria per no guanyar res,
+  perquè ningú els llegeix a mà. Van al `.prettierignore` el mateix dia que
+  s'afegeix l'ordre `npm run format`, no després.
 
 ---
 

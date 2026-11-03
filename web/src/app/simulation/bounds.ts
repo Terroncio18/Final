@@ -24,8 +24,7 @@ export function boundsOf(geometry: AreaGeometry): [number, number, number, numbe
   let east = -180;
   let north = -90;
 
-  const polygons =
-    geometry.type === 'MultiPolygon' ? geometry.coordinates : [geometry.coordinates];
+  const polygons = geometry.type === 'MultiPolygon' ? geometry.coordinates : [geometry.coordinates];
 
   for (const polygon of polygons) {
     // Only the first ring is read: it is the outline, and the rest are holes

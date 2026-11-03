@@ -1,0 +1,9 @@
+# Sortida dels scripts de preprocessament. El GeoJSON es publica minificat a
+# propòsit —són 13 MB que es baixa el navegador— i formatar-lo el multiplicaria
+# per res: ningú el llegeix a mà.
+public/data
+
+# Res d'això s'escriu a mà. Ja són fora per .gitignore, i aquí hi consten
+# perquè no depengui d'un detall de com Prettier recorre els directoris.
+dist
+.angular

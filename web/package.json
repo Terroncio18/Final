@@ -7,6 +7,8 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "data:regions": "node scripts/fetch-regions.mjs",
     "data:provinces": "node scripts/fetch-provinces.mjs",
     "data:municipalities": "node --max-old-space-size=6144 scripts/fetch-municipalities.mjs"

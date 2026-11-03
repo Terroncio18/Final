@@ -23,10 +23,7 @@ import { fileURLToPath } from 'node:url';
 const SOURCE =
   'https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_03M_2024_4326_LEVL_3.geojson';
 
-const OUTPUT = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../public/data/provinces.geojson',
-);
+const OUTPUT = resolve(dirname(fileURLToPath(import.meta.url)), '../public/data/provinces.geojson');
 
 /** The same regions the first step leaves out, so the two files agree. */
 const EXCLUDED_REGIONS = new Set(['PT20', 'PT30', 'ES63', 'ES64']);

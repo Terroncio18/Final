@@ -18,6 +18,7 @@ import {
   buildMunicipalityLayers,
   buildProvinceLayers,
   buildStyle,
+  DOMAIN_SOURCE,
   IGNITION_SOURCE,
   LAYERS,
   MUNICIPALITIES_SOURCE,
@@ -262,6 +263,28 @@ export class MapService {
   }
 
   /**
+   * Draws the region borders, or takes them off.
+   *
+   * Visibility and not the filter above, which answers a different question:
+   * the scope is whose regions these are and survives the form, while this is
+   * whether the level is on screen at all. Writing both into one filter would
+   * mean that coming back out of the form had to remember a scope it never
+   * chose.
+   *
+   * The fill goes with the line. It is nearly invisible and it is what would
+   * make a region clickable, which is not something to offer while the user is
+   * two levels further down.
+   */
+  setRegionsVisible(visible: boolean): void {
+    this.withStyle((map) => {
+      const visibility = visible ? 'visible' : 'none';
+      for (const id of [LAYERS.regionsFill, LAYERS.regionsLine]) {
+        map.setLayoutProperty(id, 'visibility', visibility);
+      }
+    });
+  }
+
+  /**
    * Picks out one region, or none.
    *
    * A filter and nothing else, because the focus layers carry fixed paint. That
@@ -395,7 +418,32 @@ export class MapService {
       source?.setData({
         type: 'FeatureCollection',
         features: point
-          ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [...point] } }]
+          ? [
+              {
+                type: 'Feature',
+                properties: {},
+                geometry: { type: 'Point', coordinates: [...point] },
+              },
+            ]
+          : [],
+      });
+    });
+  }
+
+  /** Draws the simulation domain, or takes it off. */
+  setDomain(ring: readonly (readonly [number, number])[] | null): void {
+    this.withStyle((map) => {
+      const source = map.getSource(DOMAIN_SOURCE) as GeoJSONSource | undefined;
+      source?.setData({
+        type: 'FeatureCollection',
+        features: ring
+          ? [
+              {
+                type: 'Feature',
+                properties: {},
+                geometry: { type: 'Polygon', coordinates: [ring.map((p) => [...p])] },
+              },
+            ]
           : [],
       });
     });

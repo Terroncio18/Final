@@ -2,6 +2,7 @@ import { Component, DestroyRef, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
 import { MapService } from '../map/map.service';
+import { LevelsService } from './levels.service';
 
 /**
  * The form, as something with a lifetime of its own.
@@ -24,17 +25,15 @@ import { MapService } from '../map/map.service';
 export class SimulationFlow {
   constructor() {
     const maps = inject(MapService);
+    const levels = inject(LevelsService);
 
     maps.setHotspotsVisible(false);
     inject(DestroyRef).onDestroy(() => {
       maps.setHotspotsVisible(true);
-      maps.focusRegion(null);
-      maps.focusProvince(null);
-      maps.showProvincesOf(null);
-      maps.focusMunicipality(null);
-      maps.setMunicipalities(null);
+      levels.clear();
       maps.setPicking(false);
       maps.setIgnition(null);
+      maps.setDomain(null);
     });
   }
 }

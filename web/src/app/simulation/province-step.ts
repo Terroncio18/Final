@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { MapService } from '../map/map.service';
+import { LevelsService } from './levels.service';
 import { ProvincesService } from './provinces.service';
 import { RegionsService } from './regions.service';
 
@@ -21,6 +22,7 @@ export class ProvinceStep {
   private readonly regions = inject(RegionsService);
   private readonly provinces = inject(ProvincesService);
   private readonly maps = inject(MapService);
+  private readonly levels = inject(LevelsService);
 
   /** The `:region` segment, bound by withComponentInputBinding(). */
   readonly region = input.required<string>();
@@ -53,9 +55,9 @@ export class ProvinceStep {
       this.maps.goToBounds(chosen.bounds, true);
 
       // The region's own outline belongs to the first step; here the camera has
-      // already framed it. What the map draws now is the level below.
-      this.maps.focusRegion(null);
-      this.maps.showProvincesOf(chosen.id);
+      // already framed it. What the map draws now is the level below, and
+      // nothing from the level under that one.
+      this.levels.show('province', { region: chosen.id });
     });
   }
 

@@ -131,8 +131,7 @@ function inRing(point, ring) {
 }
 
 function inGeometry(point, geometry) {
-  const polygons =
-    geometry.type === 'MultiPolygon' ? geometry.coordinates : [geometry.coordinates];
+  const polygons = geometry.type === 'MultiPolygon' ? geometry.coordinates : [geometry.coordinates];
   for (const polygon of polygons) {
     if (!inRing(point, polygon[0])) continue;
     if (polygon.slice(1).some((hole) => inRing(point, hole))) continue;

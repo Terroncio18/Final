@@ -2,6 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { MapService } from '../map/map.service';
+import { LevelsService } from './levels.service';
 import { RegionsService } from './regions.service';
 
 /**
@@ -30,6 +31,7 @@ const COUNTRIES = [
 export class RegionStep {
   private readonly regions = inject(RegionsService);
   private readonly maps = inject(MapService);
+  private readonly levels = inject(LevelsService);
 
   protected readonly failed = this.regions.failed;
 
@@ -56,8 +58,9 @@ export class RegionStep {
   constructor() {
     this.regions.load();
 
-    // Back from a later step: nothing is chosen here, so nothing is outlined.
-    this.maps.focusRegion(null);
+    // Back from a later step: nothing is chosen here, so nothing is outlined
+    // and nothing below the regions is drawn either.
+    this.levels.show('region');
 
     // Read once and not tracked: what matters is the scope on arrival. The
     // framing is repeated so the panel does not cover what it frames, which

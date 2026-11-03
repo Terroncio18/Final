@@ -15,8 +15,44 @@
     @if (ignition()) {
       <p class="code">{{ coordinates() }}</p>
       <p class="pending">
-        Latitud i longitud, en graus decimals. Són al final de l'adreça, de manera
-        que aquest enllaç torna a obrir exactament aquest punt.
+        Latitud i longitud, en graus decimals. Són al final de l'adreça, de manera que aquest enllaç
+        torna a obrir exactament aquest punt.
+      </p>
+
+      <dl>
+        <dt>Domini</dt>
+        <dd>{{ domain.km }} × {{ domain.km }} km</dd>
+
+        <dt>Graella</dt>
+        <dd>{{ domain.grid }} × {{ domain.grid }}</dd>
+
+        <dt>Cel·la</dt>
+        <dd>{{ domain.cell }} m</dd>
+
+        @if (slopes(); as ground) {
+          <dt>Altitud</dt>
+          <dd>{{ ground.low }}–{{ ground.high }} m</dd>
+
+          <dt>Pendent màx.</dt>
+          <dd>{{ ground.max }}°</dd>
+
+          <dt>Pendent mitjana</dt>
+          <dd>{{ ground.mean }}°</dd>
+        }
+      </dl>
+
+      @if (reading()) {
+        <p class="waiting">Llegint l'elevació…</p>
+      } @else if (failedTerrain()) {
+        <p class="warning">No s'ha pogut llegir l'elevació del domini.</p>
+      } @else if (slopes(); as ground) {
+        <canvas #relief class="relief" width="256" height="256"></canvas>
+        <p class="note">Relleu del domini, de {{ ground.tiles }} tessel·les</p>
+      }
+
+      <p class="pending">
+        El quadrat no segueix el límit del municipi i sol ser més gran: es retalla al voltant del
+        punt perquè el foc tampoc no el segueix.
       </p>
 
       <button type="button" class="simulate" disabled>Obrir la simulació</button>
@@ -25,8 +61,8 @@
       <p class="pending">Torna a fer clic al mapa per moure el punt.</p>
     } @else {
       <p class="pending">
-        Fes clic al mapa per marcar on comença el foc. Al voltant d'aquest punt
-        es retallarà el domini de la simulació.
+        Fes clic al mapa per marcar on comença el foc. Al voltant d'aquest punt es retallarà el
+        domini de la simulació.
       </p>
     }
   </div>

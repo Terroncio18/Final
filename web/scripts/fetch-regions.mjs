@@ -22,10 +22,7 @@ import { fileURLToPath } from 'node:url';
 const SOURCE =
   'https://gisco-services.ec.europa.eu/distribution/v2/nuts/geojson/NUTS_RG_03M_2024_4326_LEVL_2.geojson';
 
-const OUTPUT = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../public/data/regions.geojson',
-);
+const OUTPUT = resolve(dirname(fileURLToPath(import.meta.url)), '../public/data/regions.geojson');
 
 /** Outside the study area: Atlantic archipelagos and the autonomous cities. */
 const EXCLUDED = new Set(['PT20', 'PT30', 'ES63', 'ES64']);
