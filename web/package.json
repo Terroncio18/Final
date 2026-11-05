@@ -11,7 +11,8 @@
     "format:check": "prettier --check .",
     "data:regions": "node scripts/fetch-regions.mjs",
     "data:provinces": "node scripts/fetch-provinces.mjs",
-    "data:municipalities": "node --max-old-space-size=6144 scripts/fetch-municipalities.mjs"
+    "data:municipalities": "node --max-old-space-size=6144 scripts/fetch-municipalities.mjs",
+    "data:places": "node scripts/fetch-places.mjs"
   },
   "private": true,
   "packageManager": "npm@10.9.8",
@@ -22,6 +23,7 @@
     "@angular/forms": "^22.2.0",
     "@angular/platform-browser": "^22.2.0",
     "@angular/router": "^22.2.0",
+    "maplibre-contour": "^0.1.1",
     "maplibre-gl": "^6.15.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"

@@ -874,6 +874,7 @@ Coses que han costat temps i convé no redescobrir.
 | COS (DGT) | Ús i ocupació del sòl | Portugal | Pendent |
 | AEMET OpenData | Meteorologia | Espanya | Pendent |
 | IPMA | Meteorologia | Portugal | Pendent |
+| OpenStreetMap (Overpass) | Topònims i cims | ES i PT | En ús (pantalla de simulació) |
 
 **FIRMS.** L'API d'àrea és `/api/area/csv/[MAP_KEY]/[FONT]/[o,s,e,n]/[DIES]`, amb
 un màxim de cinc dies per consulta i 5.000 transaccions cada deu minuts per clau.
@@ -881,6 +882,14 @@ Les tres plataformes VIIRS donen 375 m, la millor resolució operativa.
 Mesurat el 25/10/2026, un dia de deteccions a l'àmbit en dona 195, amb
 potències d'entre 0,39 i 56,7 MW i una mediana de 2,1: a l'octubre el que crema són
 majoritàriament rostolls, no bosc (§3.5).
+
+**OpenStreetMap.** L'ODbL demana que l'atribució i la llicència viatgin amb les
+dades derivades, de manera que el crèdit del mapa diu «Topònims: ©
+OpenStreetMap contributors, ODbL» i no només el nom. Els topònims es preparen
+fora de línia amb `npm run data:places` i es publiquen com un fitxer per
+província: Overpass és un servei públic i gratuït, i una pantalla que
+arrenqués demanant-li dades dependria que estigui lliure —durant la preparació
+d'aquests fitxers em va limitar la taxa dues vegades el mateix matí.
 
 **IDEIB.** Publica `MODCOMB` amb el model d'Anderson 13 ja assignat pels autors de
 l'inventari, de manera que el simulador hereta una classificació oficial i no una
@@ -901,6 +910,7 @@ font es marca **per confirmar** en lloc d'endevinar-ho.
 | --- | --- | --- |
 | Angular | 22.2.3 | MIT |
 | MapLibre GL JS | 6.15.0 | BSD-3-Clause |
+| maplibre-contour | 0.1.1 | BSD-3-Clause |
 | RxJS | 7.8.2 | Apache-2.0 |
 | tslib | 2.8.1 | 0BSD |
 | TypeScript | 6.0.3 | Apache-2.0 |
@@ -908,6 +918,7 @@ font es marca **per confirmar** en lloc d'endevinar-ho.
 | pino | 10.4.0 | MIT |
 | @types/geojson | 7946.0.16 | MIT |
 | Material Symbols «mode_heat» | — | Apache-2.0 |
+| Open Sans, servida per fonts.openmaptiles.org | — | Per confirmar: Apache-2.0 o OFL segons la versió |
 
 Les dades no tenen cap llicència amb nom, i això és una troballa:
 
@@ -917,6 +928,7 @@ Les dades no tenen cap llicència amb nom, i això és una troballa:
 | Esri World Imagery | Esri Master License Agreement | «Esri, Vantor, Earthstar Geographics, and the GIS User Community» |
 | Mapzen / AWS Terrain Tiles | Cap llicència conjunta: cada font té la seva | Per font; a Europa, Copernicus EU-DEM |
 | NASA FIRMS | Cap llicència amb nom; dades obertes | Text d'agraïment publicat (vegeu sota) |
+| OpenStreetMap | ODbL 1.0 | «© OpenStreetMap contributors», amb la llicència al costat |
 
 **GISCO.** La nota de copyright «© EuroGeographics for the administrative
 boundaries» i la clàusula explícita de no comercial són a la pàgina d'*unitats

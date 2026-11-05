@@ -13,6 +13,7 @@ import { RouterLink } from '@angular/router';
 
 import { Chrome } from '../chrome';
 import { MapService } from '../map/map.service';
+import { PlacesService } from '../map/places.service';
 import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from '../simulation/domain';
 import { MunicipalitiesService } from '../simulation/municipalities.service';
 import { parsePoint } from '../simulation/point';
@@ -43,6 +44,7 @@ import { parsePoint } from '../simulation/point';
 export class SimulatorView {
   private readonly maps = inject(MapService);
   private readonly municipalities = inject(MunicipalitiesService);
+  private readonly places = inject(PlacesService);
 
   /** The element MapLibre takes over. This screen owns its map (§2.20). */
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
@@ -110,10 +112,17 @@ export class SimulatorView {
       const point = this.ignition();
       if (!point) return;
 
+      // The names of the ground underneath, which is the difference between a
+      // relief and a place: a ridge with a name is where a fire stops being an
+      // abstraction. Cut to the domain, because the rest of the province is
+      // not what this screen is about.
+      this.places.load(this.province(), domainAround(point));
+
       this.maps.setIgnition(point);
       this.maps.setDomain(domainRing(point));
       this.maps.setTerrain3D(true);
       this.maps.setOrbit(true);
+      this.maps.setContours(true);
       this.maps.goToBounds(domainAround(point), true);
     });
 

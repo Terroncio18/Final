@@ -78,6 +78,36 @@ export const PROVINCES_URL = 'data/provinces.geojson';
  */
 export const MUNICIPALITIES_URL = 'data/municipalities';
 
+/**
+ * Place names, one file per province, like the municipalities above.
+ *
+ * Towns and named peaks from OpenStreetMap: the administrative files carry
+ * polygons and no settlements, and a label at the centre of Sóller's territory
+ * would sit on a mountainside rather than on the town. Prepared offline by
+ * `npm run data:places`, and not asked of Overpass at runtime: a public API
+ * that can be slow or busy is no place for a screen to start from.
+ */
+export const PLACES_URL = 'data/places';
+
+/** ODbL asks for the credit and the licence to travel with the data (§6). */
+export const PLACES_ATTRIBUTION =
+  'Topònims: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">' +
+  'OpenStreetMap</a> contributors, ODbL';
+
+/**
+ * Where the letters come from.
+ *
+ * A style without `glyphs` renders no text at all, and MapLibre does not ship
+ * any: the glyphs are protocol-buffer ranges of a font, served per 256
+ * codepoints. OpenMapTiles publishes them openly and without a key, which is
+ * the same bargain as the imagery and the elevation. Self-hosting is three
+ * hundred kilobytes in `public/` the day the dependency is worth removing.
+ */
+export const GLYPHS = 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf';
+
+/** The one font stack asked for, and the only one that has to exist. */
+export const LABEL_FONT = 'Open Sans Regular';
+
 export interface NamedView {
   readonly label: string;
   readonly bounds: LngLatBoundsLike;

@@ -220,6 +220,99 @@ mentre no hi hagi §12.5 no hi ha res a controlar.
 Comprovat el mateix dia: el botó obre l'adreça correcta, la pantalla surt sense
 barra, el terreny i l'òrbita hi són, i tornant al formulari la barra hi torna.
 
+### 11.5. El terreny porta noms, i els noms surten d'un fitxer per província
+
+Decidit el 5/11/2026. Un relleu sense topònims és una maqueta: el que converteix
+una vall en un lloc és que es digui Sóller. FireCast en posa sis, escrits a mà i
+només per a Sóller —el seu README ho diu: les referències urbanes són
+sintètiques.
+
+**D'on surten.** Els fitxers administratius porten polígons i cap nucli de
+població: el centre del terme de Sóller és una muntanya, no el poble, de manera
+que una etiqueta al centroide posa el nom al lloc equivocat. Els nuclis i els
+cims són d'OpenStreetMap.
+
+**Preparats fora de línia, un fitxer per província** (`npm run data:places`),
+com els municipis i per la mateixa raó (§2.25), més una de nova: Overpass és un
+servei públic que pot anar lent o dir que no, i una pantalla no pot dependre
+d'això per obrir-se.
+
+**Retallats per extensió i no pel límit provincial**, amb un marge de 0,2°: el
+domini fa 30,7 km i creua fronteres contínuament, i un fitxer tallat pel límit
+deixaria mitja vista sense noms.
+
+Què s'hi posa, mesurat sobre un domini de la Serra de Tramuntana:
+
+| | dins de 30 × 30 km | |
+| --- | --- | --- |
+| `place` = city, town, village | 19 | tots |
+| + hamlet, suburb, locality | 1.250 | fora: és soroll |
+| `natural` = peak amb nom i cota | 357 | els **12** més alts |
+
+Les capes són `symbol`, que és una de les coses que MapLibre **no** drapeja
+(§13.1): el text es queda dret sobre el relleu en lloc d'embolcallar la
+carena, que és el que faria una capa d'etiquetes ràster.
+
+Dues coses apreses pel camí, totes dues per haver-ho mirat:
+
+- **Els cims van fer fora els pobles.** Amb els 357 a la capa, la col·lisió
+  d'etiquetes es resolia a favor seu i Sóller, Deià i Valldemossa
+  desapareixien darrere d'una paret de «Puig de… 1.113 m». El tall a dotze no
+  és estètica: és el que torna a deixar els pobles a la vista.
+- **Tallar al domini és part de la decisió.** Amb la província sencera a la
+  capa, la meitat inferior de la pantalla era el pla de Mallorca escrit a sobre
+  d'una vista que parla de la serra. Es retalla al client abans de pintar,
+  perquè cada nom descartat és també una etiqueta menys per encaixar.
+
+El fitxer més gran de les tres províncies preparades són 281 kB, l'ordre dels
+de municipis. Si algun dia cal densitat de llogarets, el pas no és un altre
+servei: és afegir `hamlet` al script i tornar-lo a passar.
+
+### 11.6. Corbes de nivell, tretes del relleu que ja hi és
+
+Decidit el 5/11/2026, tancant el que faltava per igualar el mode Relleu de
+FireCast. Una fotografia d'una muntanya diu on és la roca i no diu res de com
+és de dreta, i la inclinació és precisament el que aquesta pantalla existeix
+per ensenyar. El mapa de corbes és la resposta més antiga a aquesta pregunta i
+encara la única que no s'ha d'explicar a ningú.
+
+**Cap dada nova i cap proveïdor nou.** `maplibre-contour` (0.1.1, BSD-3-Clause,
+sense dependències) registra un protocol, pren les mateixes tessel·les
+Terrarium que l'ombrejat i el terreny ja llegeixen, traça les isolínies en un
+worker i torna una tessel·la vectorial. El que l'estil demana és una URL. Costa
+**9 kB** per la xarxa: de 319,35 a 328,29 kB.
+
+**L'equidistància depèn del zoom**, perquè una sola no serveix per a les dues
+escales d'aquesta pantalla:
+
+| zoom | menor | major |
+| --- | --- | --- |
+| 10 (el domini sencer) | 200 m | 1.000 m |
+| 12 | 100 m | 500 m |
+| 14 | 50 m | 250 m |
+
+Cent metres és l'equidistància d'un full 1:25.000 i és el que es llegeix bé a
+dins del domini; estesa sobre els 30,7 km sencers, la mateixa xifra és una
+madeixa.
+
+Són capes `line`, que MapLibre **sí** que drapeja (§13.1), i és el que han de
+ser: una isolínia que no seguís el terra seria el dibuix d'un altre turó.
+
+Dues coses que només es veuen mirant-ho:
+
+- **Dibuixades i invisibles.** La primera versió les va posar a 0,22
+  d'opacitat: el mapa en renderitzava vint-i-cinc i a la pantalla no n'hi havia
+  cap. Les xifres d'un `queryRenderedFeatures` diuen que una capa funciona, no
+  que es vegi.
+- **La badia venia amb isòbates.** Terrarium porta el fons del mar com a
+  elevació negativa i el traçador no hi té cap opinió, de manera que el mar
+  sortia amb corbes a −200 m: cert, i no té res a veure amb un incendi. Les
+  capes filtren per `ele > 0`.
+
+Les cotes només s'escriuen a partir del zoom 12 i cada 320 px de línia: tres o
+quatre xifres en una vista, que és el que fa falta per saber a quina alçada
+s'està sense convertir el vessant en una graella numerada.
+
 ---
 
 ## 12. Decisions pendents

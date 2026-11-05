@@ -1,13 +1,17 @@
 import type { FeatureCollection } from 'geojson';
 import type { FilterSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl';
+import { CONTOUR_TILES } from './contours';
 import {
   BOUNDARIES_ATTRIBUTION,
   DEM_ATTRIBUTION,
   DEM_MAX_ZOOM,
   DEM_TILES,
+  GLYPHS,
   HOTSPOTS_URL,
   IMAGERY_ATTRIBUTION,
   IMAGERY_TILES,
+  LABEL_FONT,
+  PLACES_ATTRIBUTION,
   REGIONS_URL,
 } from './map.config';
 
@@ -27,6 +31,10 @@ export const LAYERS = {
   municipalityFocusFill: 'municipality-focus-fill',
   municipalityFocusLine: 'municipality-focus-line',
   hotspots: 'hotspots',
+  contourLines: 'contour-lines',
+  contourLabels: 'contour-labels',
+  placeLabels: 'place-labels',
+  peakLabels: 'peak-labels',
   domainFill: 'domain-fill',
   domainLine: 'domain-line',
   ignitionHalo: 'ignition-halo',
@@ -38,6 +46,8 @@ export const REGIONS_SOURCE = 'regions';
 export const PROVINCES_SOURCE = 'provinces';
 export const MUNICIPALITIES_SOURCE = 'municipalities';
 export const IGNITION_SOURCE = 'ignition';
+export const PLACES_SOURCE = 'places';
+export const CONTOURS_SOURCE = 'contours';
 export const DOMAIN_SOURCE = 'domain';
 
 /** No point yet. The source has to exist from the start to be drawn into. */
@@ -144,6 +154,7 @@ export function buildStyle(): StyleSpecification {
   return {
     version: 8,
     name: 'IgnisLab · base',
+    glyphs: GLYPHS,
     sources: {
       [DEM_SOURCE]: {
         type: 'raster-dem',
@@ -172,6 +183,17 @@ export function buildStyle(): StyleSpecification {
       },
       [DOMAIN_SOURCE]: { type: 'geojson', data: NO_POINT },
       [IGNITION_SOURCE]: { type: 'geojson', data: NO_POINT },
+      [PLACES_SOURCE]: {
+        type: 'geojson',
+        data: NO_POINT,
+        attribution: PLACES_ATTRIBUTION,
+      },
+      [CONTOURS_SOURCE]: {
+        type: 'vector',
+        tiles: [CONTOUR_TILES],
+        // Traced from the elevation tiles, so they stop where those do.
+        maxzoom: DEM_MAX_ZOOM,
+      },
     },
     layers: [
       {
@@ -301,6 +323,116 @@ export function buildStyle(): StyleSpecification {
           'line-width': 1.5,
           'line-opacity': 0.9,
           'line-dasharray': [4, 3],
+        },
+      },
+      {
+        // Contours are `line`, which MapLibre does drape (§13.1), and that is
+        // what they want: an isoline that did not follow the ground would be
+        // a drawing of a different hill. Off until a screen asks for them —
+        // the form's map is flat and a contour on a flat map is a decoration.
+        id: LAYERS.contourLines,
+        type: 'line',
+        source: CONTOURS_SOURCE,
+        'source-layer': 'contours',
+        // Dry land only. Terrarium carries the sea floor as negative
+        // elevation and the tracer has no opinion about it, so without this
+        // the bay comes with isobaths at −200 m: true, and nothing to do with
+        // a fire.
+        filter: ['>', ['get', 'ele'], 0],
+        layout: { visibility: 'none' },
+        paint: {
+          'line-color': '#f2f6fa',
+          // Every fifth line carries the height, so it is drawn heavier.
+          'line-width': ['match', ['get', 'level'], 1, 1.3, 0.7],
+          // Faint enough not to compete with the photograph, strong enough to
+          // be read over it: at a fifth of an opacity the first version was
+          // drawing twenty-five lines that nobody could see.
+          'line-opacity': ['match', ['get', 'level'], 1, 0.7, 0.4],
+        },
+      },
+      {
+        id: LAYERS.contourLabels,
+        type: 'symbol',
+        source: CONTOURS_SOURCE,
+        'source-layer': 'contours',
+        filter: ['all', ['>', ['get', 'level'], 0], ['>', ['get', 'ele'], 0]],
+        // Only once the camera is inside the domain. At the opening framing
+        // the figures would be a second layer of text over the names.
+        minzoom: 12,
+        layout: {
+          visibility: 'none',
+          'symbol-placement': 'line',
+          'text-field': ['concat', ['number-format', ['get', 'ele'], { locale: 'ca-ES' }], ' m'],
+          'text-font': [LABEL_FONT],
+          'text-size': 10,
+          'symbol-spacing': 320,
+          'text-max-angle': 25,
+        },
+        paint: {
+          'text-color': '#f2f6fa',
+          'text-halo-color': 'rgba(8, 12, 16, 0.7)',
+          'text-halo-width': 1,
+          'text-opacity': 0.75,
+        },
+      },
+      {
+        // Names over the ground and not painted on it: a symbol layer is one
+        // of the things MapLibre does not drape over the terrain (§13.1), so
+        // the text stands upright on the relief instead of wrapping over a
+        // hillside the way a label in the imagery would.
+        //
+        // Settlements before peaks, because collision is resolved in the order
+        // the layers are drawn: when a name and a summit want the same pixels,
+        // the name wins.
+        id: LAYERS.placeLabels,
+        type: 'symbol',
+        source: PLACES_SOURCE,
+        filter: ['!=', ['get', 'kind'], 'peak'],
+        layout: {
+          'text-field': ['get', 'name'],
+          'text-font': [LABEL_FONT],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 9, 11, 13, 15],
+          'text-max-width': 7,
+          // Lower goes first and first wins: cities, then towns, then
+          // villages. Without it the order is whatever the file happens to be.
+          'symbol-sort-key': ['get', 'rank'],
+        },
+        paint: {
+          'text-color': '#ffffff',
+          'text-halo-color': 'rgba(8, 12, 16, 0.85)',
+          'text-halo-width': 1.3,
+        },
+      },
+      {
+        // The summits, dimmer and only from close up. Six hundred of them
+        // come in each province's file and a domain holds a dozen legible
+        // ones, so the height decides which: the highest is placed first and
+        // the rest give way to it.
+        id: LAYERS.peakLabels,
+        type: 'symbol',
+        source: PLACES_SOURCE,
+        filter: ['==', ['get', 'kind'], 'peak'],
+        // The domain is framed at about zoom 10, so anything stricter would
+        // keep the summits off the one view this screen opens on.
+        minzoom: 9.5,
+        layout: {
+          'text-field': [
+            'concat',
+            ['get', 'name'],
+            '  ',
+            ['number-format', ['get', 'ele'], { locale: 'ca-ES' }],
+            ' m',
+          ],
+          'text-font': [LABEL_FONT],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 10.5, 9.5, 13, 12],
+          'text-max-width': 9,
+          'symbol-sort-key': ['-', ['get', 'ele']],
+        },
+        paint: {
+          'text-color': '#d8e2ea',
+          'text-halo-color': 'rgba(8, 12, 16, 0.8)',
+          'text-halo-width': 1.1,
+          'text-opacity': 0.85,
         },
       },
       {

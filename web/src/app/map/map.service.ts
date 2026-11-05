@@ -23,6 +23,7 @@ import {
   IGNITION_SOURCE,
   LAYERS,
   MUNICIPALITIES_SOURCE,
+  PLACES_SOURCE,
   PROVINCES_SOURCE,
 } from './map.style';
 
@@ -463,6 +464,37 @@ export class MapService {
             ]
           : [],
       });
+    });
+  }
+
+  /**
+   * Draws the contour lines, or takes them off.
+   *
+   * Visibility and not data: the lines are traced on demand from the
+   * elevation tiles (see contours.ts), so there is nothing to load and
+   * nothing to free —what the style asks for is only asked for while the
+   * layers are on.
+   */
+  setContours(on: boolean): void {
+    this.withStyle((map) => {
+      const visibility = on ? 'visible' : 'none';
+      for (const id of [LAYERS.contourLines, LAYERS.contourLabels]) {
+        map.setLayoutProperty(id, 'visibility', visibility);
+      }
+    });
+  }
+
+  /**
+   * Writes the place names of one province over the ground, or clears them.
+   *
+   * One province's worth and not one domain's: the file is a couple of hundred
+   * kilobytes, the style filters what is on screen, and cutting it to the
+   * domain would mean a fetch every time the point moves.
+   */
+  setPlaces(data: FeatureCollection | null): void {
+    this.withStyle((map) => {
+      const source = map.getSource(PLACES_SOURCE) as GeoJSONSource | undefined;
+      source?.setData(data ?? { type: 'FeatureCollection', features: [] });
     });
   }
 

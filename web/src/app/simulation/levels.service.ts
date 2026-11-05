@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 
 import { MapService } from '../map/map.service';
+import { PlacesService } from '../map/places.service';
 import { MunicipalitiesService } from './municipalities.service';
 
 /**
@@ -49,6 +50,7 @@ interface Of {
 export class LevelsService {
   private readonly maps = inject(MapService);
   private readonly municipalities = inject(MunicipalitiesService);
+  private readonly places = inject(PlacesService);
 
   /**
    * Puts the borders into the state one level needs, whatever was there before.
@@ -107,6 +109,14 @@ export class LevelsService {
     // not easier.
     this.maps.setTerrain3D(false);
     this.maps.setOrbit(false);
+
+    // Nor are the place names: the form's map carries administrative borders
+    // and nothing else, so that what is on it answers the question being
+    // asked. Released rather than hidden, for the same reason the
+    // municipalities are: a layer taken off screen without telling its
+    // service means coming back shows nothing at all.
+    this.places.release();
+    this.maps.setContours(false);
   }
 
   /**
