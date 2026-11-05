@@ -529,6 +529,27 @@ Dues coses que es deixen com estan, a propòsit:
   el factor que mana. Si algun dia ho és, la palanca és activar el zoom només
   en aquest pas, no a la portada.
 
+Esmena del 5/11/2026, sobre la primera d'aquestes dues: que el clic no es
+limiti al polígon era correcte, però deixar-ho només així volia dir que el
+panell seguia descrivint el municipi triat tres passos enrere mentre el punt
+era dues valls més enllà —nom, altituds, pendents i contorn, tot del municipi
+equivocat. **Ara el punt decideix el municipi i no al revés**: en clicar es
+busca quin dels municipis carregats conté el punt i el segment del mig de la
+URL passa a ser aquell, de manera que el títol, les dades i el contorn ressaltat
+són sempre els del lloc clicat.
+
+La cerca és per punt dins de polígon contra el fitxer de la província que ja és
+a memòria (§2.25), amb l'extensió de cada municipi com a filtre previ: quatre
+comparacions descarten tot menys un grapat, i el llançament de raig només corre
+sobre aquests. Els forats dels polígons compten amb la mateixa regla, que és el
+que fa que un municipi amb un enclavament a dins respongui bé.
+
+Quan el punt no cau enlloc —el mar, o la província del costat, que a 30 km de
+domini passa sovint— el segment es queda com estava, perquè no hi ha res millor
+per posar-hi, i **el panell ho diu**: «el punt no cau dins de cap municipi de la
+província». Carregar el fitxer del veí per respondre seria fer la pregunta al
+revés, perquè el formulari és en aquesta província.
+
 ### 2.27. El domini es dibuixa, i són tres números lligats
 
 En marcar el punt apareix el quadrat del domini i la càmera l'enquadra. És

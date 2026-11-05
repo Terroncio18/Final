@@ -99,6 +99,14 @@ export class LevelsService {
       this.maps.setIgnition(null);
       this.maps.setDomain(null);
     }
+
+    // The relief is not of a level: the form's map stays flat at every step,
+    // including the last one. The terrain and the orbit are the simulation
+    // view's, which is a different screen with a different question —here the
+    // user is picking a place, and a leaning map makes a place harder to pick,
+    // not easier.
+    this.maps.setTerrain3D(false);
+    this.maps.setOrbit(false);
   }
 
   /**

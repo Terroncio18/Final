@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
+import { Chrome } from './chrome';
 import { TopBar } from './top-bar/top-bar';
 
 @Component({
@@ -9,4 +10,7 @@ import { TopBar } from './top-bar/top-bar';
   styleUrl: './app.css',
   templateUrl: './app.html',
 })
-export class App {}
+export class App {
+  /** The top bar is on screen unless a full screen has asked for it to go. */
+  protected readonly chrome = inject(Chrome);
+}

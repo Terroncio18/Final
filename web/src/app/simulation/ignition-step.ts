@@ -53,6 +53,20 @@ export class IgnitionStep {
 
   protected readonly chosen = computed(() => this.municipalities.find(this.municipality()));
 
+  /**
+   * True when the point is in none of the province's municipalities.
+   *
+   * The sea, or a neighbouring province: the domain is 30 km wide and the
+   * border is wherever it is. The URL then keeps the municipality it came
+   * with —there is nothing better to put in it— and the panel says so, which
+   * is the one thing that must not be left to the user to notice.
+   */
+  protected readonly outside = computed(() => {
+    const point = this.ignition();
+    if (!point || !this.municipalities.municipalities().length) return false;
+    return this.municipalities.at(point) === null;
+  });
+
   /** Nothing when the segment is absent or does not parse. */
   protected readonly ignition = computed(() => parsePoint(this.point()));
 
@@ -78,6 +92,19 @@ export class IgnitionStep {
       high: Math.round(ground.maxElevation),
       tiles: ground.tiles,
     };
+  });
+
+  /**
+   * Where the button goes, or nothing while there is no point to simulate.
+   *
+   * The same four segments on the simulator's route, so the two screens name
+   * the same simulation the same way (§2.26) and the link can be copied from
+   * one address bar to the other.
+   */
+  protected readonly simulation = computed(() => {
+    const point = this.ignition();
+    if (!point) return null;
+    return ['/simulador', this.region(), this.province(), this.municipality(), formatPoint(point)];
   });
 
   /** What the square on the map is, in the three numbers that define it. */
@@ -134,8 +161,15 @@ export class IgnitionStep {
     effect(() => {
       const picked = this.maps.picked();
       if (!picked) return;
+      // The point decides the municipality, and not the other way round. The
+      // three steps above chose one, but the map does not stop at its border:
+      // clicking two valleys over has to answer about the valley clicked, or
+      // the panel describes a municipality the fire is not in. Nothing under
+      // the point —the sea, the next province— leaves the segment as it was,
+      // and the panel says the point is outside it.
+      const municipality = this.municipalities.at(picked)?.id ?? this.municipality();
       void this.router.navigate(
-        ['/simulacio', this.region(), this.province(), this.municipality(), formatPoint(picked)],
+        ['/simulacio', this.region(), this.province(), municipality, formatPoint(picked)],
         // Moving a point that is already set replaces the entry instead of
         // stacking one: otherwise the back button would walk a trail of nudges
         // rather than returning to the list.

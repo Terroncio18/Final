@@ -1,0 +1,39 @@
+<div class="simulator">
+  <div #container class="map-canvas" role="application" aria-label="Terreny de la simulació"></div>
+
+  <div class="map-loading" [class.is-hidden]="ready()" role="status" aria-live="polite">
+    <span class="map-loading-ring" aria-hidden="true"></span>
+    <p>Carregant el terreny…</p>
+    <small>Imatgeria d'Esri · relleu de Mapzen</small>
+  </div>
+
+  <aside class="panel" role="complementary" aria-label="Simulació">
+    <header>
+      <p class="step">Simulació</p>
+      <h1>{{ chosen()?.name ?? 'Municipi desconegut' }}</h1>
+      <p class="code">{{ coordinates() }}</p>
+    </header>
+
+    <dl>
+      <dt>Domini</dt>
+      <dd>{{ domain.km }} × {{ domain.km }} km</dd>
+
+      <dt>Graella</dt>
+      <dd>{{ domain.grid }} × {{ domain.grid }}</dd>
+
+      <dt>Cel·la</dt>
+      <dd>{{ domain.cell }} m</dd>
+    </dl>
+
+    <p class="pending">
+      El relleu és el del domini, a alçada real i sense exagerar: la pendent de cada cel·la és una
+      dada del model. Arrossega amb el botó dret per girar-lo.
+    </p>
+
+    <p class="warning">
+      El model de propagació encara no existeix. Aquesta pantalla és el terreny sobre el qual anirà.
+    </p>
+
+    <a class="back" [routerLink]="back()">← Tornar al formulari</a>
+  </aside>
+</div>

@@ -7,6 +7,7 @@ import { MunicipalityStep } from './simulation/municipality-step';
 import { ProvinceStep } from './simulation/province-step';
 import { RegionStep } from './simulation/region-step';
 import { SimulationFlow } from './simulation/simulation-flow';
+import { SimulatorView } from './simulator/simulator-view';
 
 /**
  * One segment per level of the hierarchy, and the map above all of them.
@@ -16,6 +17,7 @@ import { SimulationFlow } from './simulation/simulation-flow';
  *   /simulacio              pick a region        (NUTS 2)
  *   /simulacio/ES51         pick a province or island (NUTS 3)
  *   /simulacio/ES51/ES511   pick a municipality  (LAU, to come)
+ *   /simulador/ES53/ES532/ES_07061/@2.72,39.78   the simulation itself
  *
  * A parameter matches one segment, so `:region` and `:region/:province` are
  * told apart by how many there are.
@@ -30,8 +32,18 @@ import { SimulationFlow } from './simulation/simulation-flow';
  * The steps are siblings rather than nested, because each one is a different
  * panel and not a panel inside another. `simulacio` is declared before `:scope`
  * because a parameter matches any single segment, that word included.
+ *
+ * The simulator hangs outside MapShell and not under it. It is a screen and not
+ * a panel over the overview's map: it wants the whole window, no top bar and no
+ * detections, and it opens in a tab of its own, where there is no warm map to
+ * inherit anyway. It is declared first for the same reason `simulacio` is: left
+ * below, `:scope` would swallow the word.
  */
 export const routes: Routes = [
+  {
+    path: 'simulador/:region/:province/:municipality/:point',
+    component: SimulatorView,
+  },
   {
     path: '',
     component: MapShell,

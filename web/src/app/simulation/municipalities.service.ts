@@ -3,8 +3,9 @@ import type { FeatureCollection } from 'geojson';
 
 import { MUNICIPALITIES_URL } from '../map/map.config';
 import { MapService } from '../map/map.service';
-import { boundsOf, type AreaGeometry } from './bounds';
+import { boundsOf, contains, type AreaGeometry } from './bounds';
 import type { Municipality } from './municipality';
+import type { Point } from './point';
 
 interface MunicipalityFeature {
   readonly properties: {
@@ -39,6 +40,15 @@ export class MunicipalitiesService {
 
   private readonly cache = new Map<string, readonly Municipality[]>();
   private readonly sources = new Map<string, FeatureCollection>();
+
+  /**
+   * The outline of each municipality read so far, by code.
+   *
+   * Kept beside the list because the list carries extents and an extent is not
+   * a shape: a point can sit inside the box of a coastal municipality and be
+   * out at sea. See at().
+   */
+  private readonly shapes = new Map<string, AreaGeometry>();
   private asked: string | null = null;
 
   load(province: string): void {
@@ -66,6 +76,7 @@ export class MunicipalitiesService {
       .then((collection) => {
         const features = collection.features as unknown as MunicipalityFeature[];
         const list = features.map(toMunicipality);
+        for (const feature of features) this.shapes.set(feature.properties.id, feature.geometry);
         this.cache.set(province, list);
         this.sources.set(province, collection);
         // A slow answer for a province the user has already left must not
@@ -87,6 +98,33 @@ export class MunicipalitiesService {
 
   find(id: string): Municipality | undefined {
     return this.municipalities().find((municipality) => municipality.id === id);
+  }
+
+  /**
+   * The municipality a point falls in, or nothing.
+   *
+   * Only among the ones now on screen, which are one province's (§2.25): the
+   * domain is wider than most provinces' border regions, so a point near the
+   * edge can perfectly well land outside everything that is loaded. Nothing is
+   * the honest answer there, and the caller says what to do with it —loading
+   * the neighbour's file to answer would be asking the question backwards,
+   * since the form is on this province.
+   *
+   * The extent is tested first because it is four comparisons and rules out
+   * every municipality but a handful; the ray casting then runs on those.
+   */
+  at(point: Point): Municipality | null {
+    const [lon, lat] = point;
+
+    for (const municipality of this.municipalities()) {
+      const [west, south, east, north] = municipality.bounds;
+      if (lon < west || lon > east || lat < south || lat > north) continue;
+
+      const shape = this.shapes.get(municipality.id);
+      if (shape && contains(shape, point)) return municipality;
+    }
+
+    return null;
   }
 
   private show(province: string, list: readonly Municipality[]): void {

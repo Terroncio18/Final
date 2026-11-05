@@ -18,6 +18,7 @@ import {
   buildMunicipalityLayers,
   buildProvinceLayers,
   buildStyle,
+  DEM_SOURCE,
   DOMAIN_SOURCE,
   IGNITION_SOURCE,
   LAYERS,
@@ -49,6 +50,27 @@ const FIT_BESIDE_PANEL = {
 
 /** Half the side of the click target, in pixels. */
 const HIT_SLOP = 2;
+
+/**
+ * How far the camera leans over at the last step, in degrees from straight down.
+ *
+ * Terrain seen from directly above is a flat map with shadows on it: the relief
+ * is only relief once the camera has an angle on it. 55° and not MapLibre's
+ * maximum of 60°, which puts so much of the horizon on screen that the domain
+ * stops being the subject.
+ */
+const DOMAIN_PITCH = 55;
+
+/**
+ * The relief at its true height.
+ *
+ * A demo would exaggerate it —one and a half times is the usual— and the
+ * mountains would read better. Here the slope of each cell is an input of the
+ * model (§2.28), so an inflated terrain would be a second, different ground
+ * under the same numbers: what the user judges the point on would not be what
+ * the simulation runs on.
+ */
+const TERRAIN_EXAGGERATION = 1;
 
 function frpOf(feature: MapGeoJSONFeature): number {
   return Number(feature.properties['frp'] ?? 0);
@@ -91,6 +113,9 @@ export class MapService {
 
   /** True while a step is waiting for a click on the map rather than on a mark. */
   private picking = false;
+
+  /** Whether the map is draped over the terrain. See setTerrain3D(). */
+  private terrain3D = false;
 
   /**
    * Where the last click while picking landed, as [lon, lat].
@@ -243,7 +268,18 @@ export class MapService {
   goToBounds(bounds: LngLatBoundsLike, clearOfPanel = false): void {
     this.withStyle((map) => {
       const fit = clearOfPanel ? FIT_BESIDE_PANEL : FIT;
-      map.fitBounds(bounds, { ...fit, duration: this.framed ? 900 : 0 });
+      // The lean goes in the framing and not in a move of its own. The first
+      // version tilted the camera when the terrain went on, a step framed its
+      // extent right after, and the second animation cut the first one off
+      // partway: the map ended up at nine degrees, which reads as a mistake
+      // rather than as a point of view.
+      const pitch = this.terrain3D ? DOMAIN_PITCH : 0;
+      // Where the user has turned the relief, the framing keeps their angle:
+      // moving the point reframes the domain (§2.27) and snapping back to north
+      // would undo the look they had chosen. Flat, north is up again, which is
+      // what fitBounds does on its own when no bearing is asked for.
+      const bearing = this.terrain3D ? map.getBearing() : 0;
+      map.fitBounds(bounds, { ...fit, pitch, bearing, duration: this.framed ? 900 : 0 });
       this.framed = true;
     });
   }
@@ -449,6 +485,66 @@ export class MapService {
     });
   }
 
+  /**
+   * Drapes the map over the terrain, or lays it flat again.
+   *
+   * Nothing new is downloaded and nothing new is drawn: the elevation is the
+   * `raster-dem` source the hillshade has read since the first style (§2.6),
+   * and the same tiles the fourth step samples for the slope (§2.28). MapLibre
+   * builds the mesh and drapes over it what it already drapes —the imagery,
+   * the borders, the domain square— so this is one call and not a second
+   * renderer: `background`, `fill`, `line`, `raster`, `hillshade` and
+   * `color-relief` go onto the terrain by themselves.
+   *
+   * The camera is not touched here. A terrain seen from straight above is a
+   * flat map with shadows, so it does have to lean —but the lean belongs to
+   * the framing that each step asks for right after this call (§2.8), and not
+   * to a second animation that would interrupt it. goToBounds() reads the
+   * state this sets.
+   */
+  setTerrain3D(on: boolean): void {
+    if (on === this.terrain3D) return;
+    this.terrain3D = on;
+    this.withStyle((map) => {
+      map.setTerrain(on ? { source: DEM_SOURCE, exaggeration: TERRAIN_EXAGGERATION } : null);
+    });
+  }
+
+  /**
+   * Hands the relief over to the pointer, or takes it back.
+   *
+   * The rotation and nothing else. The map is built with `interactive: false`
+   * because the portada is a picture to click on (§2.9), and that argument does
+   * not reach the last step: at thirty kilometres over a mountain range the
+   * angle is the whole point of drawing the terrain. But only the angle —the
+   * extent is the step's to decide (§2.8), so panning and zooming stay off.
+   *
+   * It is the right button and ctrl+drag that turn, which is MapLibre's own
+   * binding and the reason there is no conflict to resolve: the left button
+   * goes on meaning «the fire starts here» (§2.26), and a click still places
+   * the point while the drag is turning the ground under it.
+   *
+   * On touch, two fingers tilt. Turning them would mean enabling the pinch
+   * handler, and that one brings the zoom with it.
+   */
+  setOrbit(on: boolean): void {
+    this.withStyle((map) => {
+      if (on) {
+        // Linear and not MapLibre's default: turning follows the horizontal
+        // movement of the pointer and means the same anywhere on the canvas.
+        // The default follows the pointer around the centre like a wheel,
+        // which is sound on a north-up plan and disorienting on a relief: the
+        // same drag turns one way above the middle of the screen and the other
+        // way below it.
+        map.dragRotate.enable({ movement: 'linear' });
+        map.touchPitch.enable();
+      } else {
+        map.dragRotate.disable();
+        map.touchPitch.disable();
+      }
+    });
+  }
+
   clearSelection(): void {
     this.selected.set(null);
   }
@@ -505,6 +601,7 @@ export class MapService {
     this.framed = false;
     this.styled = false;
     this.picking = false;
+    this.terrain3D = false;
     this.picked.set(null);
     this.ready.set(false);
     this.selected.set(null);

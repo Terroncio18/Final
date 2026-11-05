@@ -1,0 +1,150 @@
+/* The simulator is a screen and not a panel over the map, so it fills whatever
+   the shell leaves it —which, with the top bar gone, is the window. */
+.simulator {
+  position: absolute;
+  inset: 0;
+}
+
+.map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* The same curtain as the shell's (§2.6): the map underneath is half drawn for
+   a second or two and a half-drawn map reads as a glitch. Written again here
+   and not shared, because component styles are scoped and a stylesheet shared
+   between two screens would tie their layouts together for four rules. */
+.map-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  background: var(--bg);
+  background-image: radial-gradient(circle at 50% 42%, #18222d 0%, var(--bg) 62%);
+  transition:
+    opacity 0.45s ease,
+    visibility 0s linear 0.45s;
+}
+
+.map-loading.is-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.map-loading p {
+  margin: 0;
+  color: var(--text);
+}
+
+.map-loading small {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.map-loading-ring {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgb(255 122 60 / 0.16);
+  border-top-color: var(--accent);
+  animation: simulator-spin 0.9s linear infinite;
+}
+
+@keyframes simulator-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-loading-ring {
+    animation: simulator-pulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes simulator-pulse {
+    50% {
+      opacity: 0.3;
+    }
+  }
+}
+
+.panel {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  padding: 16px 18px;
+  overflow-y: auto;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+}
+
+.step {
+  margin: 0 0 2px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.code {
+  margin: 16px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  margin: 18px 0 0;
+  padding: 14px 0 0;
+  font-size: 12.5px;
+  border-top: 1px solid var(--line);
+}
+
+dt {
+  color: var(--muted);
+}
+
+dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pending,
+.warning {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.warning {
+  color: #e8a87c;
+}
+
+.back {
+  display: inline-block;
+  margin-top: 18px;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.back:hover {
+  color: var(--text);
+}

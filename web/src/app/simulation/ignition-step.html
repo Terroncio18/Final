@@ -19,6 +19,13 @@
         torna a obrir exactament aquest punt.
       </p>
 
+      @if (outside()) {
+        <p class="warning">
+          El punt no cau dins de cap municipi de la província, de manera que les dades del costat
+          són les del municipi triat i no les del punt.
+        </p>
+      }
+
       <dl>
         <dt>Domini</dt>
         <dd>{{ domain.km }} × {{ domain.km }} km</dd>
@@ -55,8 +62,12 @@
         punt perquè el foc tampoc no el segueix.
       </p>
 
-      <button type="button" class="simulate" disabled>Obrir la simulació</button>
-      <p class="note">El simulador encara no existeix.</p>
+      @if (simulation(); as link) {
+        <a class="simulate" [routerLink]="link" target="_blank" rel="noopener">
+          Obrir la simulació
+        </a>
+        <p class="note">S'obre en una pestanya nova, amb el relleu del domini.</p>
+      }
 
       <p class="pending">Torna a fer clic al mapa per moure el punt.</p>
     } @else {
