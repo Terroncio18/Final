@@ -1,9 +1,28 @@
-# Bitàcola tècnica — IgnisLab
+# Bitàcola tècnica — IgnisLab · Fase 1: el mapa i el formulari
 
 Registre de **decisions preses**: què s'ha decidit i per quins motius. Material
 de base per a la memòria del TFG.
 
-Darrera actualització: 29 d'octubre de 2026.
+Darrera actualització: 5 de novembre de 2026.
+
+**Fase tancada el 5 de novembre de 2026.** Entrega la portada de focus actius,
+el formulari de quatre nivells fins al punt d'ignició, el domini dibuixat al
+voltant del punt i l'elevació del domini llegida al navegador.
+
+Tancada vol dir que no s'hi afegeixen decisions noves, no que sigui intocable:
+una esmena a una decisió d'aquí es continua escrivint aquí, com la del 5 de
+novembre al §2.29. Els números §2.x i §3.x els cita el codi als comentaris i
+no es renumeren mai.
+
+La fase 2 —el simulador i la vista 3D— té bitàcola pròpia a
+[bitacola-simulacio.md](bitacola-simulacio.md), numerada des del §10 perquè cap
+referència no es pugui confondre amb les d'aquí. Hi passen tres pendents que
+són del simulador i no del mapa: la 3.2, la 3.3 i la 3.6.
+
+Es queden obertes aquí, i no blocaven el tancament: la 3.4 i la 3.11 —com
+anomenar i en quina llengua escriure els dos nivells de dalt—, la 3.7 —què és
+«un focus» en clicar— i la unió dels dos camins, que una detecció porti al seu
+municipi, que la 3.12 ja va degradar a millora.
 
 ---
 
@@ -643,21 +662,30 @@ enrere: ES51 → ES511 → Abrera i tornant amunt, baixant-hi un segon cop —qu
 el cas de la memòria cau—, i sortint del formulari i commutant a Canàries per
 veure que les regions hi tornen.
 
+L'esmena del 5 de novembre: la regla valia per a les vores, però el punt
+d'ignició i el domini en quedaven fora —«són del darrer pas»— i tornar del quart
+pas els deixava dibuixats sobre la llista de municipis, el mateix defecte que
+aquesta decisió havia de tancar. **Dir on és el punt sí que és del darrer pas**,
+perquè és l'únic que el sap; **treure'l no pot ser-ho**, perquè treure'l és
+justament el que no pot fer un pas que marxa, segons la regla de dues línies més
+amunt. Ara `show()` l'apaga —i el domini amb ell— a tots els nivells menys a
+`ignition`, on el pas diu quin és just després de la crida, i el `onDestroy` de
+`SimulationFlow` ja no en porta cap línia pròpia: `levels.clear()` ho cobreix.
+L'excepció era el defecte i no la regla, i amb ella fora el servei és l'únic lloc
+d'on el mapa rep què toca a cada nivell.
+
+Comprovat al navegador el 5/11/2026: amb un punt triat, tornar al tercer
+pas deixa la llista de municipis neta, sense el punt ni el quadrat.
+
 ---
 
 ## 3. Decisions pendents
 
 - ~~**3.1. Llenguatge del backend.**~~ Resolta el 25/10/2026: Node amb Fastify
   (§2.12).
-- **3.2. Model digital d'elevacions.** Terrarium per comoditat; l'estat de
-  l'art cita el Copernicus DEM GLO-30, de més qualitat. Des del 29/10/2026
-  Terrarium ja no és només el relleu ombrejat: és la font de la pendent que
-  alimentarà el model (§2.28), de manera que la pendent pesa més. Canviar-lo
-  voldria dir servir les tessel·les nosaltres, perquè el GLO-30 no es
-  distribueix com a tessel·les obertes.
-- **3.3. Polígons sense model de combustible.** `MODCOMB = 0` són 5.471 d'11.654
-  polígons a l'inventari balear. Confondre'ls amb terreny no combustible
-  convertiria mitja illa en tallafocs.
+- **3.2. Model digital d'elevacions.** Passa a la fase 2, §12.1: qui en depèn
+  és el model i no el mapa.
+- **3.3. Polígons sense model de combustible.** Passa a la fase 2, §12.2.
 - **3.4. Com anomenar la jerarquia a Portugal.** Els NUTS 2 i 3 portuguesos són
   regions estadístiques, no comunitats ni províncies, i els seus 18 districtes
   —amb què treballa l'ICNF— no hi surten. El tercer nivell ja no hi entra:
@@ -667,9 +695,7 @@ veure que les regions hi tornen.
 - ~~**3.5. Cremes agrícoles i incendis.**~~ Resolta el 29/10/2026: etiqueta per
   potència i cap afirmació sobre què crema (§2.17). Res no es filtra. Distingir
   rostoll de bosc queda per quan hi hagi coberta del sòl (MFE25, COS).
-- **3.6. Terreny 3D a la vista de simulació.** Activable i no obligatori, perquè
-  drapejar el `CustomLayer` sobre una malla de terreny és més feina que pintar-lo
-  sobre un pla.
+- **3.6. Terreny 3D a la vista de simulació.** Passa a la fase 2, §12.3.
 - **3.7. Què és «un focus» en clicar.** Un episodi real dona centenars de
   deteccions de 375 m solapades i FIRMS no les agrupa en incendis.
 - ~~**3.8. Pressupost de *bundle*.**~~ Resolta el 29/10/2026: els límits
@@ -683,15 +709,20 @@ veure que les regions hi tornen.
   - El pressupost mira la mida crua i qui pateix és la comprimida, i 314 kB per
     a una aplicació de mapes és normal. Carregar MapLibre a part queda per si
     algun dia es mesura que l'espera de la portada molesta de debò.
-- **3.9. L'antiguitat de les dades no arriba a la pantalla.** El servidor
-  publica `x-fetched-at` i `x-stale`, però la font GeoJSON la descarrega
-  MapLibre pel seu compte i ningú llegeix les capçaleres. Amb deteccions NRT la
-  pantalla ha de dir de quan són, i també què passa si l'API no respon: ara el
-  mapa surt buit, que és justament el que §2.15 volia evitar.
-- **3.10. Deteccions fora de l'àmbit.** La caixa peninsular arriba al nord del
-  Marroc i d'Algèria: 65 de les 196 deteccions del 25/10/2026, un terç del que
-  es veu a la portada. Ajornada com a millora, no com a dubte: la via és clara i
-  el que falta és fer-la.
+- ~~**3.9. L'antiguitat de les dades no arriba a la pantalla.**~~ Tancada el
+  5/11/2026 sense fer-la, amb la 3.10: el motiu és allà, perquè és el mateix.
+  El servidor publica `x-fetched-at` i `x-stale`, però la font GeoJSON la
+  descarrega MapLibre pel seu compte i ningú llegeix les capçaleres.
+- ~~**3.10. Deteccions fora de l'àmbit.**~~ Tancada el 5/11/2026 **sense
+  fer-la**, i amb ella la 3.9. Les dues es resolien amb el mateix canvi —que el
+  navegador es descarregués ell mateix el GeoJSON en lloc de donar-ne la URL a
+  MapLibre, cosa que posava les capçaleres a l'abast i donava on etiquetar i
+  filtrar cada detecció— i la decisió és no pujar la complexitat del camí de
+  dades per dues coses de poc pes. El preu, dit perquè consti: la portada
+  dibuixa deteccions del nord del Marroc i d'Algèria —la caixa peninsular hi
+  arriba, 65 de les 196 del 25/10/2026, un terç del que es veu— i no diu de
+  quan són les dades. El diagnòstic i la via es queden escrits a sota per si
+  alguna vegada el preu canvia.
   - Retallar la caixa per latitud no serveix: 41 d'aquestes 65 queden per sobre
     del paral·lel de Tarifa, perquè la costa argelina entre Alger i Dellys va
     dels 36,1° als 36,8°, més al nord que Màlaga.

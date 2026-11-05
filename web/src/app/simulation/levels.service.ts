@@ -41,8 +41,9 @@ interface Of {
  * SimulationFlow's exit carried the whole list of layers by hand.
  *
  * What it does not own: the camera, which each step frames on its own extent
- * (§2.8), and the ignition point with its domain, which belong to the last step
- * alone.
+ * (§2.8). Saying where the ignition point is stays the last step's, because it
+ * is the only one that knows it; taking it off does not, and that is the one
+ * thing §2.29 left out —see show().
  */
 @Injectable({ providedIn: 'root' })
 export class LevelsService {
@@ -86,6 +87,18 @@ export class LevelsService {
     this.maps.focusRegion(null);
     this.maps.focusProvince(null);
     this.maps.focusMunicipality(level === 'ignition' ? (of.municipality ?? null) : null);
+
+    // The point and its domain are the last step's answer and not a level's, so
+    // no level above it has one and arriving at one takes them off. Here and not
+    // in that step's own exit, for the same reason as the borders: a step that
+    // tidies up after itself is one more thing the next step depends on, and the
+    // back button can land on any level. Not at 'ignition', where the step says
+    // what the point is right after this call: clearing it there would be
+    // erasing it to draw it again.
+    if (level !== 'ignition') {
+      this.maps.setIgnition(null);
+      this.maps.setDomain(null);
+    }
   }
 
   /**
