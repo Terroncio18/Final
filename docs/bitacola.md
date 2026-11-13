@@ -1178,7 +1178,16 @@ font es marca **per confirmar** en lloc d'endevinar-ho.
 | pino | 10.4.0 | MIT |
 | @types/geojson | 7946.0.16 | MIT |
 | Material Symbols «mode_heat» | — | Apache-2.0 |
+| DM Sans (variable, latin i latin-ext) | v17 | OFL-1.1 |
+| Manrope (variable, latin i latin-ext) | v23 | OFL-1.1 |
 | Open Sans, servida per fonts.openmaptiles.org | — | Per confirmar: Apache-2.0 o OFL segons la versió |
+
+**Les dues famílies de lletra són al repositori, no a Google Fonts.** Quatre
+fitxers woff2 a `web/src/fonts/`, 95 kB en total, amb el text de l'OFL de
+cadascuna al costat —que és el que la llicència demana de qui les
+redistribueix. Es van baixar de Google Fonts el 13/11/2026 i no es demanen en
+temps d'execució: l'única dependència remota de tipografia que queda és la dels
+glifs del mapa, que serveix OpenMapTiles i que la §2.6 ja compta.
 
 Les dades no tenen cap llicència amb nom, i això és una troballa:
 

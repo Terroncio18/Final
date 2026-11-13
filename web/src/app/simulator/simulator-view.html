@@ -1,39 +1,521 @@
-<div class="simulator">
-  <div #container class="map-canvas" role="application" aria-label="Terreny de la simulació"></div>
+<div class="console">
+  <!-- The bar carries what IgnisLab actually has here: the mark, which
+       simulation this is, and the way back. No tabs that lead nowhere. -->
+  <header class="topbar">
+    <a class="brand" [routerLink]="back()">
+      <!--
+      Material Symbols Outlined «mode_heat», eixos FILL 0, wght 400, GRAD 0,
+      opsz 24. Google, llicència Apache 2.0. El mateix traçat que la portada:
+      la marca és la marca.
+      -->
+      <span class="brand-icon">
+        <svg viewBox="0 -960 960 960" aria-hidden="true">
+          <path
+            d="M240-400q0 52 21 98.5t60 81.5q-1-5-1-9v-9q0-32 12-60t35-51l113-111 113 111q23 23 35 51t12 60v9q0 4-1 9 39-35 60-81.5t21-98.5q0-50-18.5-94.5T648-574q-20 13-42 19.5t-45 6.5q-62 0-107.5-41T401-690q-39 33-69 68.5t-50.5 72Q261-513 250.5-475T240-400Zm240 52-57 56q-11 11-17 25t-6 29q0 32 23.5 55t56.5 23q33 0 56.5-23t23.5-55q0-16-6-29.5T537-292l-57-56Zm0-492v132q0 34 23.5 57t57.5 23q18 0 33.5-7.5T622-658l18-22q74 42 117 117t43 163q0 134-93 227T480-80q-134 0-227-93t-93-227q0-129 86.5-245T480-840Z"
+          />
+        </svg>
+      </span>
+      <strong>IgnisLab<span class="brand-dot">.</span></strong>
+      <span class="brand-tag">SIMULACIÓ D'INCENDIS FORESTALS</span>
+    </a>
 
-  <div class="map-loading" [class.is-hidden]="ready()" role="status" aria-live="polite">
-    <span class="map-loading-ring" aria-hidden="true"></span>
-    <p>Carregant el terreny…</p>
-    <small>Imatgeria d'Esri · relleu de Mapzen</small>
+    <div class="header-actions">
+      <span class="where">
+        <app-icon name="pin" />
+        <strong>{{ chosen()?.name ?? municipality() }}</strong>
+        <span>/</span>
+        <span>{{ provinceName() }}</span>
+      </span>
+      <a class="button subtle" [routerLink]="back()">
+        <app-icon name="back" />
+        Tornar al formulari
+      </a>
+    </div>
+  </header>
+
+  <div class="workspace-heading">
+    <div class="title-block">
+      <span class="eyebrow">CENTRE DE SIMULACIÓ</span>
+      <h1>Predicció de propagació d'incendis</h1>
+    </div>
+    <div class="heading-right">
+      <!-- The first of the three places this screen admits what it is. -->
+      <span class="mock-badge">
+        <span></span>
+        Maqueta · sense model de propagació
+      </span>
+    </div>
   </div>
 
-  <aside class="panel" role="complementary" aria-label="Simulació">
-    <header>
-      <p class="step">Simulació</p>
-      <h1>{{ chosen()?.name ?? 'Municipi desconegut' }}</h1>
-      <p class="code">{{ coordinates() }}</p>
-    </header>
+  <main class="workspace">
+    <!-- ───────────────────────── esquerra: entrades ───────────────────────── -->
+    <aside class="sidebar left-panel" aria-label="Configuració de la simulació">
+      <div class="panel-heading">
+        <h2><app-icon name="sliders" /> Configuració</h2>
+        <span class="tiny-tag">{{ municipality() }}</span>
+      </div>
 
-    <dl>
-      <dt>Domini</dt>
-      <dd>{{ domain.km }} × {{ domain.km }} km</dd>
+      <section class="control-section">
+        <h3>ÀREA D'ESTUDI <app-icon name="pin" /></h3>
+        <div class="location-card">
+          <span class="location-icon"><app-icon name="map" /></span>
+          <span>
+            <strong>{{ chosen()?.name ?? 'Municipi desconegut' }}</strong>
+            <small>{{ provinceName() }} · {{ domain.km }} × {{ domain.km }} km</small>
+          </span>
+        </div>
+      </section>
 
-      <dt>Graella</dt>
-      <dd>{{ domain.grid }} × {{ domain.grid }}</dd>
+      <section class="control-section weather">
+        <h3>METEOROLOGIA <span class="manual-tag">MANUAL</span></h3>
 
-      <dt>Cel·la</dt>
-      <dd>{{ domain.cell }} m</dd>
-    </dl>
+        <div class="wind-summary">
+          <div class="wind-rose">
+            <span class="north">N</span>
+            <span class="east">E</span>
+            <span class="south">S</span>
+            <span class="west">O</span>
+            <div class="rose-rings"></div>
+            <!-- The needle points where the wind goes, which is why it turns
+                 with the origin plus 180°. -->
+            <span class="wind-needle" [style.transform]="'rotate(' + direction() + 'deg)'">↑</span>
+          </div>
+          <div>
+            <span class="secondary">Vent del {{ from().name }}</span>
+            <div class="wind-number">{{ wind() }}<small>km/h</small></div>
+            <small class="secondary">
+              Des de {{ from().short }} → cap a {{ towards().short }}
+            </small>
+            <label class="direction-select">
+              <select
+                aria-label="Direcció d'origen del vent"
+                [value]="direction()"
+                (change)="setDirection($event)"
+              >
+                @for (option of directions; track option.degrees) {
+                  <option [value]="option.degrees">
+                    {{ option.short }} · {{ option.degrees }}°
+                  </option>
+                }
+              </select>
+            </label>
+          </div>
+        </div>
 
-    <p class="pending">
-      El relleu és el del domini, a alçada real i sense exagerar: la pendent de cada cel·la és una
-      dada del model. Arrossega amb el botó dret per girar-lo.
-    </p>
+        <label class="slider-label" for="wind">
+          <span>Velocitat del vent</span>
+          <output>{{ wind() }} km/h</output>
+        </label>
+        <input
+          id="wind"
+          type="range"
+          min="0"
+          max="60"
+          [value]="wind()"
+          [style.--fill]="fill(wind(), 0, 60)"
+          (input)="setNumber('wind', $event)"
+        />
+        <div class="range-bounds"><span>0 km/h</span><span>60 km/h</span></div>
 
-    <p class="warning">
-      El model de propagació encara no existeix. Aquesta pantalla és el terreny sobre el qual anirà.
-    </p>
+        <label class="slider-label" for="humidity">
+          <span><app-icon name="droplet" /> Humitat relativa</span>
+          <output>{{ humidity() }} %</output>
+        </label>
+        <input
+          id="humidity"
+          class="blue-range"
+          type="range"
+          min="10"
+          max="90"
+          [value]="humidity()"
+          [style.--fill]="fill(humidity(), 10, 90)"
+          (input)="setNumber('humidity', $event)"
+        />
 
-    <a class="back" [routerLink]="back()">← Tornar al formulari</a>
-  </aside>
+        <label class="slider-label" for="temperature">
+          <span><app-icon name="thermometer" /> Temperatura</span>
+          <output>{{ temperature() }} °C</output>
+        </label>
+        <input
+          id="temperature"
+          type="range"
+          min="10"
+          max="45"
+          [value]="temperature()"
+          [style.--fill]="fill(temperature(), 10, 45)"
+          (input)="setNumber('temperature', $event)"
+        />
+      </section>
+
+      <section class="control-section">
+        <h3>COMBUSTIBLE <app-icon name="trees" /></h3>
+        <label class="secondary" for="fuel">Coberta predominant</label>
+        <select id="fuel" class="full-select" [value]="fuel()" (change)="setFuel($event)">
+          @for (option of fuels; track option.id) {
+            <option [value]="option.id">{{ option.label }}</option>
+          }
+        </select>
+        <div class="fuel-detail">
+          <span class="fuel-dot"></span>
+          <span>{{ fuelDetail().note }}</span>
+          <span class="fuel-badge">{{ fuelDetail().load }}</span>
+        </div>
+      </section>
+
+      <section class="control-section">
+        <h3>ESCENARIS</h3>
+        <div class="scenario-options">
+          @for (option of scenarios; track option.id) {
+            <button
+              type="button"
+              class="scenario-button"
+              [class.selected]="scenario() === option.id"
+              (click)="scenario.set(option.id)"
+            >
+              <app-icon [name]="option.icon" />
+              {{ option.label }}
+              @if (scenario() === option.id) {
+                <span class="selected-dot"></span>
+              }
+            </button>
+          }
+        </div>
+      </section>
+
+      <section class="control-section">
+        <h3>EINES</h3>
+        <div class="tools-row">
+          <button
+            type="button"
+            [class.active]="tool() === 'ignition'"
+            (click)="toggleTool('ignition')"
+          >
+            <app-icon name="flame" /> Ignició
+          </button>
+          <button
+            type="button"
+            [class.active]="tool() === 'measure'"
+            (click)="toggleTool('measure')"
+          >
+            <app-icon name="ruler" /> Mesurar
+          </button>
+        </div>
+      </section>
+
+      <div class="simulation-controls">
+        <div class="simulation-state">
+          <span class="live-dot waiting"></span>
+          <span>Pendent del model</span>
+          <span class="elapsed">T + {{ elapsed() }} h</span>
+        </div>
+        <div class="play-controls">
+          <button type="button" class="button primary" disabled>
+            <app-icon name="play" /> Iniciar simulació
+          </button>
+          <button type="button" class="button reset-button" disabled aria-label="Reiniciar">
+            <app-icon name="reset" />
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ────────────────────────── centre: el terreny ────────────────────────── -->
+    <section class="map-panel" aria-label="Terreny de la simulació">
+      <div class="map-topbar">
+        <div class="map-place">
+          <app-icon name="pin" />
+          <strong>{{ chosen()?.name ?? 'Municipi desconegut' }}</strong>
+          <span>/</span>
+          <span>{{ provinceName() }}</span>
+        </div>
+        <span class="map-coordinates">{{ coordinates() }}</span>
+        <div class="map-style-switch" role="group" aria-label="Vista del terreny">
+          <button type="button" [class.on]="relief()" (click)="relief.set(true)">Relleu</button>
+          <button type="button" [class.on]="!relief()" (click)="relief.set(false)">Pla</button>
+        </div>
+        <span class="terrain-badge">{{ domain.grid }} · {{ domain.cell }} m</span>
+      </div>
+
+      <div class="map-viewport">
+        <div #container class="map-canvas" role="application" aria-label="Terreny en relleu"></div>
+
+        <div class="map-loading" [class.is-hidden]="ready()" role="status" aria-live="polite">
+          <span class="loader" aria-hidden="true"></span>
+          Preparant el relleu…
+        </div>
+
+        <div class="map-vignette"></div>
+
+        <div class="time-chip">
+          <span class="time-chip-icon"><app-icon name="clock" /></span>
+          <div>
+            <small>TEMPS DE SIMULACIÓ</small>
+            <strong>T + {{ elapsed() }} <span>h</span></strong>
+          </div>
+          <span class="time-chip-tag">SENSE MODEL</span>
+        </div>
+
+        <!-- Only the controls that do something here. Panning and zooming are
+             off on this screen by decision, so no buttons offer them. -->
+        <div class="map-toolbar">
+          <button
+            type="button"
+            [class.active]="relief()"
+            title="Relleu inclinat"
+            aria-label="Relleu inclinat"
+            (click)="relief.set(true)"
+          >
+            3D
+          </button>
+          <button
+            type="button"
+            [class.active]="!relief()"
+            title="Vista zenital"
+            aria-label="Vista zenital"
+            (click)="relief.set(false)"
+          >
+            <app-icon name="map" />
+          </button>
+          <span></span>
+          <button
+            type="button"
+            title="Tornar a enquadrar el domini"
+            aria-label="Tornar a enquadrar el domini"
+            (click)="recentre()"
+          >
+            <app-icon name="crosshair" />
+          </button>
+          <button
+            type="button"
+            [class.active]="layersOpen()"
+            title="Capes del mapa"
+            aria-label="Capes del mapa"
+            (click)="layersOpen.set(!layersOpen())"
+          >
+            <app-icon name="layers" />
+          </button>
+        </div>
+
+        @if (layersOpen()) {
+          <div class="layer-menu">
+            <h3>CAPES DEL MAPA</h3>
+            <label>
+              <input type="checkbox" [checked]="relief()" (change)="relief.set(!relief())" />
+              Relleu
+            </label>
+            <label>
+              <input type="checkbox" [checked]="contours()" (change)="contours.set(!contours())" />
+              Corbes de nivell
+            </label>
+            <label>
+              <input type="checkbox" [checked]="labels()" (change)="labels.set(!labels())" />
+              Topònims
+            </label>
+          </div>
+        }
+
+        <div class="map-bottom">
+          <div class="map-legend">
+            <span><i class="legend-domain"></i>Domini</span>
+            <span><i class="legend-fire"></i>Punt d'ignició</span>
+            <span><i class="legend-town"></i>Municipi</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="timeline">
+        <div class="timeline-top">
+          <div>
+            <app-icon name="clock" />
+            <strong>Evolució temporal</strong>
+            <span class="secondary">Horitzó de simulació · 6 h</span>
+          </div>
+          <div class="timeline-actions">
+            <button type="button" disabled aria-label="Reproduir"><app-icon name="play" /></button>
+            <select aria-label="Velocitat" [value]="speed()" (change)="setSpeed($event)" disabled>
+              <option value="1">1×</option>
+              <option value="2">2×</option>
+              <option value="5">5×</option>
+            </select>
+          </div>
+        </div>
+        <div class="timeline-track">
+          <input
+            type="range"
+            aria-label="Minuts des de l'inici"
+            min="0"
+            max="360"
+            step="1"
+            [value]="minutes()"
+            [style.--fill]="fill(minutes(), 0, 360)"
+            (input)="setMinutes($event)"
+          />
+          <div class="timeline-ticks">
+            <span>Inici</span>
+            <span>+1 h</span>
+            <span>+2 h</span>
+            <span>+3 h</span>
+            <span>+4 h</span>
+            <span>+5 h</span>
+            <span>+6 h</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ───────────────────── dreta: sortides, totes inventades ───────────────────── -->
+    <aside class="sidebar right-panel" aria-label="Anàlisi">
+      <div class="panel-heading">
+        <h2><app-icon name="activity" /> Anàlisi</h2>
+        <span class="tiny-tag warn">EXEMPLE</span>
+      </div>
+
+      <div class="risk-banner">
+        <app-icon name="warning" />
+        <div>
+          <strong>{{ sample.risk.title }}</strong>
+          <small>{{ sample.risk.detail }}</small>
+        </div>
+        <span class="risk-level">
+          0{{ sample.risk.level }}<span>/0{{ sample.risk.of }}</span>
+        </span>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric">
+          <span>Superfície afectada</span>
+          <div>
+            <strong>{{ sample.area }}</strong
+            ><small>ha</small>
+          </div>
+          <em>{{ sample.areaTrend }}</em>
+        </div>
+        <div class="metric">
+          <span>Vel. de propagació</span>
+          <div>
+            <strong>{{ sample.spread }}</strong
+            ><small>m/min</small>
+          </div>
+          <em class="muted">Front principal</em>
+        </div>
+        <div class="metric">
+          <span>Direcció dominant</span>
+          <div>
+            <strong class="direction-metric">↘ {{ sample.heading.short }}</strong>
+          </div>
+          <em class="muted">{{ sample.heading.degrees }}° · cap al {{ sample.heading.name }}</em>
+        </div>
+        <div class="metric">
+          <span>Contenció estimada</span>
+          <div>
+            <strong>{{ sample.containment }}</strong
+            ><small>%</small>
+          </div>
+          <div class="containment-track">
+            <span [style.width.%]="sample.containment"></span>
+          </div>
+        </div>
+        <div class="metric warning-metric">
+          <span>ETA a zona urbana</span>
+          <div>
+            <app-icon name="clock" />
+            <strong>{{ sample.eta }}</strong
+            ><small>min</small>
+          </div>
+          <em class="muted">Segons les condicions d'ara</em>
+        </div>
+        <div class="metric">
+          <span>Habitatges exposats</span>
+          <div>
+            <strong>{{ sample.homes }}</strong
+            ><app-icon name="house" />
+          </div>
+          <em class="muted">Exposició a +90 min</em>
+        </div>
+      </div>
+
+      <section class="chart-section">
+        <div class="chart-heading">
+          <h3>Evolució prevista</h3>
+          <span>Pròxims 90 min</span>
+        </div>
+        <div class="chart-key">
+          <span><i class="legend-fire"></i>Superfície afectada</span>
+          <small>ha</small>
+        </div>
+        <div class="chart">
+          <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
+            <path class="chart-area" [attr.d]="forecastChart.area" />
+            <path class="chart-line" [attr.d]="forecastChart.line" />
+          </svg>
+        </div>
+      </section>
+
+      <section class="chart-section">
+        <div class="chart-heading">
+          <h3>Àrea cremada</h3>
+          <span>Acumulada · ha</span>
+        </div>
+        <div class="chart small-chart">
+          <svg viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true">
+            <path class="chart-area muted-area" [attr.d]="historyChart.area" />
+            <path class="chart-line muted-line" [attr.d]="historyChart.line" />
+          </svg>
+        </div>
+      </section>
+
+      <section class="comparison-section">
+        <div class="chart-heading">
+          <h3>Comparació d'escenaris</h3>
+          <span>+90 min</span>
+        </div>
+        @for (row of sample.comparison; track row.id) {
+          <div class="comparison-row" [class.selected]="scenario() === row.id">
+            <span>{{ row.label }}</span>
+            <span class="comparison-bar">
+              <span
+                [style.width.%]="(row.value / row.of) * 100"
+                [style.background]="row.colour"
+              ></span>
+            </span>
+            <b>{{ row.value }} ha</b>
+          </div>
+        }
+      </section>
+
+      <!-- The second place, and the one that sits under the numbers. -->
+      <div class="model-note">
+        <app-icon name="info" />
+        <span>
+          Xifres d'exemple, no calculades
+          <small>
+            El model de propagació encara no existeix. Aquesta columna ensenya on aniran els
+            resultats, i cap dels seus números surt d'un càlcul.
+          </small>
+        </span>
+      </div>
+    </aside>
+  </main>
+
+  <!-- I la tercera. -->
+  <footer class="statusbar">
+    <div>
+      <span class="live-dot waiting"></span>
+      Sense model de propagació
+      <span class="status-divider">|</span>
+      <span
+        >Escenari:
+        <strong>{{
+          scenario() === 'base' ? 'Base' : scenario() === 'wind' ? 'Vent fort' : 'Humitat alta'
+        }}</strong></span
+      >
+    </div>
+    <div>
+      <span>WGS 84</span>
+      <span class="status-divider">|</span>
+      <span>{{ relief() ? 'Relleu 3D' : 'Vista plana' }}</span>
+      <span class="status-divider">|</span>
+      <strong>IgnisLab <span>TFG UOC</span></strong>
+    </div>
+  </footer>
 </div>
