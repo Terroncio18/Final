@@ -12,7 +12,8 @@
     "data:regions": "node scripts/fetch-regions.mjs",
     "data:provinces": "node scripts/fetch-provinces.mjs",
     "data:municipalities": "node --max-old-space-size=6144 scripts/fetch-municipalities.mjs",
-    "data:places": "node scripts/fetch-places.mjs"
+    "data:places": "node scripts/fetch-places.mjs",
+    "data:index": "node scripts/build-index.mjs"
   },
   "private": true,
   "packageManager": "npm@10.9.8",

@@ -698,6 +698,93 @@ d'on el mapa rep què toca a cada nivell.
 Comprovat al navegador el 5/11/2026: amb un punt triat, tornar al tercer
 pas deixa la llista de municipis neta, sense el punt ni el quadrat.
 
+### 2.30. Un cercador de municipis, i per nom i no per codi postal
+
+El formulari baixa per tres nivells perquè és la forma que té la dada (§2.25),
+i és la forma correcta per a qui mira el territori. És la forma equivocada per
+a qui ja porta el nom: **la regió d'un municipi és justament el que hauria
+d'anar a mirar primer**, i una llista de disset regions no l'hi diu. Qui vol
+simular un incendi a Sóller no sap que ha de passar per «Illes Balears» i
+«Mallorca»; ho sabrà quan hi arribi.
+
+**El codi postal es va mirar i es va descartar.** Tècnicament hi és: GeoNames
+publica els dos països amb coordenades i llicència CC-BY —`ES.zip` 556 kB,
+`PT.zip` 1,08 MB—, de manera que el problema no és la dada sinó què és un CP.
+És un districte de repartiment i no un territori: la relació amb el municipi és
+de molts a molts —una ciutat gran en té desenes, un CP rural cobreix diversos
+municipis—, de manera que **no resol el codi LAU que la URL necessita** sense
+fer triar l'usuari un altre cop. El bosc no en té cap, i el punt d'ignició es
+posa fora de nucli, que és exactament la pregunta que el CP no respon. I ningú
+en sap cap d'un lloc on no viu. L'únic tros gratis és que a Espanya els dos
+primers dígits són la província de l'INE; a Balears i Canàries un sol prefix en
+tapa tres, de manera que ni això és net. Hauria estat una font nova, una
+llicència nova i una atribució nova per respondre pitjor.
+
+Decidit: **cerca per nom**, sobre un índex derivat del que ja hi ha.
+`scripts/build-index.mjs` llegeix els 81 fitxers de municipis —13 MB de
+geometria— i n'escriu un de sol amb les 11.012 unitats: nom, codi LAU, codi
+NUTS 3 i nom de la província. Són 537 kB, 111 kB per la xarxa, i no entren al
+paquet: es demanen el primer cop que algú es posa a cercar. El paquet creix
+1,3 kB, de 328,29 a 329,56 kB.
+
+El segment NUTS 2 no hi viatja perquè no cal: els codis NUTS són jeràrquics per
+construcció i la regió són els quatre primers caràcters del codi de la
+província. Les 81 ho compleixen, i el script ho comprova contra
+`provinces.geojson` abans d'escriure res. **El nom de la província sí que hi
+viatja**, i és l'únic camp que no és derivable: **173 noms els porta més d'una
+unitat** —`Pinheiro`, sis— i una fila sense província és una fila entre la qual
+no es pot triar. Portar-lo també vol dir que el camp respon al primer pas sense
+arrossegar els 380 kB de províncies que aquell pas deliberadament no carrega
+(§2.23).
+
+Tot d'un cop, que és el contrari de la resta de serveis d'aquí. És el mateix
+tracte vist de l'altre costat: els fitxers per província són barats perquè la
+pantalla sempre sap de quina província és, i **aquesta és l'única pregunta que
+es fa abans de triar-ne cap**.
+
+El que es compara no és només el nom, perquè el registre n'amaga dues formes
+que d'una altra manera serien introbables: **786 unitats porten l'article al
+final** —`Coruña, A`, `Ametlla del Vallès, L'`—, que és com ordena un registre i
+no com ho escriu ningú, i **126 són bilingües** —`Agurain / Salvatierra`—, on
+qualsevol de les dues meitats és la que algú coneix. El nom es mostra tal com el
+dona la dada, que és l'oficial; el que creix és el conjunt de formes contra les
+quals es prova la consulta. L'apòstrof no porta espai al darrere: la primera
+versió escrivia `L' Ametlla` i `l'ametlla` no trobava res.
+
+L'ordre són **tres graus i no una xifra de rellevància**: el nom comença pel que
+s'ha escrit, hi comença una paraula seva, o el conté en algun lloc. És el que
+cal perquè `sant` posi `Sant Boi` per sobre de `Son Servera`. A igualtat de
+grau mana l'alfabètic, que ja ve fet del fitxer. S'escanegen les 11.012
+entrades a cada tecla, sense índex de prefixos ni retard: són dues o tres
+cerques de cadena per entrada i no s'acosta a un fotograma.
+
+El camp viu a la **capçalera dels tres passos** —sempre el mateix lloc, sobre la
+llista— i la llista de resultats flota sobre el cos del panell, que és el que fa
+scroll: dins del flux empenyeria la llista del pas avall a cada tecla. Vuit
+files, que és un terç de l'alçada del panell, i dues lletres com a mínim.
+Segueix el patró ARIA de combobox: el focus no surt mai del camp, les files són
+`option` i no enllaços, i quina és l'actual viatja a `aria-activedescendant`.
+
+On porta és **al pas del punt d'ignició i no a la llista de municipis d'on
+surt**: el nom escrit *és* la resposta que demanen els tres passos, de manera
+que aturar-se un nivell abans per ensenyar-lo ressaltat en una llista seria
+tornar-la a demanar. Els tres passos es queden on són: la jerarquia continua
+sent com es llegeix el mapa, i això és per a qui mira el territori i no per a
+qui ja porta un nom (§2.18).
+
+El límit conegut: unes quantes freguesies portugueses repeteixen nom **dins de
+la mateixa NUTS 3** —tres `Pinheiro` a Viseu Dão Lafões—, i allà la província no
+desempata. El codi LAU no vol dir res a ningú i el concelho no és al fitxer que
+en vam derivar, de manera que aquestes files només es distingeixen obrint-ne
+una i mirant el mapa. Són poques i el defecte és visible; inventar-hi una
+desambiguació hauria demanat una font més.
+
+Comprovat al navegador el 13/11/2026, amb el servidor de desenvolupament:
+`soller` sense accent obre Sóller a Mallorca des del primer pas, `a corun` troba
+`Coruña, A` des del tercer pas de Barcelona, `l'ametlla` torna les dues Ametlles
+i `ametlla` + fletxa avall + retorn obre `Ametlla del Vallès, L'` a
+`/simulacio/ES51/ES511/ES_08005`.
+
 ---
 
 ## 3. Decisions pendents

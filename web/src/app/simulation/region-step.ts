@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { MapService } from '../map/map.service';
 import { LevelsService } from './levels.service';
 import { RegionsService } from './regions.service';
+import { SearchBox } from './search-box';
 
 /**
  * Spain first, then Portugal. A heading each, because NUTS 2 already says which
@@ -24,7 +25,7 @@ const COUNTRIES = [
  */
 @Component({
   selector: 'app-region-step',
-  imports: [RouterLink],
+  imports: [RouterLink, SearchBox],
   templateUrl: './region-step.html',
   styleUrl: './step-panel.css',
 })

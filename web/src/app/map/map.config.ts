@@ -79,6 +79,19 @@ export const PROVINCES_URL = 'data/provinces.geojson';
 export const MUNICIPALITIES_URL = 'data/municipalities';
 
 /**
+ * Every municipality's name in one file, for the form's search field.
+ *
+ * Derived from the eighty-one files above by `npm run data:index` and not a
+ * source of its own. The hierarchy is read one province at a time because a
+ * step always knows which province it is on; the search field is the one thing
+ * that does not —answering before a province has been chosen is what it is
+ * for— so it is the one thing that needs all the names at once. 540 kB, 111 kB
+ * over the wire, asked for the first time somebody means to search and never
+ * with a step.
+ */
+export const MUNICIPALITY_INDEX_URL = 'data/municipality-index.json';
+
+/**
  * Place names, one file per province, like the municipalities above.
  *
  * Towns and named peaks from OpenStreetMap: the administrative files carry

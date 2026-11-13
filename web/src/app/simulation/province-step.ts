@@ -5,6 +5,7 @@ import { MapService } from '../map/map.service';
 import { LevelsService } from './levels.service';
 import { ProvincesService } from './provinces.service';
 import { RegionsService } from './regions.service';
+import { SearchBox } from './search-box';
 
 /**
  * Step two of three: pick a province or an island.
@@ -14,7 +15,7 @@ import { RegionsService } from './regions.service';
  */
 @Component({
   selector: 'app-province-step',
-  imports: [RouterLink],
+  imports: [RouterLink, SearchBox],
   templateUrl: './province-step.html',
   styleUrl: './step-panel.css',
 })

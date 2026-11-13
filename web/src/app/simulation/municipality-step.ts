@@ -5,6 +5,7 @@ import { MapService } from '../map/map.service';
 import { LevelsService } from './levels.service';
 import { MunicipalitiesService } from './municipalities.service';
 import { ProvincesService } from './provinces.service';
+import { SearchBox } from './search-box';
 
 /**
  * Step three of three: pick a municipality.
@@ -15,7 +16,7 @@ import { ProvincesService } from './provinces.service';
  */
 @Component({
   selector: 'app-municipality-step',
-  imports: [RouterLink],
+  imports: [RouterLink, SearchBox],
   templateUrl: './municipality-step.html',
   styleUrl: './step-panel.css',
 })
