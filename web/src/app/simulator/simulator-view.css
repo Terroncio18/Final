@@ -302,6 +302,32 @@
   color: #8f9ca6;
 }
 
+.terrain-facts {
+  margin: 9px 0 0;
+}
+
+.terrain-facts div {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 1px;
+}
+
+.terrain-facts dt {
+  color: #8e9ba8;
+}
+
+.terrain-facts dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.terrain-note {
+  margin: 9px 0 0;
+  font-size: 10px;
+  color: #8e9ba8;
+}
+
 .manual-tag {
   padding: 3px 4px;
   font-size: 8px;
@@ -577,6 +603,57 @@ input[type='range']::-webkit-slider-thumb {
   border-color: var(--orange);
 }
 
+.tool-hint {
+  margin: 8px 0 0;
+  font-size: 10px;
+  color: #c9a183;
+}
+
+.start-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.start-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+
+.start-list li > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+
+.start-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  background: #ff773d;
+  border-radius: 50%;
+  box-shadow: 0 0 6px #ff773d;
+}
+
+.start-list small {
+  display: block;
+  font-size: 9px;
+  color: #8f9ca6;
+  font-variant-numeric: tabular-nums;
+}
+
+.start-list button {
+  padding: 0 6px;
+  font-size: 15px;
+  line-height: 1.2;
+  color: #a7b4c0;
+  background: none;
+  border: 1px solid #35414e;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
 .simulation-controls {
   position: sticky;
   bottom: 0;
@@ -695,6 +772,11 @@ input[type='range']::-webkit-slider-thumb {
   color: #7f929e;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.map-coordinates strong {
+  font-weight: 600;
+  color: #c9d3db;
 }
 
 .map-style-switch {
@@ -915,13 +997,18 @@ input[type='range']::-webkit-slider-thumb {
   accent-color: #f79c65;
 }
 
-/* Above MapLibre's own two rows —the credits and the scale bar, which are a
-   licence condition and a reading aid and not ours to move. */
-.map-bottom {
+/* Under the time chip and not in the bottom corner. That corner is MapLibre's:
+   the credits are a licence condition, they wrap to as many lines as the card
+   is narrow, and a legend placed a fixed distance above them ends up on top of
+   them. Up here nothing else changes size. */
+.map-key {
   position: absolute;
   z-index: 3;
-  left: 16px;
-  bottom: 74px;
+  top: 86px;
+  left: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   pointer-events: none;
 }
 
@@ -951,6 +1038,17 @@ input[type='range']::-webkit-slider-thumb {
   width: 6px;
   height: 6px;
   border-radius: 50%;
+}
+
+/* Squares and not dots: these are areas of ground, not marks on it. */
+.slope-legend {
+  margin-top: 6px;
+}
+
+.slope-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
 }
 
 .legend-domain {
@@ -1003,6 +1101,7 @@ input[type='range']::-webkit-slider-thumb {
   cursor: pointer;
 }
 
+.timeline-track input:disabled,
 .timeline-actions button:disabled,
 .timeline-actions select:disabled {
   opacity: 0.45;

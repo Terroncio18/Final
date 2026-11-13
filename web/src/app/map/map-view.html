@@ -1,3 +1,36 @@
+<!-- What a mark means, which the map cannot say by itself. Drawn from the same
+     stops the layer is painted with, at the sizes the map uses. -->
+<aside class="hotspot-legend" aria-label="Llegenda dels focus">
+  <h2>Potència radiativa <small>FRP</small></h2>
+  <ul>
+    @for (stop of stops; track stop.mw) {
+      <li>
+        <span class="swatch">
+          <i
+            [style.width.px]="stop.radius * 2 * scale()"
+            [style.height.px]="stop.radius * 2 * scale()"
+            [style.background]="byDate() ? null : stop.colour"
+            [class.plain]="byDate()"
+          ></i>
+        </span>
+        {{ stop.label }}
+      </li>
+    }
+  </ul>
+  <!-- With more than a day on screen the colour stops repeating the power and
+       says when: the circles above go grey, because their colour no longer
+       means anything, and the ramp gets a key of its own. -->
+  @if (byDate()) {
+    <h2 class="second">Data de la detecció</h2>
+    <div class="date-ramp" [style.background]="dateRamp"></div>
+    <div class="date-ends">
+      <span>{{ ends().from }}</span>
+      <span>{{ ends().to }}</span>
+    </div>
+  }
+  <p>Una marca per detecció del satèl·lit, no per incendi.</p>
+</aside>
+
 @if (selected(); as hotspot) {
   <app-hotspot-panel [hotspot]="hotspot" (closed)="clearSelection()" />
 }

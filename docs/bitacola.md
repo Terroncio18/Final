@@ -3,7 +3,7 @@
 Registre de **decisions preses**: què s'ha decidit i per quins motius. Material
 de base per a la memòria del TFG.
 
-Darrera actualització: 5 de novembre de 2026.
+Darrera actualització: 13 de novembre de 2026.
 
 **Fase tancada el 5 de novembre de 2026.** Entrega la portada de focus actius,
 el formulari de quatre nivells fins al punt d'ignició, el domini dibuixat al
@@ -937,6 +937,152 @@ Comprovat al navegador el 13/11/2026: l'agost del 2024 passa de 6.788 a **4.303
 focus** a la península i el mapa es queda sense cap punt al Marroc, a Algèria
 ni al Llenguadoc; les Canàries segueixen amb 11; i el panell diu que 2.485
 queden fora.
+
+### 2.33. La portada porta llegenda, i la detecció oberta es marca
+
+Decidit el 13/11/2026. Dues coses que el mapa de focus no deia.
+
+**Què vol dir una marca.** La §2.16 va fer que la mida i el color portessin la
+potència, i enlloc de la pantalla no s'explicava: calia obrir una detecció per
+saber que un cercle gros era un foc intens. Ara hi ha una llegenda a dalt a
+l'esquerra amb quatre cercles —1, 10, 100 i «1.000 MW o més»— a la mida i amb
+el color amb què el mapa els pinta, i una línia que repeteix el que el
+comptador ja diu amb una paraula (§2.31): **una marca per detecció del
+satèl·lit, no per incendi**.
+
+- **Les xifres surten de l'estil i no d'una còpia.** Les quatre parades viuen
+  en una sola constant, `HOTSPOT_STOPS`, de la qual es construeixen el radi i
+  el color de la capa, l'anell de selecció i la llegenda. Una llegenda escrita
+  a part és una segona versió de l'escala, lliure de separar-se'n el dia que
+  algú toqui una parada.
+- **«O més» a l'última**, perquè a 1.000 MW el que s'atura és la marca i no la
+  potència.
+- **A dalt a l'esquerra.** A baix a l'esquerra hi ha els crèdits i l'escala,
+  que són de MapLibre, i a la dreta s'obre el panell de detecció.
+- **No és clicable**, de manera que les marques que queden a sota ho segueixen
+  sent.
+- **Només a la portada.** Viu a `MapView`, que és la ruta de la portada: dins
+  del formulari els focus s'apaguen (§2.21) i la llegenda amb ells.
+
+El que la llegenda **no** diu són els trams del panell —baixa, moderada,
+alta, amb talls a 5 i 50 MW (§2.17). Són dues escales: la del mapa és contínua
+i puja per desenes, la del panell són tres paraules. Unificar-les voldria dir
+desfer les parades de la §2.16 a favor d'uns talls que la §2.17 ja dona per mal
+calibrats; es deixa com està i es diu aquí.
+
+**Quina detecció s'està mirant.** En clicar s'obria el panell i al mapa no
+quedava res que digués de quina marca parlava —entre quatre mil, i amb les
+tres plataformes veient el mateix foc a pocs píxels (§2.31). Ara la detecció
+oberta porta un anell blanc al voltant.
+
+- **Blanc i sense farciment.** Blanc perquè en aquest mapa és el color que
+  assenyala i el taronja és el foc (§2.22); sense farciment perquè la marca de
+  sota conservi la mida i el color, que són la dada.
+- **No parpelleja**, com cap ressaltat d'aquí (§2.22).
+- **És un filtre sobre la mateixa font**, per `id`, i no un estat de la marca:
+  la font se substitueix sencera en canviar les dates (§2.31) i un estat no hi
+  sobreviuria. El senyal que llegeix el panell i el filtre es posen junts, en
+  un sol mètode, perquè l'anell sigui sempre al voltant del que el panell
+  descriu.
+- **S'apaga amb les marques** quan s'obre el formulari (§2.21).
+
+Comprovat al navegador el 13/11/2026 amb l'agost del 2024: la llegenda surt a
+la península i a les Canàries; clicar una detecció de 264,3 MW a l'est de la
+península li posa l'anell i obre el panell; tancar el panell treu l'anell.
+
+### 2.34. Amb moltes deteccions, les marques s'encongeixen
+
+Decidit el 13/11/2026. La §2.16 es va dibuixar amb un dia de deteccions, que
+són un parell de centenars. Des que la portada deixa triar dates (§2.31) un
+mes en són quatre mil, i a mida completa les marques grosses enterren les
+petites: l'agost del 2024, Galícia i el nord de Portugal eren una sola taca
+taronja.
+
+Decidit: **la mida i l'opacitat de les marques depenen de quantes n'hi ha a la
+vista.** Fins a 300 es dibuixen com sempre; a partir d'aquí s'encongeixen i
+s'aclareixen fins al 60% de la mida i el 65% d'opacitat, que s'assoleix a
+5.000.
+
+- **És presentació i res més.** No es fusiona, no es descarta i no es fa cap
+  mitjana: això seria decidir què fa que dues deteccions siguin el mateix foc,
+  que és la 3.7 i segueix oberta. Totes les marques es multipliquen pel mateix
+  factor, de manera que una que era el doble d'una altra ho segueix sent.
+- **Descartats el mapa de calor i els agrupaments**, que són el que es fa
+  normalment amb milers de punts. El mapa de calor converteix «més deteccions»
+  en «més foc», i aquí tres plataformes veuen el mateix incendi en passades
+  diferents (§2.31): pintaria com a més intens el que només està més observat.
+  Agrupar és, altra vegada, la 3.7.
+- **Pel logaritme del recompte**, pel mateix motiu pel qual les parades pugen
+  per desenes: de 300 a 600 canvia més la pantalla que de 4.000 a 4.300.
+- **El recompte és el del territori que es mira**, el mateix que diu el botó
+  (§2.31): les 11 deteccions de les Canàries no s'han de dibuixar com si
+  fossin les quatre mil de la península que arriben a la mateixa resposta.
+- **La llegenda segueix el mateix factor** (§2.33), de manera que els cercles
+  que ensenya són sempre els que el mapa fa servir. L'anell de selecció també,
+  i la vora fosca s'aprima amb la marca: un píxel sencer de vora al voltant
+  d'un punt de dos píxels és gairebé tot vora.
+
+El preu: **la mateixa detecció es dibuixa més petita en un mes que en un
+dia**, de manera que dues captures de rangs diferents no es poden comparar a
+ull sense mirar la llegenda. Els números —300, 5.000, 60% i 65%— els fixa
+aquest treball mirant l'agost del 2024, i són a `hotspotDensity()`.
+
+Comprovat al navegador el 13/11/2026: amb l'agost del 2024, a la península
+(4.303) les marques es dibuixen al 62% i els grups de Galícia i Andalusia es
+poden llegir; canviant a les Canàries (11) tornen a mida completa, i la
+llegenda canvia amb elles.
+
+### 2.35. Amb més d'un dia a la pantalla, el color diu la data
+
+Decidit el 13/11/2026, i **esmena la §2.16**, que feia que la mida i el color
+portessin el mateix valor. Aquella decisió es va prendre per a un dia de
+deteccions, i per a un dia es manté. El que la canvia és el mateix que va
+canviar la §2.34: des de la §2.31 la portada pot ensenyar un mes.
+
+En un mes hi ha una dimensió que cap canal portava: **quan**. Un incendi del
+dia 2 i un del dia 30 es dibuixaven igual, i l'única manera de saber-ho era
+obrir-los d'un en un. Mentrestant el color repetia la potència, que la mida ja
+diu, i amb una rampa tan estreta —d'ambre fosc a ambre pàl·lid— que a la
+pantalla tot era el mateix taronja.
+
+Decidit:
+
+- **Un dia a la pantalla: res no canvia.** Color i mida porten la potència,
+  com a la §2.16. «Què crema ara» no té cap «quan» a ensenyar.
+- **Més d'un dia: el color diu la data i la mida es queda sola amb la
+  potència.** Del primer dia del rang a l'últim.
+
+El que es perd, dit clar: en els rangs llargs **la potència ja no es llegeix
+en una impressió sense mida** —la redundància que la §2.16 buscava. Es manté
+la seva prova d'una altra manera: la rampa de dates s'aclareix de punta a
+punta, de manera que l'ordre sobreviu al gris.
+
+**Una rampa diferent i no la mateixa amb un altre significat**: de violeta a
+groc pàl·lid, passant pel magenta i el salmó. Si el color canvia de sentit ha
+de canviar d'aspecte, o la lectura d'ahir es trasllada a un mapa que ja no la
+diu. El cap antic és violeta perquè és un color que la fotografia de sota no
+té; el recent és el clar perquè és el que l'ull ha de trobar primer.
+
+**La llegenda canvia amb el mapa** (§2.33): els quatre cercles de potència
+passen a gris —el seu color ja no vol dir res— i a sota apareix la barra de
+dates amb els dos extrems del rang. Llegeix què pinta el mapa i no què s'ha
+demanat, de manera que no canvia fins que arriben les deteccions.
+
+Com està fet: en arribar la resposta, cada detecció rep un número `when`, de 0
+a 1, que és on cau dins del rang —de la primera mitjanit a la mitjanit de
+després de l'últim dia, en UTC, que és com FIRMS data un pas. Un número i no
+la data perquè una expressió d'estil pot interpolar un número i no pot fer
+aritmètica amb una data escrita com a text. La regla de pintar i les dades es
+canvien juntes, al mateix lloc.
+
+El llindar és **més d'un dia**, de manera que «Darrers 3 dies» ja va per data.
+I el que segueix sense fer-se: l'ordre d'encavalcament és per potència
+(§2.16), no per data, de manera que una detecció recent i feble pot quedar
+sota una d'antiga i forta.
+
+Comprovat al navegador el 13/11/2026: l'agost del 2024 es pinta de violeta a
+groc amb la barra «1 d'ag. – 31 d'ag.» i els cercles de la llegenda en gris;
+tornant a «Avui» (37 deteccions) les marques i la llegenda tornen a l'ambre.
 
 ---
 

@@ -5,6 +5,7 @@ import {
   ScaleControl,
   setWorkerUrl,
   type GeoJSONSource,
+  type ImageSource,
   type LngLatBoundsLike,
   type MapGeoJSONFeature,
   type MapMouseEvent,
@@ -20,13 +21,19 @@ import {
   buildStyle,
   DEM_SOURCE,
   DOMAIN_SOURCE,
+  hotspotColour,
+  type HotspotColourBy,
+  hotspotDensity,
+  hotspotRadius,
   HOTSPOTS_SOURCE,
   IGNITION_SOURCE,
   LAYERS,
   MUNICIPALITIES_SOURCE,
   PLACES_SOURCE,
   PROVINCES_SOURCE,
+  SLOPES_SOURCE,
 } from './map.style';
+import { addSpawnMarker, type SpawnMarker } from './spawn-marker';
 
 /**
  * MapLibre picks its worker file name at runtime, which neither Vite nor esbuild
@@ -194,6 +201,9 @@ export class MapService {
   /** Whether the map is draped over the terrain. See setTerrain3D(). */
   private terrain3D = false;
 
+  /** The marks of where the fire starts. See setFireStarts(). */
+  private fireStarts: SpawnMarker[] = [];
+
   /**
    * Where the last click while picking landed, as [lon, lat].
    *
@@ -201,6 +211,14 @@ export class MapService {
    * two answers: the value is what changed, not where it is.
    */
   readonly picked = signal<[number, number] | null>(null);
+
+  /**
+   * Where the pointer is over the canvas, as [lon, lat], or nothing when it
+   * has left. With the relief on MapLibre answers with the ground under the
+   * pointer and not the flat plane behind it, which is what a reading of the
+   * terrain needs.
+   */
+  readonly pointer = signal<[number, number] | null>(null);
 
   /** Whether the style has loaded once, which is when the layers start existing. */
   private styled = false;
@@ -285,13 +303,15 @@ export class MapService {
         return;
       }
       const feature = this.featureAt(event);
-      this.selected.set(feature ? toHotspot(feature) : null);
+      this.select(feature ? toHotspot(feature) : null);
     });
 
     // Without this the marks read as decoration. Only written when it changes:
     // mousemove fires for every pixel the pointer crosses.
     let overMark = false;
+    map.on('mouseout', () => this.pointer.set(null));
     map.on('mousemove', (event) => {
+      this.pointer.set([event.lngLat.lng, event.lngLat.lat]);
       // While picking the whole canvas is the target, so the pointer must not
       // keep flickering between a hand and a crosshair over the marks.
       if (this.picking) return;
@@ -510,6 +530,48 @@ export class MapService {
     });
   }
 
+  /** What the colour of the marks is saying. The legend reads it. */
+  readonly hotspotColourBy = signal<HotspotColourBy>('power');
+
+  /**
+   * Makes the colour of the marks say the power, or the date.
+   *
+   * See hotspotColour(). Called with the detections and not before them: the
+   * dates are written on the features, and a map recoloured ahead of its data
+   * would paint the old answer by a rule it was not prepared for.
+   */
+  setHotspotColourBy(by: HotspotColourBy): void {
+    this.hotspotColourBy.set(by);
+    this.withStyle((map) =>
+      map.setPaintProperty(LAYERS.hotspots, 'circle-color', hotspotColour(by)),
+    );
+  }
+
+  /**
+   * How much the marks have been shrunk for the number on screen, from 1 down.
+   * Published because the legend draws the same circles and has to match.
+   */
+  readonly hotspotScale = signal(1);
+
+  /**
+   * Sizes and thins the marks for how many of them are in view.
+   *
+   * See hotspotDensity() for the rule and for why it is only presentation. The
+   * ring of the selected detection follows the same scale, so it stays the
+   * same distance from the mark it is around; the dark edge thins with the
+   * mark, because a full pixel of edge around a two-pixel dot is mostly edge.
+   */
+  setHotspotDensity(count: number): void {
+    const { scale, opacity } = hotspotDensity(count);
+    this.hotspotScale.set(scale);
+    this.withStyle((map) => {
+      map.setPaintProperty(LAYERS.hotspots, 'circle-radius', hotspotRadius(scale));
+      map.setPaintProperty(LAYERS.hotspots, 'circle-opacity', opacity);
+      map.setPaintProperty(LAYERS.hotspots, 'circle-stroke-width', scale);
+      map.setPaintProperty(LAYERS.hotspotSelected, 'circle-radius', hotspotRadius(scale, 4));
+    });
+  }
+
   /**
    * Hides the detections, or brings them back.
    *
@@ -518,9 +580,13 @@ export class MapService {
    * featureAt() finds nothing and no panel can open behind the form.
    */
   setHotspotsVisible(visible: boolean): void {
-    this.withStyle((map) =>
-      map.setLayoutProperty(LAYERS.hotspots, 'visibility', visible ? 'visible' : 'none'),
-    );
+    this.withStyle((map) => {
+      // The ring goes with the marks: it is drawn from the same source, and a
+      // ring left over the form would point at a detection that is not there.
+      for (const id of [LAYERS.hotspots, LAYERS.hotspotSelected]) {
+        map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
+      }
+    });
   }
 
   /**
@@ -553,6 +619,26 @@ export class MapService {
             ]
           : [],
       });
+    });
+  }
+
+  /**
+   * Marks where the fire starts, one standing mark per place.
+   *
+   * Not setIgnition(), in spite of the name: that one draws the centre of the
+   * domain, which is what the form's click has meant since §11.11, and keeps
+   * its old name until the rename of §12.7. These are the points the
+   * simulator's own tool places, and there can be several.
+   *
+   * Taken down and put up again on every call rather than diffed: there are a
+   * handful of them, and each is two DOM elements (see spawn-marker.ts).
+   */
+  setFireStarts(
+    starts: readonly { readonly point: readonly [number, number]; readonly label: string }[],
+  ): void {
+    this.withStyle((map) => {
+      for (const mark of this.fireStarts) mark.remove();
+      this.fireStarts = starts.map((start) => addSpawnMarker(map, start.point, start.label));
     });
   }
 
@@ -595,6 +681,63 @@ export class MapService {
         type: 'FeatureCollection',
         features: ring ? [domainFeature(ring), maskFeature(ring)] : [],
       });
+    });
+  }
+
+  /**
+   * Paints the slope of the domain over the ground, or takes it off.
+   *
+   * The picture is one pixel per cell of the grid (see slope-classes.ts) and
+   * the bounds are the domain's, `[west, south, east, north]`. It is a
+   * `raster` layer, which MapLibre drapes (§13.1), so on the relief each band
+   * lies on the hillside it describes.
+   *
+   * Under the contours, the mask and the outline of the domain: it is a
+   * property of the ground and everything drawn *on* the ground goes over it.
+   * `nearest` and not the default smoothing, because the picture is classes
+   * and a blend of two bands would be a colour the legend does not have.
+   *
+   * Added and removed rather than hidden: an image source cannot exist without
+   * its image, and a megapixel texture is not worth keeping for a layer that
+   * is off by default.
+   */
+  setSlopes(image: string | null, bounds?: readonly [number, number, number, number]): void {
+    this.withStyle((map) => {
+      if (!image || !bounds) {
+        if (map.getLayer(LAYERS.slopes)) map.removeLayer(LAYERS.slopes);
+        if (map.getSource(SLOPES_SOURCE)) map.removeSource(SLOPES_SOURCE);
+        return;
+      }
+
+      const [west, south, east, north] = bounds;
+      const coordinates: [[number, number], [number, number], [number, number], [number, number]] =
+        [
+          [west, north],
+          [east, north],
+          [east, south],
+          [west, south],
+        ];
+
+      const source = map.getSource(SLOPES_SOURCE) as ImageSource | undefined;
+      if (source) {
+        source.updateImage({ url: image, coordinates });
+        return;
+      }
+
+      map.addSource(SLOPES_SOURCE, { type: 'image', url: image, coordinates });
+      map.addLayer(
+        {
+          id: LAYERS.slopes,
+          type: 'raster',
+          source: SLOPES_SOURCE,
+          paint: {
+            'raster-opacity': 0.7,
+            'raster-resampling': 'nearest',
+            'raster-fade-duration': 0,
+          },
+        },
+        LAYERS.contourLines,
+      );
     });
   }
 
@@ -756,21 +899,6 @@ export class MapService {
       if (framed?.zoom !== undefined) map.setMinZoom(framed.zoom - 0.15);
       map.setMaxZoom(SANDBOX_MAX_ZOOM);
 
-      // The wall is the centre of the camera, not `maxBounds`.
-      //
-      // `maxBounds` asks that the *view* stay inside it, and a view leaning at
-      // 55° covers far more ground than the square it frames: asked for the
-      // square itself, MapLibre satisfied it the only way it could —by zooming
-      // in until the visible trapezoid fitted, so the domain opened at 500 m
-      // across instead of thirty kilometres. Widening it enough to make the
-      // framing legal then let a drag push the block into a corner of an
-      // otherwise empty card. It is the wrong tool for a tilted camera.
-      //
-      // Clamping the centre is the right one, and it is also the plainer rule:
-      // wherever the camera is pointed, it is pointed at somewhere inside the
-      // domain. At the far edge half the view is the mask, which is the truth
-      // —there is nothing out there— and the toolbar's recentre button is one
-      // click away.
       // The wall is the centre of the camera, and it is deliberately loose.
       //
       // `maxBounds` is the obvious tool and it is the wrong one here: it asks
@@ -811,8 +939,34 @@ export class MapService {
     });
   }
 
+  /**
+   * Moves the camera in or out by so many zoom levels.
+   *
+   * For the buttons of the sandbox, which is the only screen with a zoom to
+   * offer. No limits of its own: the floor and the ceiling are the ones
+   * setSandboxBounds() set, and MapLibre stops at them by itself.
+   */
+  zoomBy(levels: number): void {
+    this.withStyle((map) => map.easeTo({ zoom: map.getZoom() + levels, duration: 250 }));
+  }
+
   clearSelection(): void {
-    this.selected.set(null);
+    this.select(null);
+  }
+
+  /**
+   * Opens a detection, or closes whichever was open.
+   *
+   * The signal is what the panel reads and the filter is what the map draws,
+   * and they are set together so that the ring is always around the detection
+   * the panel is describing. A filter and not a feature state: the source is
+   * replaced whole when the dates change, and a state would not survive it.
+   */
+  private select(hotspot: Hotspot | null): void {
+    this.selected.set(hotspot);
+    this.withStyle((map) =>
+      map.setFilter(LAYERS.hotspotSelected, ['==', ['get', 'id'], hotspot?.id ?? ''] as never),
+    );
   }
 
   /**
@@ -861,6 +1015,8 @@ export class MapService {
   }
 
   destroy(): void {
+    for (const mark of this.fireStarts) mark.remove();
+    this.fireStarts = [];
     this.instance?.remove();
     this.instance = null;
     this.queued.length = 0;
@@ -869,6 +1025,7 @@ export class MapService {
     this.picking = false;
     this.terrain3D = false;
     this.picked.set(null);
+    this.pointer.set(null);
     this.ready.set(false);
     this.selected.set(null);
   }

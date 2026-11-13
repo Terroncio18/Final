@@ -1,5 +1,10 @@
 import type { FeatureCollection } from 'geojson';
-import type { FilterSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl';
+import type {
+  ExpressionSpecification,
+  FilterSpecification,
+  LayerSpecification,
+  StyleSpecification,
+} from 'maplibre-gl';
 import { contourTiles } from './contours';
 import {
   BOUNDARIES_ATTRIBUTION,
@@ -30,6 +35,8 @@ export const LAYERS = {
   municipalityFocusFill: 'municipality-focus-fill',
   municipalityFocusLine: 'municipality-focus-line',
   hotspots: 'hotspots',
+  hotspotSelected: 'hotspot-selected',
+  slopes: 'slopes',
   contourLines: 'contour-lines',
   contourLabels: 'contour-labels',
   placeLabels: 'place-labels',
@@ -49,6 +56,124 @@ export const IGNITION_SOURCE = 'ignition';
 export const PLACES_SOURCE = 'places';
 export const CONTOURS_SOURCE = 'contours';
 export const DOMAIN_SOURCE = 'domain';
+
+/** Not in the style: an image source needs its image, so it is added on demand. */
+export const SLOPES_SOURCE = 'slopes';
+
+/**
+ * How a detection is drawn, by its radiative power.
+ *
+ * In one place because three things read it: the radius and the colour of the
+ * layer, the ring around the selected detection, and the legend of the
+ * portada —which would otherwise be a second copy of these numbers, free to
+ * drift from what the map actually paints.
+ *
+ * The stops climb by tens because the power spans orders of magnitude (§2.16).
+ */
+export const HOTSPOT_STOPS = [
+  { mw: 1, radius: 3.5, colour: '#b06a12' },
+  { mw: 10, radius: 6, colour: '#e08b1e' },
+  { mw: 100, radius: 10, colour: '#ffb13c' },
+  { mw: 1000, radius: 15, colour: '#ffe3ad' },
+] as const;
+
+/**
+ * The radius of a mark: the stop's own, shrunk by `scale` when the map is
+ * crowded (see hotspotDensity), plus whatever a ring around it needs to clear
+ * it. The ring's clearance is not scaled: it is a gap, not a size.
+ */
+export function hotspotRadius(scale = 1, extra = 0): ExpressionSpecification {
+  return [
+    'interpolate',
+    ['linear'],
+    ['get', 'frp'],
+    ...HOTSPOT_STOPS.flatMap((stop) => [stop.mw, stop.radius * scale + extra]),
+  ] as ExpressionSpecification;
+}
+
+/** Up to here the marks are drawn at full size: a day is one or two hundred. */
+const SPARSE = 300;
+/** From here on they are as small as they get: a summer month is four thousand. */
+const CROWDED = 5000;
+const CROWDED_SCALE = 0.6;
+const FULL_OPACITY = 0.9;
+const CROWDED_OPACITY = 0.65;
+
+/**
+ * How the marks are drawn for a given number of them on screen.
+ *
+ * A day of detections is a couple of hundred marks and each can be read; a
+ * month is four thousand, and at full size the large ones bury the small ones
+ * and Galicia in August is one orange stain. So past a few hundred the marks
+ * shrink and thin out, down to 60 % of the size and 65 % of the opacity.
+ *
+ * **Presentation and nothing else.** No detection is merged, dropped or
+ * averaged —that would be deciding what makes two of them the same fire,
+ * which is §3.7 and is not decided— and the order between them is untouched:
+ * every mark is scaled by the same factor, so a mark twice as large as another
+ * still is. The legend reads the same factor and shows the sizes in use.
+ *
+ * By the logarithm of the count, for the reason the stops climb by tens: from
+ * three hundred to six hundred is a bigger change on screen than from four
+ * thousand to four thousand three hundred.
+ */
+export function hotspotDensity(count: number): { scale: number; opacity: number } {
+  const span = Math.log(CROWDED / SPARSE);
+  const crowding = Math.min(Math.max(Math.log(Math.max(count, 1) / SPARSE) / span, 0), 1);
+  return {
+    scale: 1 - crowding * (1 - CROWDED_SCALE),
+    opacity: FULL_OPACITY - crowding * (FULL_OPACITY - CROWDED_OPACITY),
+  };
+}
+
+/**
+ * The colours of a detection by when it was seen, from the first day of the
+ * range on screen to the last.
+ *
+ * A different ramp from the power's amber, on purpose: when the colour changes
+ * meaning it has to change looks, or yesterday's reading of the map is carried
+ * over to a map that no longer says it. Violet to pale yellow, which gets
+ * lighter all the way —so the order survives a greyscale print, the same test
+ * §2.16 set— and whose old end is a colour the photograph underneath does not
+ * have. The recent end is the bright one because recent is what the eye should
+ * find first.
+ */
+export const HOTSPOT_DATE_STOPS = [
+  { at: 0, colour: '#6a1f8a' },
+  { at: 1 / 3, colour: '#c43c75' },
+  { at: 2 / 3, colour: '#f8765c' },
+  { at: 1, colour: '#fde3a0' },
+] as const;
+
+/** What the colour of a mark is saying. The size always says the power. */
+export type HotspotColourBy = 'power' | 'date';
+
+/**
+ * The colour of a mark.
+ *
+ * By power, colour and size carry the same value (§2.16). By date, the colour
+ * reads `when` —where in the range the detection falls, from 0 to 1, written
+ * on each feature by whoever loads them— and the size is left to carry the
+ * power alone. A detection without it is drawn as the most recent, which is
+ * the bright end: a mark that stands out is a better mistake than one that
+ * hides.
+ */
+export function hotspotColour(by: HotspotColourBy): ExpressionSpecification {
+  if (by === 'date') {
+    return [
+      'interpolate',
+      ['linear'],
+      ['coalesce', ['get', 'when'], 1],
+      ...HOTSPOT_DATE_STOPS.flatMap((stop) => [stop.at, stop.colour]),
+    ] as ExpressionSpecification;
+  }
+  return [
+    'interpolate',
+    ['linear'],
+    ['get', 'frp'],
+    ...HOTSPOT_STOPS.flatMap((stop) => [stop.mw, stop.colour]),
+  ] as ExpressionSpecification;
+}
 
 /** No point yet. The source has to exist from the start to be drawn into. */
 const NO_POINT: FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -274,38 +399,30 @@ export function buildStyle(): StyleSpecification {
           'circle-sort-key': ['get', 'frp'],
         },
         paint: {
-          'circle-radius': [
-            'interpolate',
-            ['linear'],
-            ['get', 'frp'],
-            1,
-            3.5,
-            10,
-            6,
-            100,
-            10,
-            1000,
-            15,
-          ],
-          'circle-color': [
-            'interpolate',
-            ['linear'],
-            ['get', 'frp'],
-            1,
-            '#b06a12',
-            10,
-            '#e08b1e',
-            100,
-            '#ffb13c',
-            1000,
-            '#ffe3ad',
-          ],
-          'circle-opacity': 0.9,
+          'circle-radius': hotspotRadius(),
+          'circle-color': hotspotColour('power'),
+          'circle-opacity': FULL_OPACITY,
           // The dark ring is what detaches the mark from the imagery: over sand
           // or cloud an amber dot on its own dissolves.
           'circle-stroke-width': 1,
           'circle-stroke-color': '#2b1403',
           'circle-stroke-opacity': 0.8,
+        },
+      },
+      {
+        // The detection the panel is describing. A ring and no fill, so the
+        // mark underneath keeps its own size and colour, and white because on
+        // this map white is what points at something (§2.22) while orange is
+        // the fire itself. Still, like every highlight here: nothing blinks.
+        id: LAYERS.hotspotSelected,
+        type: 'circle',
+        source: HOTSPOTS_SOURCE,
+        filter: NOTHING,
+        paint: {
+          'circle-radius': hotspotRadius(1, 4),
+          'circle-color': 'transparent',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff',
         },
       },
       {

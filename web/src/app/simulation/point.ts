@@ -21,6 +21,29 @@ export function formatPoint(point: Point): string {
   return '@' + point[0].toFixed(DECIMALS) + ',' + point[1].toFixed(DECIMALS);
 }
 
+/**
+ * Several points as they travel in a query parameter:
+ * `2.81190,39.77270;2.66240,39.72760`.
+ *
+ * The same five decimals and the same longitude-first order as the segment,
+ * without the `@`: inside a named parameter there is nothing to tell a
+ * coordinate apart from. The semicolon separates points because the comma is
+ * already taken inside each one, and the router leaves both unescaped, so the
+ * address stays readable.
+ */
+export function formatPoints(points: readonly Point[]): string {
+  return points.map((point) => formatPoint(point).slice(1)).join(';');
+}
+
+/** The points a parameter carries. What does not parse is dropped, not guessed. */
+export function parsePoints(value: string | undefined): Point[] {
+  if (!value) return [];
+  return value
+    .split(';')
+    .map((part) => parsePoint('@' + part))
+    .filter((point): point is Point => point !== null);
+}
+
 /** The point a URL segment carries, or nothing if it carries none. */
 export function parsePoint(segment: string | undefined): Point | null {
   if (!segment || !segment.startsWith('@')) return null;

@@ -64,6 +64,29 @@
             <small>{{ provinceName() }} · {{ domain.km }} × {{ domain.km }} km</small>
           </span>
         </div>
+
+        <!-- Read from the elevation, not from SAMPLE: the same figures the
+             form's last step gives for this square (§2.28). -->
+        @if (ground(); as ground) {
+          <dl class="terrain-facts">
+            <div>
+              <dt>Altitud</dt>
+              <dd>{{ ground.low }}–{{ ground.high }} m</dd>
+            </div>
+            <div>
+              <dt>Pendent mitjana</dt>
+              <dd>{{ ground.mean }}°</dd>
+            </div>
+            <div>
+              <dt>Pendent màxima</dt>
+              <dd>{{ ground.max }}°</dd>
+            </div>
+          </dl>
+        } @else if (terrainFailed()) {
+          <p class="terrain-note">No s'ha pogut llegir l'elevació del domini.</p>
+        } @else {
+          <p class="terrain-note">Llegint l'elevació…</p>
+        }
       </section>
 
       <section class="control-section weather">
@@ -76,9 +99,11 @@
             <span class="south">S</span>
             <span class="west">O</span>
             <div class="rose-rings"></div>
-            <!-- The needle points where the wind goes, which is why it turns
-                 with the origin plus 180°. -->
-            <span class="wind-needle" [style.transform]="'rotate(' + direction() + 'deg)'">↑</span>
+            <!-- The needle points where the wind goes, which is where it takes
+                 the fire: the origin plus 180°, and not the origin. -->
+            <span class="wind-needle" [style.transform]="'rotate(' + towards().degrees + 'deg)'"
+              >↑</span
+            >
           </div>
           <div>
             <span class="secondary">Vent del {{ from().name }}</span>
@@ -200,6 +225,36 @@
             <app-icon name="ruler" /> Mesurar
           </button>
         </div>
+
+        @if (tool() === 'ignition') {
+          <p class="tool-hint">Fes clic al terreny, dins del domini, per posar-hi una ignició.</p>
+        }
+        @if (startRows().length) {
+          <ul class="start-list">
+            @for (row of startRows(); track row.index) {
+              <li>
+                <span class="start-dot"></span>
+                <span>
+                  <strong>{{ row.label }}</strong>
+                  <small>
+                    {{ row.coordinates }}
+                    @if (row.ground) {
+                      · {{ row.ground }}
+                    }
+                  </small>
+                </span>
+                <button
+                  type="button"
+                  [attr.aria-label]="'Treure ' + row.label"
+                  title="Treure"
+                  (click)="removeStart(row.index)"
+                >
+                  ×
+                </button>
+              </li>
+            }
+          </ul>
+        }
       </section>
 
       <div class="simulation-controls">
@@ -228,7 +283,16 @@
           <span>/</span>
           <span>{{ provinceName() }}</span>
         </div>
-        <span class="map-coordinates">{{ coordinates() }}</span>
+        <!-- The cell under the pointer while there is one, and the centre of
+             the domain otherwise. Each says which it is. -->
+        @if (under(); as cell) {
+          <span class="map-coordinates">
+            Cursor · {{ cell.coordinates }} · <strong>{{ cell.elevation }} m</strong> ·
+            <strong>pendent {{ cell.slope }}°</strong>
+          </span>
+        } @else {
+          <span class="map-coordinates">Centre · {{ coordinates() }}</span>
+        }
         <div class="map-style-switch" role="group" aria-label="Vista del terreny">
           <button type="button" [class.on]="relief()" (click)="relief.set(true)">Relleu</button>
           <button type="button" [class.on]="!relief()" (click)="relief.set(false)">Pla</button>
@@ -255,9 +319,17 @@
           <span class="time-chip-tag">SENSE MODEL</span>
         </div>
 
-        <!-- Only the controls that do something here. Panning and zooming are
-             off on this screen by decision, so no buttons offer them. -->
+        <!-- Only the controls that do something here. The zoom has buttons
+             since the sandbox has a zoom (§11.10): the wheel alone leaves out
+             whoever has no wheel, and the keyboard handler stays off (§11.3). -->
         <div class="map-toolbar">
+          <button type="button" title="Acostar" aria-label="Acostar" (click)="zoom(1)">
+            <app-icon name="plus" />
+          </button>
+          <button type="button" title="Allunyar" aria-label="Allunyar" (click)="zoom(-1)">
+            <app-icon name="minus" />
+          </button>
+          <span></span>
           <button
             type="button"
             [class.active]="relief()"
@@ -311,14 +383,26 @@
               <input type="checkbox" [checked]="labels()" (change)="labels.set(!labels())" />
               Topònims
             </label>
+            <label>
+              <input type="checkbox" [checked]="slopes()" (change)="slopes.set(!slopes())" />
+              Pendents
+            </label>
           </div>
         }
 
-        <div class="map-bottom">
+        <div class="map-key">
           <div class="map-legend">
             <span><i class="legend-domain"></i>Domini</span>
             <span><i class="legend-fire"></i>Centre del domini</span>
           </div>
+          @if (slopes()) {
+            <div class="map-legend slope-legend">
+              <span>Pendent</span>
+              @for (band of slopeClasses; track band.label) {
+                <span><i [style.background]="band.colour"></i>{{ band.label }}</span>
+              }
+            </div>
+          }
         </div>
       </div>
 
@@ -348,6 +432,7 @@
             [value]="minutes()"
             [style.--fill]="fill(minutes(), 0, 360)"
             (input)="setMinutes($event)"
+            disabled
           />
           <div class="timeline-ticks">
             <span>Inici</span>

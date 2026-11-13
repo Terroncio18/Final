@@ -6,7 +6,7 @@ de base per a la memòria del TFG.
 Continuació de [bitacola.md](bitacola.md), la fase 1 —el mapa i el formulari—,
 tancada el 5 de novembre de 2026.
 
-Darrera actualització: 5 de novembre de 2026.
+Darrera actualització: 13 de novembre de 2026.
 
 Les seccions van numerades **des del §10**. El codi cita les decisions pel seu
 número als comentaris —§2.29, §3.4— i dos documents que comencessin tots dos a
@@ -600,6 +600,239 @@ la marca del mapa, que segueix sent el punt taronja amb halo que es va dibuixar
 quan volia dir un incendi; canviar-la per una marca de centre és feina de la
 12.7, amb el canvi de nom.
 
+### 11.12. El sandbox diu el terreny que ensenya
+
+La pantalla que existeix per ensenyar la pendent (§11.6, §11.9) no en donava
+cap xifra: l'elevació del domini només la llegia el quart pas del formulari
+(§2.28), i el simulador dibuixava el relleu sense dir-ne res.
+
+Decidit el 13/11/2026: la columna de configuració porta, sota l'àrea d'estudi,
+**l'altitud mínima i màxima i la pendent mitjana i màxima del domini**. Motius:
+
+- **És l'única part de la consola que es pot omplir de veritat sense model.**
+  La columna dreta surt de `SAMPLE` (§11.7); aquestes tres línies surten del
+  DEM, i per això són a l'esquerra, amb les coses que són de debò.
+- **La mateixa lectura i el mateix arrodoniment que el formulari**, amb el
+  mateix `TerrainService`: les dues pantalles anomenen el mateix quadrat
+  (§11.4), i una pendent que digués 25,8° a l'una i 26° a l'altra serien dos
+  terrenys.
+- **Es torna a llegir en obrir la pantalla.** El simulador viu en una pestanya
+  pròpia i no hereta res; les tessel·les són les que el mapa ja baixa per al
+  relleu.
+
+Comprovat al navegador el 13/11/2026 amb el domini de Sóller
+(`@2.71500,39.76700`): altitud −24–1.438 m, pendent mitjana 9,1°, màxima 76,2°.
+
+**El que la comprovació ha fet visible:** el mínim és **−24 m**. Mig domini de
+Sóller és mar, i Terrarium porta el fons marí com a elevació negativa —el
+mateix que va fer sortir isòbates a la §11.6. El formulari dona el mateix
+número pel mateix motiu. No s'ha tocat: què són les cel·les de mar per al
+domini és la pendent 12.8.
+
+**I sota el cursor, la cel·la.** La barra de la targeta del mapa deia les
+coordenades del centre i prou. Ara, mentre el punter és sobre el quadrat, diu
+on és, a quina alçada i amb quina pendent —«Cursor · 39.7191° N, 2.8033° E ·
+234 m · pendent 5,6°»— i en sortir-ne torna a dir «Centre · …». Cadascuna porta
+la paraula al davant perquè les dues lectures comparteixen lloc i no s'han de
+poder confondre.
+
+- **Es llegeix de la graella i no del mapa.** L'altitud i la pendent són les
+  dues matrius de 1024² que el model rebrà (§2.28), i no una consulta a la
+  malla del terreny de MapLibre: el que es llegeix és el que tindrà una cel·la,
+  no el que ensenya la imatge. `groundAt()` és la inversa del mostreig de
+  `readTerrain()` i viu al seu costat.
+- **On és el punter ho publica el `MapService`**, com a senyal `pointer`, pel
+  mateix motiu que `picked`: el mapa és seu (§2.4). Amb el relleu encès,
+  MapLibre respon amb el terra de sota del punter i no amb el pla del darrere.
+- **A la vora, la pendent és la de la cel·la de dins.** `slopeOf()` no calcula
+  la primera i l'última fila i columna —no hi ha veí per diferenciar— i les
+  deixa a zero; la lectura pren la cel·la veïna en lloc d'afirmar un pla que no
+  hi és. Les estadístiques no ho noten: ja es feien només amb l'interior.
+
+Comprovat al navegador el 13/11/2026 a 1680 × 945, amb Sóller: sobre terra,
+234 m i 5,6°; sobre el mar, 0 m i 0°; fora del quadrat, torna al centre.
+
+### 11.13. La pendent és una capa, en cinc trams i en violeta
+
+Decidit el 13/11/2026. Les xifres de la §11.12 diuen com és el domini sencer i
+com és una cel·la; el que no deien és **on** són els vessants drets, que és la
+pregunta que es fa mirant un mapa. El menú de capes porta ara «Pendents»,
+apagada per defecte, amb la seva llegenda quan s'encén.
+
+**Cinc trams: 0–5°, 5–15°, 15–25°, 25–35° i més de 35°.** Són d'aquest treball
+i de presentació, com els talls de potència de la §2.17: **no hi ha cap
+classificació normalitzada de pendent per a incendis**, i el model no en veurà
+mai cap —rep la pendent de cada cel·la com a número. Cinc perquè és el que es
+distingeix en una llegenda i el que permet dir «aquest vessant passa de 25°».
+Descartada la rampa contínua: és més fidel a la dada i no dona cap llegenda
+que es pugui llegir en veu alta.
+
+**Un sol to, violeta, de clar a fosc.** Un sol to perquè l'ordre sobrevisqui a
+una impressió en gris (el mateix criteri que la §2.16). I violeta per
+eliminació: el taronja i el vermell volen dir foc (§2.22), el verd és de què
+està feta la fotografia de sota i el blanc és una línia administrativa.
+
+**Apagada per defecte**, perquè tapa la fotografia i la fotografia és com es
+reconeix el lloc. És una capa per fer una pregunta, no per deixar posada.
+
+Com està feta:
+
+- **Una imatge d'un píxel per cel·la**, pintada de la mateixa graella de 1024²
+  que les xifres i la lectura del cursor, i posada com a font `image` sobre
+  l'extensió del domini. No polígons: la graella ja és un ràster, i un milió
+  de cel·les traçades serien megabytes de geometria per dir el mateix.
+- **És una capa `raster`, que MapLibre drapeja** (§13.1): en relleu cada tram
+  queda sobre el vessant que descriu. Va per sota de les corbes, de la màscara
+  i del contorn del domini.
+- **`raster-resampling: nearest`.** El suavitzat per defecte barrejaria dos
+  trams en un color que la llegenda no té.
+- **S'afegeix i es treu, no s'amaga**: una font d'imatge no pot existir sense
+  imatge, i no val la pena guardar una textura d'un megapíxel per a una capa
+  que gairebé sempre és apagada. Per això no és a l'estil inicial.
+- **Un error conegut i petit:** la imatge s'estira linealment entre les quatre
+  cantonades en Mercator, i la graella és regular en latitud. Al llarg de
+  30 km la diferència al mig del domini és d'uns 15 m, mitja cel·la.
+
+El que es veu i és de la 12.8: **el mar surt pintat del tram més clar**, perquè
+per a la graella és terreny de 0°.
+
+Comprovat al navegador el 13/11/2026 amb Sóller: en relleu la Serra surt en
+violeta fosc i el pla i les valls en clar; en vista plana, igual; apagant-la,
+la capa i la llegenda desapareixen; cap error a la consola.
+
+### 11.14. Repàs del sandbox: l'agulla del vent i els botons de zoom
+
+Fet el 13/11/2026, repassant el codi del sandbox contra el que aquesta bitàcola
+diu que fa.
+
+**L'agulla del vent assenyalava d'on ve i no cap on va.** El comentari de la
+plantilla deia que apunta cap on va el vent —l'origen més 180°— i el `rotate`
+feia servir l'origen tal qual: amb vent del nord-oest, la fletxa mirava al
+nord-oest mentre el text del costat deia «cap a SE». Ara gira amb `towards()`,
+que és el mateix càlcul que escriu aquell text, de manera que no poden tornar a
+discrepar. Importa més del que sembla: les dues lectures de «vent del
+nord-oest» estan a 180° l'una de l'altra, i la del foc és només una.
+
+**El zoom té botons.** La §11.7 no en va posar perquè el zoom era apagat
+(§11.3); la §11.10 el va encendre i la caixa d'eines es va quedar com estava,
+de manera que només s'hi arribava amb la rodeta. Ara hi ha «Acostar» i
+«Allunyar» a dalt de la caixa, que mouen un nivell cada cop. No porten límits
+propis: el terra i el sostre són els de `setSandboxBounds()` (§11.10) i
+MapLibre s'hi atura sol. És també l'única via per a qui no té rodeta, perquè
+el gestor de teclat segueix apagat (§11.3).
+
+**Dos comentaris que descrivien una versió anterior**, corregits: el de la
+caixa d'eines, que encara deia que desplaçar i fer zoom eren apagats, i un
+bloc duplicat a `setSandboxBounds()` que explicava la versió estricta del
+límit al costat de la que hi ha.
+
+Comprovat al navegador: l'agulla a 135° amb vent del NO; dos clics a «Acostar»
+porten a Sóller i quatre a «Allunyar» tornen al bloc sencer i s'hi aturen.
+
+**La línia temporal espera el model, com la resta.** El lliscador es podia
+moure i canviava el «T + 02:00» del mapa i de la columna, mentre «Reproduir»
+i la velocitat eren desactivats: un rellotge que es pot arrossegar sense res
+corrent és l'hora de res. Ara és desactivat i a zero, i les dues lectures
+diuen «T + 00:00». Descartat deixar-lo mòbil com a mostra de com es farà
+servir: de tots els controls que esperen el model, era l'únic que feia veure
+que no.
+
+**La llegenda del mapa puja sota el xip de temps.** La §11.7 la va deixar a
+baix a l'esquerra, 74 px per sobre de la vora, que és l'alçada de dues línies
+de crèdits i l'escala. Els crèdits no fan dues línies: es parteixen en tantes
+com estreta és la targeta —tres a 1680 × 945, sis en un panell de 370 px— i la
+llegenda quedava a sobre seu. Els crèdits són condició de llicència i no es
+mouen (§6); el que es mou és la llegenda, a l'únic racó on res més canvia de
+mida. La de pendents (§11.13) va a sota de l'altra.
+
+Comprovat al navegador amb la capa de pendents encesa: les dues llegendes
+queden sota el xip i els crèdits, sencers i sense res al damunt.
+
+### 11.15. L'eina d'ignició posa focus, i el focus és una marca dreta
+
+Decidit el 13/11/2026. La §11.11 va deixar dit que on comença el foc es tria
+dins del simulador, amb l'eina d'ignició, i l'eina només canviava de color.
+Ara, amb l'eina encesa, **un clic al terreny hi posa una ignició**, i n'hi pot
+haver més d'una.
+
+**La marca és un «punt d'aparició» en tres peces:**
+
+- **Un anell lluminós a terra, que batega.** Diu *on*, exactament.
+- **Una agulla que flota a sobre, amb un rebot suau.**
+- **Una etiqueta flotant** —«Ignició 1», «Ignició 2»— sobre l'agulla.
+
+Com està fet, i per què:
+
+- **Són marcadors DOM de MapLibre i no capes de l'estil.** El moviment és el
+  sentit d'aquesta marca, i animar una capa vol dir repintar el mapa sencer
+  —terreny inclòs— seixanta cops per segon; una animació CSS mou un element i
+  res més. MapLibre col·loca el marcador a l'alçada del terreny i l'atenua
+  quan una carena li passa pel davant.
+- **Dos marcadors per marca, perquè no miren cap al mateix lloc.** L'anell va
+  amb `pitchAlignment: 'map'`, que és el que l'estira a terra en lloc
+  d'aixecar-lo cap a la càmera; l'agulla i l'etiqueta miren l'espectador, com
+  fa un `symbol` (§13.1), i es llegeixen des de qualsevol angle de l'òrbita.
+- **Batega, i aquí sí.** La §2.22 va treure el parpelleig de la navegació
+  perquè en un mapa d'incendis el que parpelleja vol dir foc. Això és l'única
+  cosa de la pantalla que ho vol dir. Amb `prefers-reduced-motion` s'atura
+  tot i la marca conserva la forma, amb dos anells quiets.
+- **Els estils són a `styles.css` i no al component**: MapLibre posa l'element
+  dins del seu contenidor, fora de la plantilla, i una regla amb àmbit no hi
+  arribaria.
+- **Les marques no són clicables.** Un marcador és a sobre del llenç i es
+  menjaria el clic que posa la ignició següent. Es treuen des de la llista.
+
+**La llista és a la columna esquerra, sota les eines**: cada ignició amb les
+coordenades i amb l'altitud i la pendent de la seva cel·la, llegides de la
+graella (§11.12), i un botó per treure-la. En treure'n una, les de darrere es
+renumeren.
+
+**Només dins del domini.** Un clic fora del quadrat no posa res: allà no hi ha
+cel·la per encendre (§11.8).
+
+La primera versió, del mateix dia, les guardava a la memòria de la pantalla i
+recarregar les perdia; ho tanca la §11.16. El canvi de nom de la 12.7 no s'ha
+fet: el mètode nou es diu `setFireStarts()` perquè `setIgnition()` encara vol
+dir el centre.
+
+Comprovat al navegador amb Sóller: dos clics posen «Ignició 1» (731 m, 38,9°)
+i «Ignició 2» (911 m, 28,1°), amb l'anell estirat a 55° sobre el relleu;
+treure la primera deixa l'altra com a «Ignició 1»; un clic sobre els crèdits
+del mapa no posa res.
+
+### 11.16. Les ignicions viatgen a la URL, en un paràmetre
+
+Decidit el 13/11/2026, i tanca la 12.9. Eren l'única cosa d'una simulació que
+no era a l'enllaç (§2.26):
+`/simulador/ES53/ES532/ES_07061/@2.71500,39.76700?ignicions=2.66240,39.72760;2.80224,39.78268`.
+
+- **La URL és l'únic lloc on són**, com el centre: la pantalla dibuixa el que
+  diu l'adreça i no en guarda cap còpia, de manera que obrir un enllaç i
+  clicar donen el mateix estat sense cap camí de codi que els separi.
+- **Un paràmetre de consulta i no un cinquè segment.** Els quatre segments
+  anomenen el domini, i són els mateixos que el formulari (§11.4); les
+  ignicions són el que s'hi fa a dins, opcionals i en nombre variable. És la
+  mateixa tria que les dates de la portada (§2.31). Sense cap ignició el
+  paràmetre desapareix i l'adreça és la de sempre.
+- **El mateix format que el punt**, longitud primer i cinc decimals (§2.26),
+  sense l'`@` —dins d'un paràmetre amb nom no cal distingir res— i amb punt i
+  coma entre punts, perquè la coma ja és de dins de cadascun. L'encaminador
+  no escapa cap dels dos i l'adreça es pot llegir.
+- **Posar-ne o treure'n una substitueix l'entrada de l'historial**, com moure
+  el centre (§2.26): altrament el botó enrere recorreria cada punt posat en
+  lloc de sortir de la pantalla.
+- **El que no s'entén o cau fora del quadrat es descarta**, en llegir. Un
+  enllaç tocat a mà no pot encendre una cel·la que no existeix (§11.8), i és
+  la mateixa regla per a un clic que per a un enllaç.
+
+El que queda fora: «Tornar al formulari» porta els quatre segments i no el
+paràmetre, de manera que anar al formulari i tornar-ne perd les ignicions. El
+formulari tria el centre i no en sap res (§11.11).
+
+Comprovat al navegador: un enllaç amb dues ignicions bones, una a 45° N i un
+`xx` en dibuixa dues; treure'n una deixa `?ignicions=2.66240,39.72760`; un
+clic n'hi afegeix una altra; i `history.length` no es mou de 2.
+
 ---
 
 ## 12. Decisions pendents
@@ -610,6 +843,17 @@ quan volia dir un incendi; canviar-la per una marca de centre és feina de la
   realment el punt d'ignició encara no existeix. Convé fer-ho el dia que
   l'eina del simulador col·loqui focus de debò, perquè llavors els dos
   conceptes hauran de conviure i els noms hauran de distingir-los.
+
+- **12.8. Les cel·les de mar dins del domini.** Ve de la §11.12. Un domini
+  costaner inclou mar, i Terrarium hi dona el fons marí: l'altitud mínima surt
+  negativa i la mitjana i la màxima de pendent compten talussos submarins. Cal
+  decidir si el mar s'exclou de les xifres —i amb quin criteri: elevació ≤ 0 o
+  una línia de costa— i el mateix criteri servirà al model, on el mar és
+  no combustible.
+
+- ~~**12.9. Les ignicions a la URL.**~~ Resolta el 13/11/2026 a la §11.16: un
+  paràmetre de consulta, `?ignicions=`, i cada canvi substitueix l'entrada de
+  l'historial.
 
 La primera que toca és la 12.4, perquè condiciona on viu la resta: si el foc es
 pinta dins de MapLibre o en un segon canvas, el model no escriu al mateix lloc.

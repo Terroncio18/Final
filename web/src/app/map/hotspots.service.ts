@@ -7,7 +7,15 @@ import type { FeatureCollection } from 'geojson';
 import { HOTSPOTS_URL } from './map.config';
 import { MapService } from './map.service';
 import { StudyArea } from './study-area';
-import { defaultRange, paramsFor, rangeFrom, sameRange, type Range } from './hotspot-range';
+import {
+  addDays,
+  defaultRange,
+  paramsFor,
+  rangeFrom,
+  sameRange,
+  spanOf,
+  type Range,
+} from './hotspot-range';
 
 /**
  * The detections on the map, and the dates they are from.
@@ -83,6 +91,12 @@ export class HotspotsService {
 
   constructor() {
     effect(() => this.load(this.range()));
+
+    // How crowded the view is decides how the marks are drawn. The count is
+    // the territory's and not the answer's, for the same reason the button's
+    // is: eleven detections over the Canaries must not be drawn as if they
+    // were the four thousand of the peninsula that came in the same answer.
+    effect(() => this.maps.setHotspotDensity(this.count()));
   }
 
   /** Puts a range in the address bar. Everything else follows from there. */
@@ -96,6 +110,26 @@ export class HotspotsService {
   /** Back to the portada's own range, which writes no parameters. */
   reset(): void {
     this.choose(defaultRange());
+  }
+
+  /**
+   * Writes on each detection where in the range it falls, from 0 to 1.
+   *
+   * A number on the feature because that is what a style expression can
+   * interpolate; MapLibre cannot do arithmetic on a date written as text. The
+   * range runs from the first midnight to the midnight after the last day, in
+   * UTC, which is how FIRMS dates an overpass.
+   */
+  private stampWhen(collection: FeatureCollection, range: Range): void {
+    const start = Date.parse(range.from + 'T00:00:00Z');
+    const end = Date.parse(addDays(range.to, 1) + 'T00:00:00Z');
+    for (const feature of collection.features) {
+      const properties = feature.properties;
+      if (!properties) continue;
+      const seen = Date.parse(String(properties['observedAt']));
+      if (Number.isNaN(seen)) continue;
+      properties['when'] = Math.min(Math.max((seen - start) / (end - start), 0), 1);
+    }
   }
 
   private load(range: Range): void {
@@ -122,8 +156,17 @@ export class HotspotsService {
         if (token !== this.asked) return;
 
         const kept: FeatureCollection = { type: 'FeatureCollection', features: [...features] };
+
+        // One day on screen: the colour repeats the power, as §2.16 drew it.
+        // More than one: *when* is what no other channel carries, and the
+        // colour takes it (§2.35). Decided here, with the data, so the marks
+        // and the rule that paints them change in the same frame.
+        const dated = spanOf(range) > 1;
+        if (dated) this.stampWhen(kept, range);
+
         this.answer.set(kept);
         this.maps.setHotspots(kept);
+        this.maps.setHotspotColourBy(dated ? 'date' : 'power');
         this.loading.set(false);
       })
       .catch((error: unknown) => {

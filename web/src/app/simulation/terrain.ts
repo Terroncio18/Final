@@ -171,5 +171,30 @@ function slopeOf(elevation: Float32Array): {
   return { slope, maxSlope, meanSlope: total / inner };
 }
 
+/**
+ * The ground under one place of a domain, or nothing outside the square.
+ *
+ * The inverse of the sampling in readTerrain(): rows run from north to south
+ * and a cell stands for the ground under it. The slope is read one cell in
+ * from the edge, because slopeOf() has no neighbour to difference against on
+ * the border and leaves it at zero.
+ */
+export function groundAt(
+  terrain: Terrain,
+  centre: Point,
+  place: Point,
+): { elevation: number; slope: number } | null {
+  const [west, south, east, north] = domainAround(centre);
+  const column = Math.floor(((place[0] - west) / (east - west)) * GRID);
+  const row = Math.floor(((north - place[1]) / (north - south)) * GRID);
+  if (column < 0 || column >= GRID || row < 0 || row >= GRID) return null;
+
+  const inner = (value: number) => Math.min(Math.max(value, 1), GRID - 2);
+  return {
+    elevation: terrain.elevation[row * GRID + column],
+    slope: terrain.slope[inner(row) * GRID + inner(column)],
+  };
+}
+
 /** The side of the domain in metres, re-exported so callers need one import. */
 export { SIDE_M };
