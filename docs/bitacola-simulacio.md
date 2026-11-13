@@ -264,9 +264,47 @@ Dues coses apreses pel camí, totes dues per haver-ho mirat:
   d'una vista que parla de la serra. Es retalla al client abans de pintar,
   perquè cada nom descartat és també una etiqueta menys per encaixar.
 
-El fitxer més gran de les tres províncies preparades són 281 kB, l'ordre dels
-de municipis. Si algun dia cal densitat de llogarets, el pas no és un altre
-servei: és afegir `hamlet` al script i tornar-lo a passar.
+**Esmena del 5/11/2026: com es trien els cims.** Una província no hi cap
+sencera —Lleida en té 7.833 i el fitxer passa del megabyte—, i la primera
+versió es quedava amb els 600 més alts. Triar per alçada és triar per lloc:
+els 600 més alts de Lleida passen tots dels 2.000 m i per tant són tots del
+Pirineu, de manera que 844 dels seus 1.187 dominis possibles es quedaven sense
+cap cim, i 479 dels 687 de Barcelona, on guardant-ho tot no n'hi ha ni un. El
+29% dels dominis sortien muts, en una pantalla que existeix per ensenyar el
+pendent.
+
+Ara la tria es reparteix: una graella de 5 km sobre la província i el cim més
+alt de cada cel·la. És el que el client ja fa dins de la vista, però fet abans
+i sobre tot el territori, de manera que el que domina una comarca sobreviu a
+600 m igual que a 2.900.
+
+| tria | cims | MB | dominis sense cap cim |
+| --- | --- | --- | --- |
+| els 600 més alts | 39.125 | 5,6 | 29,0% |
+| **graella de 5 km, 1 per cel·la** | **32.066** | **4,6** | **5,6%** |
+| graella de 5 km, 2 per cel·la | 53.591 | 7,7 | 5,5% |
+| tot, sense tria | 129.655 | 18,5 | 5,5% |
+
+Guanya en els tres eixos alhora: menys cims, fitxers més petits i sis vegades
+menys dominis muts. El 5,6% és el terra —amb tots els cims que OSM té encara
+és el 5,5%, perquè Tierra de Campos i la campinya de Còrdova no en tenen amb
+nom, i això és una dada certa i no una llacuna—, i les variants de dos per
+cel·la o de 3 km paguen 3,4 MB per donar al client més candidats dels que una
+pantalla pot escriure, que en són dotze.
+
+La cel·la és quadrada a terra i no en graus: a 42° un grau de longitud són
+83 km, i un pas fix en graus aprimaria Galícia més que Andalusia.
+
+**Les 81 províncies, preparades.** 73.126 topònims —41.060 nuclis i 32.066
+cims— en 11,2 MB; el fitxer més gros són 384 kB, Saragossa, que pel marge
+porta també Pamplona i Osca. Refer-ho no costa xarxa: les respostes senceres
+queden a `scripts/.cache` i el script les reaprofita, de manera que canviar el
+criteri és un minut de CPU i cap consulta. El script també és tolerant: una
+província que Overpass rebutgi s'anota i no s'emporta les altres vuitanta —a
+la primera passada en van caure cinc, i repetir-les va ser una ordre.
+
+Si algun dia cal densitat de llogarets, el pas no és un altre servei: és
+afegir `hamlet` al script i tornar-lo a passar.
 
 ### 11.6. Corbes de nivell, tretes del relleu que ja hi és
 

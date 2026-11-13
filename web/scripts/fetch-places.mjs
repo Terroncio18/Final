@@ -54,15 +54,34 @@ const DECIMALS = 5;
 const RANK = { city: 0, town: 1, village: 2, peak: 3 };
 
 /**
- * The highest peaks kept per province, and the rest dropped.
+ * The grid the peaks are thinned on: the side of a cell in kilometres, and how
+ * many are kept inside each one.
  *
  * Every named bump is a `natural=peak` in OSM: Lleida answers with 7.833 of
  * them and the file goes past a megabyte —three times the biggest municipality
- * file— for labels a screen can never show. A domain fits a dozen; six hundred
- * candidates per province leave the client plenty wherever the point lands,
- * and it chooses by height.
+ * file— for labels a screen can never show. A province has to be cut down.
+ *
+ * **Cutting it by height cuts it by place**, which is the mistake this
+ * replaces. Lleida's six hundred highest are all above 2.000 m and therefore
+ * all in the Pyrenees, so 844 of its 1.187 possible domains were left without
+ * a single named summit —and 479 of Barcelona's 687, where keeping every peak
+ * leaves none at all. A relief map whose subject is the slope cannot go
+ * anonymous in two thirds of the places someone may point at.
+ *
+ * A grid keeps the highest of each cell instead, so whatever dominates a
+ * comarca survives at 600 m just as well as at 2.900. Measured over the
+ * eighty-one cached answers: domains with no summit fall from 29% to 5,6%,
+ * which is the floor —with every peak OSM has it is 5,5%, those places have
+ * none— and the files come out smaller than the cap's, 32.066 peaks against
+ * 39.125. Two per cell, or cells of 3 km, cost 3,4 MB more for the same 5,5%:
+ * they hand the client more candidates than a screen can write, since it
+ * labels twelve.
  */
-const PEAKS_KEPT = 600;
+const CELL_KM = 5;
+const PEAKS_PER_CELL = 1;
+
+/** A cell's side in degrees of latitude. Longitude narrows going north. */
+const CELL_LAT = CELL_KM / 111.32;
 
 /** Between queries. Overpass is a free service and this is a one-off job. */
 const PAUSE_MS = 1500;
@@ -138,6 +157,34 @@ async function ask(id, extent) {
   throw lastError;
 }
 
+/**
+ * The peaks spread over the province: the highest of every cell.
+ *
+ * Takes them sorted by height already, so the first one a cell sees is the one
+ * that stays and the answer's order survives —the client reads it top down and
+ * stops when it has labels enough.
+ */
+function spread(peaks) {
+  const taken = new Map();
+  const kept = [];
+
+  for (const peak of peaks) {
+    const [lon, lat] = peak.geometry.coordinates;
+    // The cell is square on the ground and not in degrees: at 42° a degree of
+    // longitude is 83 km, so a fixed step would make the cells of the north
+    // narrower than those of the south and thin Galicia harder than Andalusia.
+    const cellLon = CELL_LAT / Math.cos((lat * Math.PI) / 180);
+    const cell = `${Math.floor(lat / CELL_LAT)}:${Math.floor(lon / cellLon)}`;
+
+    const already = taken.get(cell) ?? 0;
+    if (already >= PEAKS_PER_CELL) continue;
+    taken.set(cell, already + 1);
+    kept.push(peak);
+  }
+
+  return kept;
+}
+
 function toFeature(element) {
   const tags = element.tags ?? {};
   const kind = tags.natural === 'peak' ? 'peak' : tags.place;
@@ -174,12 +221,24 @@ async function main() {
   await mkdir(OUTPUT, { recursive: true });
   let total = 0;
   let bytes = 0;
+  const failed = [];
 
   for (const [index, province] of targets.entries()) {
     const { id, name } = province.properties;
     process.stdout.write(`${index + 1}/${targets.length} ${id} ${name}… `);
 
-    const answer = await ask(id, extentOf(province.geometry));
+    let answer;
+    try {
+      answer = await ask(id, extentOf(province.geometry));
+    } catch (error) {
+      // One province Overpass refuses must not take the other eighty with it.
+      // What did arrive is cached, so running this again asks only for what
+      // is still missing.
+      process.stdout.write(`${error instanceof Error ? error.message : 'ha fallat'}\n`);
+      failed.push(id);
+      if (index < targets.length - 1) await sleep(PAUSE_MS);
+      continue;
+    }
     const features = (answer.elements ?? [])
       .map(toFeature)
       .filter(Boolean)
@@ -194,9 +253,7 @@ async function main() {
       );
 
     const settlements = features.filter((feature) => feature.properties.kind !== 'peak');
-    const summits = features
-      .filter((feature) => feature.properties.kind === 'peak')
-      .slice(0, PEAKS_KEPT);
+    const summits = spread(features.filter((feature) => feature.properties.kind === 'peak'));
     const kept = [...settlements, ...summits];
 
     const text = JSON.stringify({ type: 'FeatureCollection', features: kept });
@@ -205,7 +262,7 @@ async function main() {
     const dropped = features.length - kept.length;
     process.stdout.write(
       `${settlements.length} poblacions, ${summits.length} cims` +
-        (dropped ? ` (${dropped} més baixos, fora)` : '') +
+        (dropped ? ` (${dropped} fora, la cel·la ja en tenia un més alt)` : '') +
         ` · ${Math.round(text.length / 1024)} kB\n`,
     );
 
@@ -216,8 +273,11 @@ async function main() {
 
   process.stdout.write(`${OUTPUT}\n`);
   process.stdout.write(
-    `${targets.length} fitxers · ${total} topònims · ${Math.round(bytes / 1024)} kB\n`,
+    `${targets.length - failed.length} fitxers · ${total} topònims · ${Math.round(bytes / 1024)} kB\n`,
   );
+  if (failed.length) {
+    process.stdout.write(`Sense resposta, per tornar-hi: ${failed.join(' ')}\n`);
+  }
   process.stdout.write('© OpenStreetMap contributors, ODbL\n');
 }
 
