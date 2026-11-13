@@ -278,10 +278,19 @@ export class SimulatorView {
       // has a column of its own. Asking for that padding in a card 450 px wide
       // left the domain about a fifth of the width and framed the island.
       this.maps.goToBounds(domainAround(point));
+
+      // And the square is also the wall: the pointer can move and the wheel
+      // can zoom, as far as the domain and no further (§11.10).
+      this.maps.setSandboxBounds(domainAround(point));
     });
 
-    // The two layers the toolbar switches that do not touch the camera.
+    // The two layers the toolbar switches that do not touch the camera, and
+    // the lighting, which does not either.
     effect(() => this.maps.setContours(this.contours()));
+
+    // On for the whole screen and not only in relief: a flat view of thirty
+    // kilometres of mountain is just as hard to read without it.
+    this.maps.setReliefEmphasis(true);
 
     effect(() => {
       const point = this.ignition();

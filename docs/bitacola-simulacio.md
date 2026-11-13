@@ -462,6 +462,78 @@ Comprovat al navegador el 13/11/2026: el simulador ensenya el bloc de Sóller
 amb tots els noms a dins i res a fora, i el quart pas del formulari segueix amb
 la Serra sencera a la vista.
 
+### 11.9. El relleu del sandbox s'il·lumina, i la muntanya no s'infla
+
+Comparat el sandbox amb el prototip, la diferència no era de dades:
+
+| | FireCast | Aquí |
+| --- | --- | --- |
+| exageració vertical | 1,6× | **1×** |
+| llum | hemisfèrica 0,75 i direccional 2,0, amb Three.js | ombrejat de MapLibre a 0,3 |
+| imatgeria | Esri z16, retallada per a Sóller | Esri fins a z19, en directe |
+| elevació | Terrarium z12, amb el centre a z14 | Terrarium fins a z15 |
+
+**El que fa que el seu es vegi així no és haver-lo precuinat.** La seva
+imatgeria és z16 preparada i la nostra arriba a z19 en directe; el seu DEM és
+z14 al centre i el nostre z15. A l'escala d'un domini de 30 km, el que servim
+és igual o millor. La diferència són dos ajustos, i per tant es reprodueix a
+qualsevol punt de la península sense preparar-hi res.
+
+Dels dos, **l'exageració no es toca**: la §11.2 ja va decidir 1× perquè la
+pendent de cada cel·la és una entrada del model (§2.28), i el panell del quart
+pas publica una pendent màxima. Amb 1,6× la imatge ensenyaria una muntanya que
+no és la que ha donat aquell número, i la pantalla diria dues coses alhora. El
+model no se n'assabentaria —llegeix el DEM i no la malla—, però això no és un
+argument a favor: és el motiu pel qual l'engany no es notaria.
+
+L'altre sí. L'ombrejat puja de 0,3 a 0,62 **només al simulador**, amb l'ombra
+més fonda i la llum alta en el mateix to càlid que fa servir el prototip,
+`#fff0d3`, i la fotografia guanya un punt de saturació i de contrast. Res
+d'això toca la geometria: mou llum i color, i la pendent segueix sent la que
+és.
+
+Per què aquí sí i a la portada no: la §2.6 va decidir que sobre una fotografia
+l'ombrejat havia de ser un suggeriment, i tenia raó per al mapa d'un país, que
+porta la seva pròpia llum. Trenta quilòmetres de serra és l'altre cas —a
+aquesta mida la fotografia s'aplana, els valls es tanquen i cap a on mira un
+vessant, que és per on corre un foc, deixa de llegir-se.
+
+El que segueix sense donar-se i el prototip sí: copes d'arbre en 3D, oclusió
+dels valls i fum. Són d'un renderitzador propi i la §11.2 ja les va deixar
+fora.
+
+---
+
+### 11.10. Al sandbox es desplaça i s'hi fa zoom, fins a la paret
+
+La §11.3 va decidir que al relleu es gira i només es gira, i el motiu era que
+l'extensió la tria el pas (§2.8): un mapa del qual es pot sortir respon una
+altra pregunta de la que el formulari ha fet. **El que ho canvia és el
+sandbox** (§11.8): fora del quadrat ja no es dibuixa res, de manera que
+allunyar-se'n no és una altra vista, és una de buida.
+
+Amb això, moure's a dins no té cap inconvenient i sí un avantatge —mirar un
+vessant de prop és justament el que demana una pantalla sobre pendents—, així
+que s'encenen l'arrossegament i la rodeta. **El quadrat és la paret:**
+
+- `maxBounds` és el domini. MapLibre refusa el centre que trauria la càmera
+  fora, de manera que no hi ha cap manera de perdre's.
+- El **zoom mínim és el que enquadra el domini**, demanat a `cameraForBounds()`
+  amb els mateixos límits en comptes d'endevinar-lo: allunyar s'atura
+  exactament quan el quadrat sencer és a la pantalla i no ensenya mai una vora
+  de no-res.
+- El **màxim és 16**, que són uns trenta metres de terra per píxel: la mida de
+  la cel·la de la graella (§2.27). Més a prop, la fotografia són píxels
+  engrandits i la malla és més fina del que el DEM pot alimentar.
+
+Girar segueix on era, al `setOrbit()`: allò és del relleu i això és de
+l'enquadrament. El botó de tornar a enquadrar de la caixa d'eines és la sortida
+quan un s'ha arraconat.
+
+Comprovat al navegador el 13/11/2026: la rodeta acosta fins a Sóller i s'atura;
+arrossegant s'arriba a la vora del domini i la màscara apareix sense que la
+càmera la travessi; i allunyant a fons es torna al bloc sencer sense marge buit.
+
 ---
 
 ## 12. Decisions pendents

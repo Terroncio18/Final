@@ -74,6 +74,15 @@ const DOMAIN_PITCH = 55;
  */
 const TERRAIN_EXAGGERATION = 1;
 
+/**
+ * How far into the sandbox the wheel goes.
+ *
+ * Sixteen is about thirty metres of ground per imagery tile pixel, which is
+ * also the size of a cell of the simulation grid (§2.27). Closer than that the
+ * photograph is enlarged pixels and the mesh is finer than the DEM can feed.
+ */
+const SANDBOX_MAX_ZOOM = 16;
+
 function frpOf(feature: MapGeoJSONFeature): number {
   return Number(feature.properties['frp'] ?? 0);
 }
@@ -572,6 +581,43 @@ export class MapService {
   }
 
   /**
+   * Lights the ground the way the simulation screen needs it, or puts it back.
+   *
+   * The same relief, not a different one: this moves light and colour and
+   * never the geometry. The vertical exaggeration stays at 1× because the
+   * slope of each cell is an input of the model (§11.2, §2.28), and a mountain
+   * inflated for the photograph would be a second terrain under the same
+   * numbers. What the prototype gets from a directional light at full strength
+   * is had here from the shading MapLibre already computes over the same DEM.
+   *
+   * Over a photograph the shading had to be a hint (§2.6), because the imagery
+   * carries its own sunlight and the portada is read at the scale of a
+   * country. Thirty kilometres across a mountain range is the other case: at
+   * that size the photograph flattens, the valleys close up, and which way a
+   * slope faces —which is what a fire runs on— stops being legible.
+   *
+   * The highlight borrows the prototype's own warm light, `#fff0d3`, so the
+   * sunlit faces read as sunlit instead of washed out.
+   */
+  setReliefEmphasis(on: boolean): void {
+    this.withStyle((map) => {
+      map.setPaintProperty(LAYERS.hillshade, 'hillshade-exaggeration', on ? 0.62 : 0.3);
+      map.setPaintProperty(
+        LAYERS.hillshade,
+        'hillshade-highlight-color',
+        on ? '#fff0d3' : '#ffffff',
+      );
+      map.setPaintProperty(LAYERS.hillshade, 'hillshade-shadow-color', on ? '#060c12' : '#0a1016');
+      map.setPaintProperty(LAYERS.hillshade, 'hillshade-accent-color', on ? '#32444f' : '#3a4a56');
+      // The imagery of a wooded range comes back hazy from the atmosphere it
+      // was photographed through. A little saturation and contrast is what
+      // separates the pine from the rock again.
+      map.setPaintProperty(LAYERS.satellite, 'raster-saturation', on ? 0.22 : 0);
+      map.setPaintProperty(LAYERS.satellite, 'raster-contrast', on ? 0.12 : 0);
+    });
+  }
+
+  /**
    * Paints out everything outside the domain, or stops.
    *
    * The simulator's map is the square and nothing else: what happens outside
@@ -646,6 +692,54 @@ export class MapService {
         map.dragRotate.disable();
         map.touchPitch.disable();
       }
+    });
+  }
+
+  /**
+   * Lets the pointer move inside the domain, within the domain.
+   *
+   * §11.3 settled that on the relief you turn and only turn, and the reason
+   * was that the extent is the step's to decide (§2.8): a map you can drift
+   * out of answers a different question from the one the form asked. What
+   * changes it is the sandbox (§11.8) —outside the square there is nothing
+   * drawn any more, so drifting out of it is not a different view, it is a
+   * blank one.
+   *
+   * So the movement is allowed and the square is the wall:
+   *
+   * - **`maxBounds` is the domain**, which is what keeps a drag from leaving
+   *   it. MapLibre refuses a centre that would take the camera past it.
+   * - **The minimum zoom is the one that frames the domain**, computed from
+   *   the same bounds rather than guessed, so zooming out stops exactly where
+   *   the whole square is on screen and never shows a border of nothing.
+   * - **The maximum is 16**, about a tile of imagery per thirty metres of
+   *   ground: past that the photograph is enlarged pixels and the terrain is
+   *   a mesh the DEM cannot feed (§2.6).
+   *
+   * Turning stays where it was, in setOrbit(): it is the relief's and this is
+   * the frame's, and the simulator is the only screen that asks for either.
+   */
+  setSandboxBounds(bounds: LngLatBoundsLike | null): void {
+    this.withStyle((map) => {
+      if (!bounds) {
+        map.dragPan.disable();
+        map.scrollZoom.disable();
+        map.setMaxBounds(null);
+        map.setMinZoom(undefined);
+        map.setMaxZoom(undefined);
+        return;
+      }
+
+      // Asked of the camera rather than taken from it: fitBounds animates, and
+      // the zoom it is heading for is wanted before it gets there.
+      const framed = map.cameraForBounds(bounds, FIT);
+      // A shade under, so the framing itself is never refused by its own floor.
+      if (framed?.zoom !== undefined) map.setMinZoom(framed.zoom - 0.15);
+      map.setMaxZoom(SANDBOX_MAX_ZOOM);
+      map.setMaxBounds(bounds);
+
+      map.dragPan.enable();
+      map.scrollZoom.enable();
     });
   }
 
