@@ -16,8 +16,12 @@
 
   <nav class="scopes" aria-label="Àmbit geogràfic">
     @for (scope of scopes; track scope.id) {
+      <!-- The dates survive a change of territory: «the same August, over the
+           Canaries» is one question, and dropping the range on the way there
+           would make it two. -->
       <a
         [routerLink]="'/' + scope.id"
+        queryParamsHandling="preserve"
         routerLinkActive="is-active"
         #link="routerLinkActive"
         [attr.aria-current]="link.isActive ? 'page' : null"
@@ -25,5 +29,10 @@
       >
     }
   </nav>
+
+  <!-- Beside the scopes and not beside «Crear Simulació»: the two of them say
+       what the map on the portada is showing, where and when. -->
+  <app-range-picker />
+
   <a class="create" routerLink="/simulacio">Crear Simulació</a>
 </header>

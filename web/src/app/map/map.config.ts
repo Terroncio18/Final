@@ -32,12 +32,16 @@ export const DEM_ATTRIBUTION =
  * Active fire detections, served by our own API.
  *
  * FIRMS cannot be called from the browser: the key would travel with the page
- * and there is no CORS header. The server holds the key, asks the three VIIRS
+ * and there is no CORS header. The server holds the key, asks the VIIRS
  * platforms and caches the answer, which matters because the data only changes
  * when a satellite passes over.
+ *
+ * The dates are not here: they are in the URL and `HotspotsService` puts them
+ * on this path as `?from=&to=`. Which processing answers —near real time for
+ * the last months, standard for anything older— is the server's business and
+ * not something a screen should have to know.
  */
-export const HOTSPOT_DAYS = 1;
-export const HOTSPOTS_URL = `/api/hotspots?days=${HOTSPOT_DAYS}`;
+export const HOTSPOTS_URL = '/api/hotspots';
 
 /**
  * Administrative boundaries, preprocessed from Eurostat GISCO NUTS 2024.

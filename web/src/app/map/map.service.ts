@@ -20,6 +20,7 @@ import {
   buildStyle,
   DEM_SOURCE,
   DOMAIN_SOURCE,
+  HOTSPOTS_SOURCE,
   IGNITION_SOURCE,
   LAYERS,
   MUNICIPALITIES_SOURCE,
@@ -418,6 +419,19 @@ export class MapService {
       const filter = ['==', ['get', 'id'], id ?? ''] as never;
       map.setFilter(fill, filter);
       map.setFilter(line, filter);
+    });
+  }
+
+  /**
+   * Puts a set of detections on the map, replacing whatever was there.
+   *
+   * The style declares the source empty (§2.30bis): which detections belong on
+   * screen depends on the dates in the URL, and the style is built once.
+   */
+  setHotspots(data: FeatureCollection): void {
+    this.withStyle((map) => {
+      const source = map.getSource(HOTSPOTS_SOURCE) as GeoJSONSource | undefined;
+      source?.setData(data);
     });
   }
 

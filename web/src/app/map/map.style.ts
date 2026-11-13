@@ -1,13 +1,12 @@
 import type { FeatureCollection } from 'geojson';
 import type { FilterSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl';
-import { CONTOUR_TILES } from './contours';
+import { contourTiles } from './contours';
 import {
   BOUNDARIES_ATTRIBUTION,
   DEM_ATTRIBUTION,
   DEM_MAX_ZOOM,
   DEM_TILES,
   GLYPHS,
-  HOTSPOTS_URL,
   IMAGERY_ATTRIBUTION,
   IMAGERY_TILES,
   LABEL_FONT,
@@ -176,9 +175,12 @@ export function buildStyle(): StyleSpecification {
         data: REGIONS_URL,
         attribution: BOUNDARIES_ATTRIBUTION,
       },
+      // Empty on purpose, like the other sources a service feeds: the
+      // detections depend on the dates in the URL, and the style is built
+      // once. HotspotsService fetches them and sets them here.
       [HOTSPOTS_SOURCE]: {
         type: 'geojson',
-        data: HOTSPOTS_URL,
+        data: NO_POINT,
         attribution: 'Focus: NASA FIRMS (VIIRS 375 m)',
       },
       [DOMAIN_SOURCE]: { type: 'geojson', data: NO_POINT },
@@ -190,7 +192,7 @@ export function buildStyle(): StyleSpecification {
       },
       [CONTOURS_SOURCE]: {
         type: 'vector',
-        tiles: [CONTOUR_TILES],
+        tiles: [contourTiles()],
         // Traced from the elevation tiles, so they stop where those do.
         maxzoom: DEM_MAX_ZOOM,
       },

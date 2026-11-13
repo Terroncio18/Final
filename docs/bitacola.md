@@ -785,6 +785,159 @@ Comprovat al navegador el 13/11/2026, amb el servidor de desenvolupament:
 i `ametlla` + fletxa avall + retorn obre `Ametlla del Vallès, L'` a
 `/simulacio/ES51/ES511/ES_08005`.
 
+### 2.31. Les deteccions tenen dates, i la portada les deixa triar
+
+La portada demanava un dia i prou: `days=1` escrit a `map.config.ts`. És la
+resposta correcta a «què està cremant» i no en té cap a «què va cremar l'agost
+del 2024», que és la pregunta que fa qualsevol que vulgui mirar un incendi
+concret —i, per a un treball sobre propagació, la que té exemples.
+
+**Es pot fer, i l'API ja ho porta.** L'endpoint d'àrea de FIRMS accepta un
+últim segment opcional que és la data d'**inici**:
+`/api/area/csv/CLAU/FONT/CAIXA/DIES/DATA` torna de `DATA` a `DATA+DIES-1`. El
+`day_range` màxim és 5, de manera que un mes són set finestres encadenades.
+
+**El que no es podia fer és demanar-ho a les fonts d'ara.** Les tres NRT que el
+servidor consultava només cobreixen els últims mesos; per a res més enrere cal
+la variant **SP**, el processament estàndard, que és la mateixa VIIRS a 375 m
+reprocessada. Consultat a `/api/data_availability/` el 13/11/2026:
+
+| font | des de | fins a |
+| --- | --- | --- |
+| `VIIRS_SNPP_SP` | 2012-01-20 | 2026-07-31 |
+| `VIIRS_NOAA20_SP` | 2018-04-01 | 2026-07-31 |
+| `VIIRS_NOAA21_SP` | 2023-03-01 | 2026-07-31 |
+| `VIIRS_NOAA20_NRT` | 2026-08-01 | avui |
+| `VIIRS_SNPP_NRT` | 2026-08-01 | 2026-11-02 |
+
+La frontera entre les dues es mou —l'SP va guanyant terreny un mes cada mes— de
+manera que **no s'escriu al codi**: el servidor llegeix aquesta taula, la guarda
+sis hores i tria la font per data. Si la taula no es pot llegir, se suposa NRT,
+que és el que l'aplicació demanava abans d'existir tot això i és el bo per a
+l'únic rang que importa un dia que FIRMS vagi malament: avui.
+
+Una NRT que no cobreix la data **no falla: respon sense cap fila**. Sense
+aquesta taula, l'agost del 2024 hauria semblat un mes sense incendis.
+
+**Màxim 31 dies**, perquè és el cas que ho justifica i perquè és on el cost
+deixa de ser invisible: un mes són 7 finestres × 2 àmbits × 3 plataformes = 42
+peticions —la quota són 5.000 cada deu minuts— i unes 6.800 deteccions.
+Mesurat: l'agost del 2024 triga 11 s la primera vegada i després surt de la
+memòria cau. Tres mesos serien 126 peticions i 25.000 punts.
+
+**El rang viatja a la URL** com a `?des=&fins=`, per la mateixa raó que la
+jerarquia i el punt d'ignició (§2.19, §2.26): un enllaç ha de tornar a obrir el
+mateix mapa. `HotspotsService` el llegeix d'allà i ningú més el guarda, de
+manera que el control, l'enllaç i el botó enrere no poden discrepar. Els
+botons de preajust escriuen **dates concretes i no «7 dies»**, perquè un enllaç
+amb «7 dies» voldria dir una altra setmana el mes que ve; el botó torna a dir
+«Darrers 7 dies» mentre això és el que diuen les dates. El rang per defecte no
+escriu res: `/peninsula` segueix sent la portada.
+
+Els enllaços d'àmbit el conserven (`queryParamsHandling="preserve"`): «el mateix
+agost, a les Canàries» és una sola pregunta.
+
+**Qui descarrega ara és l'aplicació i no MapLibre.** La font de l'estil portava
+la URL a dins, que és el més curt possible mentre la resposta triga mig segon.
+Un mes triga deu, i un mapa que no canvia durant deu segons sembla espatllat:
+només qui ha fet la petició pot dir que encara arriba. L'estil declara la font
+buida, com les altres que alimenta un servei, i el botó diu «carregant…».
+
+El comptador del botó **compta el que es mira**. Una resposta cobreix les dues
+caixes perquè es demanen totes dues alhora i el mapa filtra per càmera; dir
+«6.799 focus» sobre una vista de les Canàries seria afirmar que les illes van
+cremar com Ibèria. Amb el filtre per àmbit són 11.
+
+**Deteccions i no focus**, que és el que compta. Les tres plataformes veuen el
+mateix incendi en passades diferents i aquí no es fusiona res —ho diuen el
+client de FIRMS i l'estil—, de manera que una marca és una observació. Amb un
+dia de diferència la distinció gairebé no es nota; amb un mes, sí: dels 11 de
+l'àmbit canari de l'agost del 2024, **sis són el mateix incendi del sud de Gran
+Canària vist per les tres plataformes en 49 minuts**, dins de 720 × 345 m, i a
+l'enquadrament de les illes —uns 500 m per píxel, amb marques de 3,5 a 10 px de
+radi— es pinten l'una damunt de l'altra. A la pantalla se'n compten cinc. Com
+que el mapa de la portada és fix (§2.9), no hi ha cap apropament que els
+separi, de manera que la paraula del comptador és l'únic lloc on això es pot
+dir. Un recompte d'incendis demanaria decidir què fa que dues deteccions siguin
+el mateix foc —una distància i una finestra de temps—, que és modelització i no
+una etiqueta.
+
+Els camps de data s'acoten amb el que FIRMS diu que té (capçalera `x-earliest`,
+2012-01-20). Sense això, demanar el 2005 tornaria buit i el mapa diria «no va
+cremar res a Espanya el 2005» en comptes de «el VIIRS encara no volava».
+
+El panell de detecció no ha calgut tocar-lo: ja escrivia la data absoluta de
+l'observació i no «fa X hores», de manera que una detecció del 5 d'agost del
+2024 es llegeix igual de bé que una d'aquest matí.
+
+Comprovat al navegador el 13/11/2026: `?des=2024-08-01&fins=2024-08-31` pinta
+6.788 deteccions sobre la península —4.303 d'ençà de la §2.32— i el botó diu «1–31 d'agost del 2024»;
+canviar a Canàries conserva les dates i el comptador passa a 11; «Darrers 7
+dies» escriu `?des=2026-11-07&fins=2026-11-13`; «Avui» esborra els paràmetres;
+i una detecció del 5 d'agost del 2024 obre el panell amb 303,8 MW i Suomi NPP.
+
+### 2.32. La caixa que es demana a FIRMS no és l'àmbit d'estudi
+
+Les deteccions es demanen per caixa perquè és el que accepta l'API, i una
+caixa al voltant d'Ibèria no és Ibèria. La peninsular va de 35,8° a 44,0°, de
+manera que hi caben el nord del Marroc, Algèria i el Llenguadoc. Fins ara
+sortien al mapa i al comptador.
+
+Mesurat sobre l'agost del 2024, que són 6.799 deteccions:
+
+| | deteccions |
+| --- | --- |
+| dins d'Espanya i Portugal | 4.314 |
+| el Marroc i Algèria (sota 36,3°) | 1.498 |
+| França (sobre 42,5°, a l'est de −1,5°) | 239 |
+| mar, costa i Algèria central | 748 |
+| **fora de l'àmbit** | **2.485, el 36,5%** |
+
+**Més d'un terç del que es comptava no era del país**, i dir-ho d'una altra
+manera: la portada afirmava que Espanya i Portugal havien cremat la meitat més
+del que van cremar.
+
+Decidit: es treuen del mapa **i** del comptador, no només del comptador. Un
+mapa amb cinquanta punts sobre el Rif i un número que els ignora és pitjor que
+el problema que arregla, perquè la contradicció és visible i no té explicació a
+la pantalla.
+
+Es filtra **al client i amb els polígons NUTS que ja hi són**:
+`regions.geojson` es baixa igualment per pintar les vores, de manera que no hi
+ha dada nova ni una segona versió d'on és la frontera. El cost mesurat són
+**19 ms per a 6.799 punts** —caixa englobant primer, que descarta vint-i-tres
+de les vint-i-quatre regions amb quatre comparacions, i llançament de raig
+només per a la que queda— i el punt-dins-de-polígon és el de `bounds.ts`, que
+ja existia per als municipis (§2.25) i no s'escriu dues vegades.
+
+**La generalització es va comprovar abans de confiar-hi.** El fitxer és NUTS a
+1:3M i la por raonable era que una costa esquemàtica llencés incendis litorals
+espanyols. Dels 748 punts que no són clarament d'un altre país, **només un cau
+a menys de 5 km de la frontera dibuixada**: la resta és mar obert i l'interior
+d'Algèria. No hi ha res legítim a perdre.
+
+**Ceuta i Melilla queden fora, i no per descuit.** `fetch-regions.mjs` les
+exclou explícitament amb les Açores i Madeira com a terreny fora de l'àmbit, de
+manera que «fora d'Espanya» i «fora de l'àmbit d'estudi» es diferencien
+exactament aquí, i el filtre aplica el segon. Són a l'Àfrica i sí que hi tenen
+incendis; si algun dia l'àmbit les inclou, el canvi és al script i no aquí.
+
+Si el fitxer de regions no es pot llegir **no es filtra res**. Un mapa amb
+quatre focus de més és una mentida més petita que un mapa buit, i l'única cosa
+que un mapa buit no pot voler dir per accident és «no crema res».
+
+Quants n'han quedat fora **no es diu a la interfície**. El panell del selector
+ho va portar escrit el primer dia i es va treure el mateix 13/11/2026: eren
+tres línies de lletra petita sota un botó, en un desplegable que ja n'hi tenia
+unes altres tres, per un número que no canvia res del que es pot fer allà. El
+número del botó és, doncs, més petit que el que donaria FIRMS per la mateixa
+caixa, i on això consta és aquí.
+
+Comprovat al navegador el 13/11/2026: l'agost del 2024 passa de 6.788 a **4.303
+focus** a la península i el mapa es queda sense cap punt al Marroc, a Algèria
+ni al Llenguadoc; les Canàries segueixen amb 11; i el panell diu que 2.485
+queden fora.
+
 ---
 
 ## 3. Decisions pendents
@@ -939,6 +1092,26 @@ Coses que han costat temps i convé no redescobrir.
   final de línia queden marcats com a modificats amb un `git diff` buit.
   `git add --renormalize` els torna a lloc i no prepara res per al commit,
   perquè el contingut normalitzat ja era el mateix.
+- **El text de l'atribució de MapLibre era negre sobre el panell fosc.** La
+  regla del projecte deia `color: var(--muted)` i no s'aplicava mai:
+  `.maplibregl-ctrl-attrib.maplibregl-compact` porta `color:#000` amb dues
+  classes i en guanya una de sola. Només els enllaços agafaven el color donat,
+  perquè MapLibre els estilitza també amb una classe. El `!important` que ja hi
+  havia al fons n'era el símptoma. Es contesta igualant les classes, no pujant
+  la prioritat. El botó que desplega els crèdits es queda amb fons clar a
+  propòsit: la seva «i» és un traç negre dins d'una imatge de fons, i un botó
+  fosc és un cercle buit.
+- **MapLibre posa `font: 12px/20px Helvetica Neue…` al contenidor del mapa**, de
+  manera que tot el que dibuixa sobre el llenç —l'escala, els crèdits, un
+  globus— parla amb una altra lletra que l'aplicació del voltant. Se sobreescriu
+  només la família, i cada control es queda amb la mida que tenia.
+- **`maplibre-contour` arrenca un *worker* en importar-se.** `contours.ts`
+  construïa el `DemSource` a nivell de mòdul, de manera que qualsevol fitxer que
+  acabés important `map.style.ts` necessitava un navegador: el dia que la
+  barra superior va passar a dependre de `MapService`, el test de `App` va
+  petar amb `Worker is not defined` sense que ningú hagués tocat cap test. Es
+  construeix al primer ús, que segueix sent abans que MapLibre vegi l'estil,
+  que és l'ordre que importa.
 - **El `--write` de Prettier arriba al GeoJSON.** Reconeix l'extensió i
   reescriuria els 83 fitxers de `public/data`, que es publiquen minificats a
   propòsit: el que es baixa el navegador es multiplicaria per no guanyar res,

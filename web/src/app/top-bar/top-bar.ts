@@ -2,10 +2,11 @@ import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import { VIEWS, type ViewId } from '../map/map.config';
+import { RangePicker } from './range-picker';
 
 @Component({
   selector: 'app-top-bar',
-  imports: [RouterLink, RouterLinkActive],
+  imports: [RangePicker, RouterLink, RouterLinkActive],
   templateUrl: './top-bar.html',
   styleUrl: './top-bar.css',
 })

@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
+import { HotspotsService } from './hotspots.service';
 import { MapService } from './map.service';
 
 /**
@@ -31,6 +32,15 @@ import { MapService } from './map.service';
 })
 export class MapShell {
   private readonly maps = inject(MapService);
+
+  /**
+   * Injected and not called: building it is what starts the detections.
+   *
+   * It watches the dates in the URL and feeds the source, and it belongs to
+   * whatever owns the map rather than to a route under it —the detections
+   * outlive every step of the form, which only hides them (§2.21).
+   */
+  private readonly hotspots = inject(HotspotsService);
 
   // The element MapLibre takes over. Required: the template always renders it.
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');

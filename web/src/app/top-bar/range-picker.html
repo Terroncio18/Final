@@ -1,0 +1,73 @@
+<div class="picker" (focusout)="leave($event)" (keydown)="key($event)">
+  <button
+    type="button"
+    class="trigger"
+    [class.busy]="loading()"
+    [attr.aria-expanded]="open()"
+    aria-haspopup="dialog"
+    (click)="toggle()"
+  >
+    <span class="when">{{ label() }}</span>
+    @if (loading()) {
+      <small class="state">carregant…</small>
+    } @else if (failed()) {
+      <small class="state warn">sense resposta</small>
+    } @else {
+      <!-- Deteccions i no focus: les tres plataformes veuen el mateix incendi
+           en passades diferents i aquí no es fusiona res (§2.31). -->
+      <small class="state">{{ count() }} {{ count() === 1 ? 'detecció' : 'deteccions' }}</small>
+    }
+  </button>
+
+  @if (open()) {
+    <div class="panel" role="dialog" aria-label="Dates de les deteccions">
+      <p class="head">Darrers dies</p>
+      <div class="presets">
+        @for (days of presets; track days) {
+          <button
+            type="button"
+            class="preset"
+            [class.on]="current() === days"
+            (click)="choosePreset(days)"
+          >
+            {{ days === 1 ? 'Avui' : days + ' dies' }}
+          </button>
+        }
+      </div>
+
+      <p class="head">Dates concretes</p>
+      <div class="dates">
+        <label>
+          <span>Des de</span>
+          <input
+            type="date"
+            [value]="from()"
+            [attr.min]="earliest()"
+            [max]="today"
+            (input)="edit('from', $event)"
+          />
+        </label>
+        <label>
+          <span>Fins a</span>
+          <input
+            type="date"
+            [value]="to()"
+            [attr.min]="earliest()"
+            [max]="today"
+            (input)="edit('to', $event)"
+          />
+        </label>
+      </div>
+
+      @if (problem(); as why) {
+        <p class="note warn">{{ why }}</p>
+      } @else {
+        <p class="note">Com a molt {{ maxDays }} dies de cop.</p>
+      }
+
+      <button type="button" class="apply" [disabled]="!!problem()" (click)="apply()">
+        Veure aquestes dates
+      </button>
+    </div>
+  }
+</div>

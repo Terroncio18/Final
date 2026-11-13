@@ -32,6 +32,14 @@ body {
   overflow: hidden;
 }
 
+/* MapLibre sets `font: 12px/20px Helvetica Neue, Arial…` on the map container,
+   so everything it draws over the canvas —the scale, the credits, a popup—
+   speaks in a different typeface from the application around it. The family
+   alone is overridden, which leaves each control's own size where it was. */
+.maplibregl-map {
+  font-family: inherit;
+}
+
 /* MapLibre's controls ship a light theme; match the application chrome. */
 .maplibregl-ctrl-scale {
   background: rgb(12 17 22 / 0.8);
@@ -39,11 +47,32 @@ body {
   color: var(--text);
 }
 
-.maplibregl-ctrl-attrib {
-  background: rgb(12 17 22 / 0.8) !important;
-  color: var(--muted);
+/* The credits are a licence condition and not decoration (§6), so they are
+   held to being readable.
+
+   They were black on the dark bar, which is why almost nothing could be made
+   out: `.maplibregl-ctrl-attrib.maplibregl-compact` carries `color:#000` and
+   two classes, so the one-class rule here never applied and only the links —
+   which MapLibre styles with one class too— took the colour they were given.
+   Matched class for class rather than answered with `!important`, which is
+   what the background had resorted to. */
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  background-color: rgb(12 17 22 / 0.94);
+  color: #c3ced9;
+  font-size: 11.5px;
+  line-height: 1.5;
 }
 
+/* Lighter than the sentence around them, which is what says they are links:
+   the colour is the only cue MapLibre gives them before the hover. */
 .maplibregl-ctrl-attrib a {
-  color: var(--muted);
+  color: var(--text);
+}
+
+/* The button that unfolds them keeps a light backing on purpose: its «i» is a
+   black path in a background image, so a dark button is an empty circle. */
+.maplibregl-ctrl-attrib-button,
+.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-button {
+  background-color: rgb(230 234 238 / 0.9);
 }
