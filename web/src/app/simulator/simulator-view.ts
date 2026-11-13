@@ -261,6 +261,11 @@ export class SimulatorView {
       this.maps.setIgnition(point);
       this.maps.setDomain(domainRing(point));
 
+      // Only the square. What is outside it is not simulated, and a map that
+      // keeps showing it invites reading a fire into ground the model never
+      // touches (§11.8).
+      this.maps.setDomainMask(true);
+
       // The relief goes on **before** the framing and in the same effect as
       // it: the lean is an argument of fitBounds and not a move of its own
       // (§13.2), so `goToBounds` has to find the terrain already set. Turning

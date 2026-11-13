@@ -35,6 +35,7 @@ export const LAYERS = {
   placeLabels: 'place-labels',
   peakLabels: 'peak-labels',
   domainFill: 'domain-fill',
+  domainMask: 'domain-mask',
   domainLine: 'domain-line',
   ignitionHalo: 'ignition-halo',
   ignitionDot: 'ignition-dot',
@@ -314,18 +315,8 @@ export function buildStyle(): StyleSpecification {
         id: LAYERS.domainFill,
         type: 'fill',
         source: DOMAIN_SOURCE,
+        filter: ['!=', ['get', 'mask'], true],
         paint: { 'fill-color': '#f4f8fb', 'fill-opacity': 0.05 },
-      },
-      {
-        id: LAYERS.domainLine,
-        type: 'line',
-        source: DOMAIN_SOURCE,
-        paint: {
-          'line-color': '#f4f8fb',
-          'line-width': 1.5,
-          'line-opacity': 0.9,
-          'line-dasharray': [4, 3],
-        },
       },
       {
         // Contours are `line`, which MapLibre does drape (§13.1), and that is
@@ -375,6 +366,43 @@ export function buildStyle(): StyleSpecification {
           'text-halo-color': 'rgba(8, 12, 16, 0.7)',
           'text-halo-width': 1,
           'text-opacity': 0.75,
+        },
+      },
+      {
+        // Everything that is not the domain, painted out.
+        //
+        // The simulation happens inside the square and nowhere else, so on the
+        // simulator's map the square is all there is to see: one polygon whose
+        // outer ring is a wide box and whose hole is the domain. A `fill` is
+        // draped onto the terrain (§13.1), which is what makes this work in
+        // relief: the paint follows the ground instead of floating over it.
+        //
+        // Off unless a screen asks for it. The form needs the surroundings,
+        // because the point is chosen by looking at where the square falls.
+        //
+        // After the contours and before the labels: what has to disappear is
+        // everything drawn on the ground outside the square, and the names are
+        // already cut to the domain by the service that loads them.
+        id: LAYERS.domainMask,
+        type: 'fill',
+        source: DOMAIN_SOURCE,
+        filter: ['==', ['get', 'mask'], true],
+        layout: { visibility: 'none' },
+        paint: { 'fill-color': '#0e141a', 'fill-opacity': 0.97 },
+      },
+      {
+        // Over the mask, which is why it moved down here: the outline sits
+        // exactly on the hole's edge, so underneath it would be half painted
+        // over.
+        id: LAYERS.domainLine,
+        type: 'line',
+        source: DOMAIN_SOURCE,
+        filter: ['!=', ['get', 'mask'], true],
+        paint: {
+          'line-color': '#f4f8fb',
+          'line-width': 1.5,
+          'line-opacity': 0.9,
+          'line-dasharray': [4, 3],
         },
       },
       {

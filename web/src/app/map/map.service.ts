@@ -10,7 +10,7 @@ import {
   type MapMouseEvent,
 } from 'maplibre-gl';
 
-import type { FeatureCollection, Point } from 'geojson';
+import type { Feature, FeatureCollection, Point } from 'geojson';
 
 import type { Hotspot } from './hotspot';
 import { BOUNDARIES_ATTRIBUTION, INITIAL_VIEW, VIEWS, type ViewId } from './map.config';
@@ -96,6 +96,54 @@ function toHotspot(feature: MapGeoJSONFeature): Hotspot {
  * The application is zoneless, so map events do not trigger change detection by
  * themselves. Anything the template must react to is published as a signal.
  */
+/** How far the mask reaches beyond the domain, in degrees. */
+const MASK_MARGIN = 3;
+
+function domainFeature(ring: readonly (readonly [number, number])[]): Feature {
+  return {
+    type: 'Feature',
+    properties: { mask: false },
+    geometry: { type: 'Polygon', coordinates: [ring.map((p) => [...p])] },
+  };
+}
+
+/**
+ * The domain seen from the outside: a wide box with the square cut out of it.
+ *
+ * A hole and not a second polygon, because a ring inside another ring is what
+ * GeoJSON means by a hole and what the renderer already knows how to leave
+ * empty. The box is three degrees wider on each side —about 330 km, well past
+ * the horizon of a camera that cannot be panned or zoomed (§11.3)— and not the
+ * whole world, which would be a polygon covering every tile at every zoom for
+ * ground that is never on screen.
+ */
+function maskFeature(ring: readonly (readonly [number, number])[]): Feature {
+  const lons = ring.map(([lon]) => lon);
+  const lats = ring.map(([, lat]) => lat);
+  const west = Math.min(...lons) - MASK_MARGIN;
+  const east = Math.max(...lons) + MASK_MARGIN;
+  const south = Math.max(-90, Math.min(...lats) - MASK_MARGIN);
+  const north = Math.min(90, Math.max(...lats) + MASK_MARGIN);
+
+  return {
+    type: 'Feature',
+    properties: { mask: true },
+    geometry: {
+      type: 'Polygon',
+      coordinates: [
+        [
+          [west, south],
+          [west, north],
+          [east, north],
+          [east, south],
+          [west, south],
+        ],
+        ring.map((p) => [...p]),
+      ],
+    },
+  };
+}
+
 @Injectable({ providedIn: 'root' })
 export class MapService {
   private instance: MapLibreMap | null = null;
@@ -518,17 +566,27 @@ export class MapService {
       const source = map.getSource(DOMAIN_SOURCE) as GeoJSONSource | undefined;
       source?.setData({
         type: 'FeatureCollection',
-        features: ring
-          ? [
-              {
-                type: 'Feature',
-                properties: {},
-                geometry: { type: 'Polygon', coordinates: [ring.map((p) => [...p])] },
-              },
-            ]
-          : [],
+        features: ring ? [domainFeature(ring), maskFeature(ring)] : [],
       });
     });
+  }
+
+  /**
+   * Paints out everything outside the domain, or stops.
+   *
+   * The simulator's map is the square and nothing else: what happens outside
+   * it is not simulated, so showing it invites reading a fire into ground the
+   * model never touches. The form does the opposite —the square is chosen by
+   * looking at where it falls— so this is off unless a screen asks.
+   *
+   * The mask travels in the same source as the square, because it is the same
+   * geometry seen from the other side and a second source would be one more
+   * thing to keep in step.
+   */
+  setDomainMask(on: boolean): void {
+    this.withStyle((map) =>
+      map.setLayoutProperty(LAYERS.domainMask, 'visibility', on ? 'visible' : 'none'),
+    );
   }
 
   /**
