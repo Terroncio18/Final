@@ -247,13 +247,14 @@ export class SimulatorView {
       this.maps.setRegionsVisible(false);
       this.maps.showProvincesOf(null);
 
-      // The municipality is context and not a boundary of the simulation
-      // (§2.25): the fire will cross it. Reading the list is what makes this
-      // run again when the province's file lands, because until then there is
-      // no layer to put the outline on.
+      // The file is still read, because the name of the municipality is what
+      // the bar and the card say. Its outline is not drawn: inside the sandbox
+      // the only edge that means anything is the domain's, and an
+      // administrative line across it is the one thing on the ground the fire
+      // does not see (§11.8). It was there while this screen was a map of a
+      // place; it is now a map of a domain.
       this.municipalities.load(this.province());
-      const arrived = this.municipalities.municipalities().length > 0;
-      this.maps.focusMunicipality(arrived ? this.municipality() : null);
+      this.maps.focusMunicipality(null);
 
       const point = this.ignition();
       if (!point) return;

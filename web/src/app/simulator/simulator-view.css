@@ -959,9 +959,6 @@ input[type='range']::-webkit-slider-thumb {
 .legend-fire {
   background: #ff773d;
 }
-.legend-town {
-  background: #8fbb94;
-}
 
 .timeline {
   flex-shrink: 0;

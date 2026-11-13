@@ -83,6 +83,20 @@ const TERRAIN_EXAGGERATION = 1;
  */
 const SANDBOX_MAX_ZOOM = 16;
 
+/**
+ * How far out of the domain the camera may be pointed, as a fraction of it.
+ *
+ * Room to move and not a tight fit. The square can be pushed to the edge of
+ * the card and off it, which nobody using this screen for what it is for will
+ * do; what the limit is there for is that the movement ends somewhere instead
+ * of running on into empty ground forever.
+ */
+const SANDBOX_REACH = 0.8;
+
+function between(value: number, low: number, high: number): number {
+  return Math.min(Math.max(value, low), high);
+}
+
 function frpOf(feature: MapGeoJSONFeature): number {
   return Number(feature.properties['frp'] ?? 0);
 }
@@ -169,6 +183,10 @@ export class MapService {
 
   /** Whether the camera has been placed yet. See goToBounds and create(). */
   private framed = false;
+
+  /** Takes the sandbox's centre clamp off again; see setSandboxBounds(). */
+  private unclamp: (() => void) | null = null;
+  private clamping = false;
 
   /** True while a step is waiting for a click on the map rather than on a mark. */
   private picking = false;
@@ -705,10 +723,10 @@ export class MapService {
    * drawn any more, so drifting out of it is not a different view, it is a
    * blank one.
    *
-   * So the movement is allowed and the square is the wall:
+   * So the movement is allowed, with a limit that is loose on purpose:
    *
-   * - **`maxBounds` is the domain**, which is what keeps a drag from leaving
-   *   it. MapLibre refuses a centre that would take the camera past it.
+   * - **The camera is pointed at the domain, give or take a domain**, which is
+   *   room to move rather than a tight fit; see the clamp below for why.
    * - **The minimum zoom is the one that frames the domain**, computed from
    *   the same bounds rather than guessed, so zooming out stops exactly where
    *   the whole square is on screen and never shows a border of nothing.
@@ -719,12 +737,13 @@ export class MapService {
    * Turning stays where it was, in setOrbit(): it is the relief's and this is
    * the frame's, and the simulator is the only screen that asks for either.
    */
-  setSandboxBounds(bounds: LngLatBoundsLike | null): void {
+  setSandboxBounds(bounds: readonly [number, number, number, number] | null): void {
     this.withStyle((map) => {
       if (!bounds) {
         map.dragPan.disable();
         map.scrollZoom.disable();
-        map.setMaxBounds(null);
+        this.unclamp?.();
+        this.unclamp = null;
         map.setMinZoom(undefined);
         map.setMaxZoom(undefined);
         return;
@@ -732,11 +751,60 @@ export class MapService {
 
       // Asked of the camera rather than taken from it: fitBounds animates, and
       // the zoom it is heading for is wanted before it gets there.
-      const framed = map.cameraForBounds(bounds, FIT);
+      const framed = map.cameraForBounds([...bounds] as [number, number, number, number], FIT);
       // A shade under, so the framing itself is never refused by its own floor.
       if (framed?.zoom !== undefined) map.setMinZoom(framed.zoom - 0.15);
       map.setMaxZoom(SANDBOX_MAX_ZOOM);
-      map.setMaxBounds(bounds);
+
+      // The wall is the centre of the camera, not `maxBounds`.
+      //
+      // `maxBounds` asks that the *view* stay inside it, and a view leaning at
+      // 55° covers far more ground than the square it frames: asked for the
+      // square itself, MapLibre satisfied it the only way it could —by zooming
+      // in until the visible trapezoid fitted, so the domain opened at 500 m
+      // across instead of thirty kilometres. Widening it enough to make the
+      // framing legal then let a drag push the block into a corner of an
+      // otherwise empty card. It is the wrong tool for a tilted camera.
+      //
+      // Clamping the centre is the right one, and it is also the plainer rule:
+      // wherever the camera is pointed, it is pointed at somewhere inside the
+      // domain. At the far edge half the view is the mask, which is the truth
+      // —there is nothing out there— and the toolbar's recentre button is one
+      // click away.
+      // The wall is the centre of the camera, and it is deliberately loose.
+      //
+      // `maxBounds` is the obvious tool and it is the wrong one here: it asks
+      // that the *view* fit inside it, and a view leaning at 55° covers far
+      // more ground than the square it frames, so asked for the square itself
+      // MapLibre satisfied it by zooming in until the visible trapezoid fitted
+      // —the domain opened at 500 m across instead of thirty kilometres.
+      //
+      // A first version then clamped the centre to the square minus half a
+      // screen, which is the strict reading: it kept the block filling the
+      // card, and at the zoom that frames the whole domain it left nothing to
+      // move at all. Strict and uncomfortable. The limit is not here to stop
+      // the square leaving the view —nobody using this screen for what it is
+      // for will drag it out— it is here so the movement ends somewhere.
+      const [west, south, east, north] = bounds;
+      const horizontal = (east - west) * SANDBOX_REACH;
+      const vertical = (north - south) * SANDBOX_REACH;
+
+      this.unclamp?.();
+      const clamp = () => {
+        if (this.clamping) return;
+        const centre = map.getCenter();
+        const lon = between(centre.lng, west - horizontal, east + horizontal);
+        const lat = between(centre.lat, south - vertical, north + vertical);
+        if (lon === centre.lng && lat === centre.lat) return;
+
+        // setCenter fires `move` again, and without this the correction would
+        // chase its own tail.
+        this.clamping = true;
+        map.setCenter([lon, lat]);
+        this.clamping = false;
+      };
+      map.on('move', clamp);
+      this.unclamp = () => map.off('move', clamp);
 
       map.dragPan.enable();
       map.scrollZoom.enable();

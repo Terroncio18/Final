@@ -19,13 +19,17 @@ import { ProvincesService } from './provinces.service';
 import { TerrainService } from './terrain.service';
 
 /**
- * The end of the hierarchy: the ignition point.
+ * The end of the hierarchy: the centre of the simulation.
  *
  * The map is already framed on the municipality, so this step only has to turn
  * the canvas into something to click on and put what was clicked into the URL.
  * From there a whole simulation is a link, which is what §2.19 was for.
  *
- * The 3D view and the simulation itself do not exist yet.
+ * **What is clicked here is the centre of the domain and not where the fire
+ * starts** (§11.11). The square is cut around it, and which cell or cells are
+ * lit is a question asked inside the simulator, where the ground can be seen
+ * in relief and there can be more than one of them. The identifiers still say
+ * «ignition» throughout; the rename is its own change.
  */
 @Component({
   selector: 'app-ignition-step',

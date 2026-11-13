@@ -455,6 +455,14 @@ Els topònims no han calgut tocar-los: el servei que els carrega ja els retalla
 a l'extensió del domini (§11.5), i com que el domini és un quadrat alineat amb
 els eixos, aquella extensió i el quadrat són la mateixa cosa.
 
+**El contorn del municipi, en canvi, s'ha tret.** Hi era perquè aquesta
+pantalla era el mapa d'un lloc, i el comentari del codi ho deia: el municipi és
+context i no un límit de la simulació. Dins del sandbox la frase es gira sola —
+l'única vora que vol dir res és la del domini, i una línia administrativa que
+el travessa és justament l'única cosa dibuixada a terra que el foc no veu. El
+fitxer de municipis se segueix llegint, perquè el nom és el que diuen la barra
+i la fitxa; el que no es dibuixa és la ratlla.
+
 Apagada per defecte, i el formulari no l'encén. Allà la pregunta és on cau el
 quadrat, i per respondre-la cal veure justament el que aquí s'amaga.
 
@@ -516,8 +524,24 @@ Amb això, moure's a dins no té cap inconvenient i sí un avantatge —mirar un
 vessant de prop és justament el que demana una pantalla sobre pendents—, així
 que s'encenen l'arrossegament i la rodeta. **El quadrat és la paret:**
 
-- `maxBounds` és el domini. MapLibre refusa el centre que trauria la càmera
-  fora, de manera que no hi ha cap manera de perdre's.
+- **El centre de la càmera es manté dins del domini amb un domini de marge**
+  a cada banda. És espai de sobres i no un ajust estret: el quadrat es pot
+  empènyer fins a sortir de la targeta. El límit no hi és per impedir-ho
+  —ningú que faci servir aquesta pantalla per al que és l'hi traurà— sinó
+  perquè el moviment s'acabi en algun lloc en comptes de continuar sobre
+  terreny buit indefinidament. El botó de tornar a enquadrar és el camí de
+  tornada.
+
+  Dos intents anteriors, perquè el següent que hi toqui no els repeteixi.
+  `maxBounds` **no serveix amb la càmera inclinada**: demana que la *vista*
+  càpiga a dins, i una de 55° cobreix molt més terreny que el quadrat que
+  enquadra, de manera que MapLibre ho complia de l'única forma que podia
+  —acostant-se fins que el trapezi visible hi cabia, i el domini s'obria a
+  500 m d'amplada en comptes de trenta quilòmetres. Després, fixar el centre al
+  quadrat **menys mitja pantalla** mantenia el bloc omplint la targeta, però al
+  zoom que enquadra el domini no deixava res a moure: correcte i incòmode. La
+  comoditat guanya, perquè el que hi havia en joc era una vista lletja i no una
+  manera d'equivocar-se.
 - El **zoom mínim és el que enquadra el domini**, demanat a `cameraForBounds()`
   amb els mateixos límits en comptes d'endevinar-lo: allunyar s'atura
   exactament quan el quadrat sencer és a la pantalla i no ensenya mai una vora
@@ -534,9 +558,58 @@ Comprovat al navegador el 13/11/2026: la rodeta acosta fins a Sóller i s'atura;
 arrossegant s'arriba a la vora del domini i la màscara apareix sense que la
 càmera la travessi; i allunyant a fons es torna al bloc sencer sense marge buit.
 
+### 11.11. El darrer pas del formulari tria el centre, no on comença el foc
+
+El quart pas demanava «fes clic al mapa per marcar on comença el foc», i el
+quadrat es retallava al voltant d'aquell punt. Les dues coses anaven juntes
+perquè la pantalla no en sabia fer dues.
+
+Ara sí. El clic del formulari **tria el centre del domini** i prou; on
+s'encén, o on s'encenen, es decideix a dins del simulador, amb l'eina
+d'ignició que hi ha a la columna de configuració.
+
+El motiu és on es pren cada decisió amb la informació a la vista:
+
+- **El centre és una pregunta de mapa pla.** El domini fa 30,7 km i el que es
+  tria és quin tros de territori s'estudia. Per a això el formulari és el bon
+  lloc: el municipi sencer a la vista, el nord amunt i cap perspectiva movent
+  el punt sota el cursor (§11.2).
+- **On comença el foc és una pregunta de terreny.** Depèn del vessant, de la
+  carena que el pararà i de per on puja. Demanar-ho sobre una fotografia plana
+  d'un municipi sencer és demanar-ho sense ensenyar el que ho decideix, i el
+  simulador ja té el relleu, la inclinació i l'eina.
+- **I no n'hi ha un de sol.** Un incendi pot tenir més d'un focus, i un camp a
+  la URL amb un punt no ho podia dir mai.
+
+Canvia el text i prou. Els identificadors segueixen dient `ignition` —el pas,
+la font, les capes, `setIgnition()`— i el segment de la URL segueix sent el
+mateix `@lon,lat`, que ara vol dir el centre. **El canvi de nom és una feina
+seva**, mecànica i ampla, i barrejar-la amb aquest text hauria amagat l'un dins
+de l'altre.
+
+**I no s'insisteix.** Hi va haver una versió amb un bloc destacat, a tots dos
+estats del panell, explicant que allò no era el punt d'ignició. Va durar poc i
+el motiu per treure'l és bo: qui llegeix «fes clic al mapa per marcar el centre
+de la simulació» no entén que estigui marcant un foc. Una frase que diu què és
+una cosa no necessita una segona que digui què no és; afegir-la és tractar el
+lector de distret i omplir el panell de lletra que no es llegirà.
+
+La llegenda del simulador sí que ho diu, perquè allà la marca conviu amb la
+resta: «Centre del domini» on deia «Punt d'ignició». El que encara no ho diu és
+la marca del mapa, que segueix sent el punt taronja amb halo que es va dibuixar
+quan volia dir un incendi; canviar-la per una marca de centre és feina de la
+12.7, amb el canvi de nom.
+
 ---
 
 ## 12. Decisions pendents
+
+- **12.7. El canvi de nom d'«ignició» a «centre».** Ve de la §11.11: el text ja
+  diu centre i els identificadors encara diuen ignició —`IgnitionStep`,
+  `IGNITION_SOURCE`, `setIgnition()`, `LAYERS.ignitionDot`— i el que és
+  realment el punt d'ignició encara no existeix. Convé fer-ho el dia que
+  l'eina del simulador col·loqui focus de debò, perquè llavors els dos
+  conceptes hauran de conviure i els noms hauran de distingir-los.
 
 La primera que toca és la 12.4, perquè condiciona on viu la resta: si el foc es
 pinta dins de MapLibre o en un segon canvas, el model no escriu al mateix lloc.
