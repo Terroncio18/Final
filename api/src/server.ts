@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 
 import {
+  AEMET_API_KEY,
   CACHE_TTL_MS,
   DEFAULT_DAYS,
   FIRMS_MAP_KEY,
@@ -20,7 +21,11 @@ import {
   type HotspotCollection,
 } from './firms.js';
 
+import { nearestObservation } from './weather.js';
+import { registerFuelRoutes } from './fuel-routes.js';
+
 const app = Fastify({ logger: { transport: undefined } });
+registerFuelRoutes(app);
 
 interface CacheEntry {
   readonly body: HotspotCollection;
@@ -124,10 +129,51 @@ app.get<{ Querystring: { from?: string; to?: string; days?: string } }>(
   },
 );
 
+/**
+ * The weather at a place, as its nearest station last measured it.
+ *
+ * The country is asked for and not worked out from the coordinates: the
+ * client already knows it —a NUTS code starts with it— and a point-in-polygon
+ * test here would need the borders the server does not hold. It decides who is
+ * asked: AEMET for Spain, IPMA for Portugal.
+ */
+app.get<{ Querystring: { country?: string; lon?: string; lat?: string } }>(
+  '/api/weather',
+  async (request, reply) => {
+    const { country } = request.query;
+    const lon = Number(request.query.lon);
+    const lat = Number(request.query.lat);
+    if (country !== 'ES' && country !== 'PT') {
+      return reply.status(400).send({ error: 'El país ha de ser ES o PT' });
+    }
+    if (!request.query.lon || !request.query.lat || !Number.isFinite(lon) || !Number.isFinite(lat)) {
+      return reply.status(400).send({ error: 'Calen lon i lat' });
+    }
+    if (Math.abs(lon) > 180 || Math.abs(lat) > 90) {
+      return reply.status(400).send({ error: 'Coordenades fora de rang' });
+    }
+
+    try {
+      const found = await nearestObservation(country, lon, lat);
+      if (!found) return reply.status(404).send({ error: 'Cap estació amb dades' });
+      reply.header('cache-control', 'public, max-age=300');
+      return {
+        ...found.observation,
+        distanceKm: Math.round(found.distanceKm * 10) / 10,
+        stale: found.stale,
+      };
+    } catch (error) {
+      request.log.error(error);
+      return reply.status(502).send({ error: 'El servei meteorològic no respon' });
+    }
+  },
+);
+
 /** Enough to tell «the server is down» from «the key is missing». */
 app.get('/api/health', async () => ({
   ok: true,
   firmsKey: FIRMS_MAP_KEY ? 'present' : 'missing',
+  aemetKey: AEMET_API_KEY ? 'present' : 'missing',
   sources: Object.fromEntries(
     [...(await availability()).entries()].map(([id, span]) => [id, `${span.min} → ${span.max}`]),
   ),

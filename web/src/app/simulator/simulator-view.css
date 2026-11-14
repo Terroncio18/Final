@@ -235,6 +235,7 @@
 
 .tiny-tag {
   padding: 3px 5px;
+  white-space: nowrap;
   font-size: 9px;
   letter-spacing: 0.5px;
   color: #7d8b99;
@@ -309,6 +310,7 @@
 .terrain-facts div {
   display: flex;
   justify-content: space-between;
+  gap: 10px;
   padding: 3px 1px;
 }
 
@@ -318,6 +320,7 @@
 
 .terrain-facts dd {
   margin: 0;
+  text-align: right;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -498,82 +501,188 @@ input[type='range']::-webkit-slider-thumb {
   color: #657585;
 }
 
-.full-select {
-  width: 100%;
-  margin-top: 7px;
-  padding: 8px;
+/* The two origins of the weather, as one control with two positions. */
+.mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 2px;
+  margin-bottom: 10px;
+  background: #121a21;
+  border: 1px solid #35414e;
+  border-radius: 5px;
+}
+
+.mode-switch button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 4px;
   font: inherit;
+  font-size: 11px;
+  color: #8e9ba8;
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  --icon-size: 13px;
+}
+
+.mode-switch button.on {
+  color: #f1f6f8;
+  background: #365465;
+}
+
+.source-card {
+  margin-bottom: 12px;
+  padding: 9px;
+  background: #1f2933;
+  border: 1px solid #34404a;
+  border-radius: 5px;
+}
+
+.source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 12px;
+}
+
+.source-card .terrain-facts {
+  margin-top: 6px;
+}
+
+.ghost-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px;
+  font: inherit;
+  font-size: 11px;
+  color: #a7b4c0;
+  background: none;
+  border: 1px solid #35414e;
+  border-radius: 4px;
+  cursor: pointer;
+  --icon-size: 13px;
+}
+
+/* Read and not set: with the weather coming from a station, the sliders show
+   a value and take none. */
+.weather-values.locked {
+  opacity: 0.55;
+}
+
+.weather-values.locked input,
+.weather-values.locked select {
+  cursor: not-allowed;
+}
+
+.section-lead {
+  margin: 0 0 9px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #8e9ba8;
+}
+
+.terrain-note .tiny-tag {
+  margin-right: 4px;
+}
+
+.scenario-now {
+  padding: 8px 9px;
+  background: #1f2933;
+  border: 1px solid #34404a;
+  border-radius: 5px;
+}
+
+.scenario-now span {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #8f9ca6;
+}
+
+.scenario-now strong {
+  font-weight: 500;
+  color: #d5dce2;
+}
+
+.scenario-name {
+  display: block;
+  margin: 10px 0 8px;
+}
+
+.scenario-name input {
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 11px;
   color: #c9d1d8;
   background: #1e2731;
   border: 1px solid #3b4650;
   border-radius: 4px;
 }
 
-.fuel-detail {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 8px;
+.empty-list {
+  margin: 9px 0 0;
+  padding: 9px;
   font-size: 10px;
-  color: #8e9d94;
+  text-align: center;
+  color: #7d8b99;
+  border: 1px dashed #35414e;
+  border-radius: 4px;
 }
 
-.fuel-dot {
-  width: 5px;
-  height: 5px;
-  background: #79a776;
-  border-radius: 50%;
+.control-section h4 {
+  margin: 10px 0 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #8e9ba8;
 }
 
-.fuel-badge {
-  margin-left: auto;
-  padding: 3px 5px;
-  font-size: 8px;
-  color: #d3ad67;
-  background: #383122;
-  border-radius: 3px;
-}
-
-.scenario-options {
+.measure-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
 }
 
-.scenario-button {
+.measure-grid button {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
-  padding: 7px 6px;
+  padding: 6px;
   font: inherit;
-  font-size: 11px;
-  color: inherit;
-  white-space: nowrap;
-  background: #1d2630;
-  border: 1px solid #35404b;
+  font-size: 10.5px;
+  text-align: left;
+  color: #a7b4c0;
+  background: none;
+  border: 1px solid #35414e;
   border-radius: 4px;
-  cursor: pointer;
   --icon-size: 13px;
 }
 
-.scenario-button:first-child {
-  grid-column: 1 / -1;
+.measure-grid small {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  color: #7d8b99;
 }
 
-.scenario-button.selected {
-  color: #edab7d;
-  background: #34291f;
-  border-color: #7c5234;
-}
-
-.selected-dot {
-  width: 6px;
-  height: 6px;
-  margin-left: auto;
-  margin-right: 4px;
-  background: var(--orange);
-  border-radius: 50%;
+.ghost-button:disabled,
+.scenario-name input:disabled,
+.measure-grid button:disabled,
+.tools-row button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .tools-row {
@@ -1369,10 +1478,6 @@ input[type='range']::-webkit-slider-thumb {
   color: #99a8b5;
 }
 
-.comparison-row.selected {
-  color: #e8b293;
-}
-
 .comparison-bar {
   height: 5px;
   overflow: hidden;
@@ -1498,4 +1603,82 @@ select:focus-visible {
   .loader {
     animation: none;
   }
+}
+
+/* ───────────────────────── the simulation ───────────────────────── */
+
+.run-progress {
+  height: 3px;
+  margin-bottom: 8px;
+  overflow: hidden;
+  background: #35404b;
+  border-radius: 2px;
+}
+
+.run-progress span {
+  display: block;
+  height: 100%;
+  background: var(--orange);
+}
+
+/* The three ages the fire is painted in (fire-spread.ts), as squares: they
+   are areas of ground, like the bands of the slope. */
+.fire-front {
+  background: #ffe278;
+}
+.fire-flames {
+  background: #ff7a28;
+}
+.fire-char {
+  background: #1c1412;
+  outline: 1px solid #6b5a52;
+}
+
+/* The banner of the column, without the alarm: it says the time, not a risk. */
+.risk-banner.calm {
+  color: #c9d3db;
+  background: #1f2933;
+  border-color: #34404a;
+}
+
+.chart-cursor {
+  stroke: #f1f6f8;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.7;
+}
+
+.no-run {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin: 14px;
+  padding: 26px 16px;
+  text-align: center;
+  color: #8e9ba8;
+  border: 1px dashed #35414e;
+  border-radius: 6px;
+  --icon-size: 22px;
+}
+
+.no-run strong {
+  font-size: 13px;
+  color: #d5dce2;
+}
+
+.no-run p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.right-panel .terrain-facts {
+  margin: 0;
+  font-size: 11px;
+}
+
+/* A figure that is a phrase —«No hi arriba», «T + 07:40»— and not a number. */
+.metric strong.text-metric {
+  font-size: 17px;
+  line-height: 1.5;
 }

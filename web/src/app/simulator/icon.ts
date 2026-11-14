@@ -36,6 +36,14 @@ const ICONS = {
   info: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 M12 11v6 M12 7v1',
   back: 'm11 5-7 7 7 7 M4 12h16',
   expand: 'M4 9V4h5 M20 9V4h-5 M4 15v5h5 M20 15v5h-5',
+  // The six below are not the prototype's: drawn here, in the same manner,
+  // when the configuration column needed them.
+  antenna: 'M5 13a7 7 0 0 1 14 0 M8.5 13a3.5 3.5 0 0 1 7 0 M12 13v8 M9 21h6',
+  save: 'M5 3h11l3 3v15H5Z M8 3v6h7V3 M8 21v-7h8v7',
+  folder: 'M3 6h6l2 2h10v11H3Z',
+  trash: 'M4 7h16 M9 7V4h6v3 M6 7l1 14h10l1-14',
+  pause: 'M8 5v14 M16 5v14',
+  plane: 'M12 3v17 M3 14l9-4 9 4 M8 21l4-2 4 2',
 } as const;
 
 export type IconName = keyof typeof ICONS;

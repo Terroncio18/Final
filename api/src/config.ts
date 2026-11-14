@@ -107,3 +107,25 @@ export const WINDOW_DAYS = 5;
  * months would be 126 requests and 25.000 points for one query.
  */
 export const MAX_RANGE_DAYS = 31;
+
+/**
+ * AEMET OpenData. Free key, from
+ * https://opendata.aemet.es/centrodedescargas/altaUsuario
+ *
+ * Kept here for the reason the FIRMS key is: it cannot live in the client.
+ */
+export const AEMET_API_KEY = process.env.AEMET_API_KEY ?? '';
+
+/** The last hours of every conventional station in Spain, in one answer. */
+export const AEMET_OBSERVATIONS =
+  'https://opendata.aemet.es/opendata/api/observacion/convencional/todas';
+
+/**
+ * IPMA's open data. No key, and open to CORS, so the browser could ask it
+ * directly; it goes through here anyway so that both countries answer in one
+ * shape and from one cache.
+ */
+export const IPMA_STATIONS =
+  'https://api.ipma.pt/open-data/observation/meteorology/stations/stations.json';
+export const IPMA_OBSERVATIONS =
+  'https://api.ipma.pt/open-data/observation/meteorology/stations/observations.json';

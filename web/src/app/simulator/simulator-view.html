@@ -39,10 +39,11 @@
       <h1>Predicció de propagació d'incendis</h1>
     </div>
     <div class="heading-right">
-      <!-- The first of the three places this screen admits what it is. -->
+      <!-- What the screen is, said where it cannot be missed: a drill on
+           assumed fuel, not a forecast. -->
       <span class="mock-badge">
         <span></span>
-        Maqueta · sense model de propagació
+        Simulacre · combustible cartografiat i estimat
       </span>
     </div>
   </div>
@@ -90,139 +91,269 @@
       </section>
 
       <section class="control-section weather">
-        <h3>METEOROLOGIA <span class="manual-tag">MANUAL</span></h3>
+        <h3>METEOROLOGIA <app-icon name="wind" /></h3>
 
-        <div class="wind-summary">
-          <div class="wind-rose">
-            <span class="north">N</span>
-            <span class="east">E</span>
-            <span class="south">S</span>
-            <span class="west">O</span>
-            <div class="rose-rings"></div>
-            <!-- The needle points where the wind goes, which is where it takes
-                 the fire: the origin plus 180°, and not the origin. -->
-            <span class="wind-needle" [style.transform]="'rotate(' + towards().degrees + 'deg)'"
-              >↑</span
-            >
-          </div>
-          <div>
-            <span class="secondary">Vent del {{ from().name }}</span>
-            <div class="wind-number">{{ wind() }}<small>km/h</small></div>
-            <small class="secondary">
-              Des de {{ from().short }} → cap a {{ towards().short }}
-            </small>
-            <label class="direction-select">
-              <select
-                aria-label="Direcció d'origen del vent"
-                [value]="direction()"
-                (change)="setDirection($event)"
-              >
-                @for (option of directions; track option.degrees) {
-                  <option [value]="option.degrees">
-                    {{ option.short }} · {{ option.degrees }}°
-                  </option>
-                }
-              </select>
-            </label>
-          </div>
+        <!-- Two ways of saying what the weather is, and only one of them is
+             wired: the live one shows where the data will come from and
+             nothing it has not read. -->
+        <div class="mode-switch" role="group" aria-label="Origen de la meteorologia">
+          <button
+            type="button"
+            [class.on]="weatherMode() === 'live'"
+            (click)="weatherMode.set('live')"
+          >
+            <app-icon name="antenna" /> En directe
+          </button>
+          <button
+            type="button"
+            [class.on]="weatherMode() === 'manual'"
+            (click)="weatherMode.set('manual')"
+          >
+            <app-icon name="sliders" /> Manual
+          </button>
         </div>
 
-        <label class="slider-label" for="wind">
-          <span>Velocitat del vent</span>
-          <output>{{ wind() }} km/h</output>
-        </label>
-        <input
-          id="wind"
-          type="range"
-          min="0"
-          max="60"
-          [value]="wind()"
-          [style.--fill]="fill(wind(), 0, 60)"
-          (input)="setNumber('wind', $event)"
-        />
-        <div class="range-bounds"><span>0 km/h</span><span>60 km/h</span></div>
-
-        <label class="slider-label" for="humidity">
-          <span><app-icon name="droplet" /> Humitat relativa</span>
-          <output>{{ humidity() }} %</output>
-        </label>
-        <input
-          id="humidity"
-          class="blue-range"
-          type="range"
-          min="10"
-          max="90"
-          [value]="humidity()"
-          [style.--fill]="fill(humidity(), 10, 90)"
-          (input)="setNumber('humidity', $event)"
-        />
-
-        <label class="slider-label" for="temperature">
-          <span><app-icon name="thermometer" /> Temperatura</span>
-          <output>{{ temperature() }} °C</output>
-        </label>
-        <input
-          id="temperature"
-          type="range"
-          min="10"
-          max="45"
-          [value]="temperature()"
-          [style.--fill]="fill(temperature(), 10, 45)"
-          (input)="setNumber('temperature', $event)"
-        />
-      </section>
-
-      <section class="control-section">
-        <h3>COMBUSTIBLE <app-icon name="trees" /></h3>
-        <label class="secondary" for="fuel">Coberta predominant</label>
-        <select id="fuel" class="full-select" [value]="fuel()" (change)="setFuel($event)">
-          @for (option of fuels; track option.id) {
-            <option [value]="option.id">{{ option.label }}</option>
-          }
-        </select>
-        <div class="fuel-detail">
-          <span class="fuel-dot"></span>
-          <span>{{ fuelDetail().note }}</span>
-          <span class="fuel-badge">{{ fuelDetail().load }}</span>
-        </div>
-      </section>
-
-      <section class="control-section">
-        <h3>ESCENARIS</h3>
-        <div class="scenario-options">
-          @for (option of scenarios; track option.id) {
+        @if (weatherMode() === 'live') {
+          <div class="source-card">
+            <div class="source-head">
+              <strong>{{ weatherSource().name }}</strong>
+              <span class="tiny-tag" [class.warn]="liveState().warn">{{ liveState().tag }}</span>
+            </div>
+            <dl class="terrain-facts">
+              <div>
+                <dt>Estació</dt>
+                <dd>{{ station()?.name ?? '—' }}</dd>
+              </div>
+              <div>
+                <dt>Distància al centre</dt>
+                <dd>{{ station()?.distance ?? '—' }}</dd>
+              </div>
+              <div>
+                <dt>Observació</dt>
+                <dd>{{ station()?.observedAt ?? '—' }}</dd>
+              </div>
+            </dl>
             <button
               type="button"
-              class="scenario-button"
-              [class.selected]="scenario() === option.id"
-              (click)="scenario.set(option.id)"
+              class="ghost-button"
+              [disabled]="weatherLoading()"
+              (click)="refreshWeather()"
             >
-              <app-icon [name]="option.icon" />
-              {{ option.label }}
-              @if (scenario() === option.id) {
-                <span class="selected-dot"></span>
-              }
+              <app-icon name="reset" /> Actualitzar
             </button>
-          }
+            <p class="terrain-note">{{ liveState().note }}</p>
+          </div>
+        }
+
+        <div class="weather-values" [class.locked]="weatherMode() === 'live'">
+          <div class="wind-summary">
+            <div class="wind-rose">
+              <span class="north">N</span>
+              <span class="east">E</span>
+              <span class="south">S</span>
+              <span class="west">O</span>
+              <div class="rose-rings"></div>
+              <!-- The needle points where the wind goes, which is where it
+                   takes the fire: the origin plus 180°, and not the origin. -->
+              <span class="wind-needle" [style.transform]="'rotate(' + now().towardsDeg + 'deg)'"
+                >↑</span
+              >
+            </div>
+            <div>
+              <span class="secondary">Vent del {{ from().name }}</span>
+              <div class="wind-number">{{ now().wind }}<small>km/h</small></div>
+              <small class="secondary">
+                Des de {{ from().short }} → cap a {{ towards().short }}
+              </small>
+              <label class="direction-select">
+                <select
+                  aria-label="Direcció d'origen del vent"
+                  [value]="from().degrees"
+                  [disabled]="weatherMode() === 'live'"
+                  (change)="setDirection($event)"
+                >
+                  @for (option of directions; track option.degrees) {
+                    <option [value]="option.degrees">
+                      {{ option.short }} · {{ option.degrees }}°
+                    </option>
+                  }
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <label class="slider-label" for="wind">
+            <span>Velocitat del vent</span>
+            <output>{{ now().wind }} km/h</output>
+          </label>
+          <input
+            id="wind"
+            type="range"
+            min="0"
+            max="60"
+            [value]="now().wind"
+            [disabled]="weatherMode() === 'live'"
+            [style.--fill]="fill(now().wind, 0, 60)"
+            (input)="setNumber('wind', $event)"
+          />
+          <div class="range-bounds"><span>0 km/h</span><span>60 km/h</span></div>
+
+          <label class="slider-label" for="humidity">
+            <span><app-icon name="droplet" /> Humitat relativa</span>
+            <output>{{ now().humidity }} %</output>
+          </label>
+          <input
+            id="humidity"
+            class="blue-range"
+            type="range"
+            min="10"
+            max="90"
+            [value]="now().humidity"
+            [disabled]="weatherMode() === 'live'"
+            [style.--fill]="fill(now().humidity, 10, 90)"
+            (input)="setNumber('humidity', $event)"
+          />
+
+          <label class="slider-label" for="temperature">
+            <span><app-icon name="thermometer" /> Temperatura</span>
+            <output>{{ now().temperatureText }} °C</output>
+          </label>
+          <input
+            id="temperature"
+            type="range"
+            min="10"
+            max="45"
+            [value]="now().temperature"
+            [disabled]="weatherMode() === 'live'"
+            [style.--fill]="fill(now().temperature, 10, 45)"
+            (input)="setNumber('temperature', $event)"
+          />
         </div>
       </section>
 
       <section class="control-section">
-        <h3>EINES</h3>
+        <h3>
+          COMBUSTIBLE
+          @if (fuels.grid(); as grid) {
+            <span class="tiny-tag" [class.warn]="grid.estimatedCells > 0 || grid.unknownCells > 0">
+              {{
+                grid.unknownCells
+                  ? 'INCOMPLET'
+                  : grid.officialCells
+                    ? grid.estimatedCells
+                      ? 'MIXT'
+                      : 'CARTOGRAFIAT'
+                    : 'ESTIMAT'
+              }}
+            </span>
+          }
+        </h3>
+        <p class="section-lead">
+          Model Anderson per cel·la de 30 m. La cartografia oficial té prioritat; les zones restants
+          s'estimen a partir de la coberta del sòl.
+        </p>
+        @if (fuels.reading()) {
+          <p role="status">Llegint els combustibles…</p>
+        }
+        @if (fuels.error(); as error) {
+          <p role="alert">{{ error }}</p>
+        }
+        @if (fuels.error() || fuels.grid()?.unknownCells) {
+          <button type="button" (click)="retryFuels()" [disabled]="fuels.reading()">
+            Torna a carregar
+          </button>
+        }
+        @if (fuels.grid(); as grid) {
+          <dl class="terrain-facts">
+            <div>
+              <dt>Model oficial</dt>
+              <dd>{{ fuelPercent(grid.officialCells) }}</dd>
+            </div>
+            <div>
+              <dt>Model estimat</dt>
+              <dd>{{ fuelPercent(grid.estimatedCells) }}</dd>
+            </div>
+            <div>
+              <dt>Sense dades</dt>
+              <dd>{{ fuelPercent(grid.unknownCells) }}</dd>
+            </div>
+            <div>
+              <dt>Sense combustible</dt>
+              <dd>{{ fuelPercent(grid.nonBurnableCells) }}</dd>
+            </div>
+            <div>
+              <dt>Cel·les que poden cremar</dt>
+              <dd>{{ burnableShare() }}</dd>
+            </div>
+          </dl>
+          @for (model of fuelModels(); track model.id) {
+            <p class="section-lead">
+              <strong>{{ model.id }} · {{ model.name }}</strong> · {{ model.share }}
+            </p>
+          }
+          @if (grid.estimatedCells) {
+            <p class="section-lead">
+              WorldCover 2021 identifica cobertes, no el combustible real: bosc → model 8, matollar
+              → 5, herbàcies i cultius → 1, sòl nu → sense combustible. No mesura càrrega ni humitat
+              actuals.
+            </p>
+          }
+          @for (source of grid.sources; track source.label) {
+            <p class="section-lead">
+              <a [href]="source.sourceUrl" target="_blank" rel="noopener noreferrer">{{
+                source.label
+              }}</a>
+              · {{ source.sourceDate }}<br />{{ source.attribution }}
+            </p>
+          }
+          @for (warning of grid.warnings; track warning) {
+            <p role="status">{{ warning }}</p>
+          }
+        }
+      </section>
+
+      <section class="control-section">
+        <h3>ESCENARIS <app-icon name="folder" /></h3>
+        <p class="section-lead">
+          Un escenari desa on són les ignicions i la meteorologia establerta, per tornar-hi després.
+        </p>
+
+        <div class="scenario-now">
+          <span>Ara</span>
+          <strong>{{ scenarioSummary() }}</strong>
+        </div>
+
+        <label class="scenario-name">
+          <span class="secondary">Nom de l'escenari</span>
+          <input type="text" placeholder="Per exemple: tramuntana forta" disabled />
+        </label>
+        <div class="tools-row">
+          <button type="button" disabled title="Encara no disponible">
+            <app-icon name="save" /> Desar
+          </button>
+          <button type="button" disabled title="Encara no disponible">
+            <app-icon name="folder" /> Carregar
+          </button>
+        </div>
+
+        <p class="empty-list">Cap escenari desat.</p>
+        <p class="terrain-note">
+          <span class="tiny-tag warn">AVIAT</span> Desar i carregar encara no funcionen.
+        </p>
+      </section>
+
+      <section class="control-section">
+        <h3>EINES D'IGNICIÓ <app-icon name="flame" /></h3>
         <div class="tools-row">
           <button
             type="button"
             [class.active]="tool() === 'ignition'"
             (click)="toggleTool('ignition')"
           >
-            <app-icon name="flame" /> Ignició
+            <app-icon name="flame" /> Punt d'ignició
           </button>
-          <button
-            type="button"
-            [class.active]="tool() === 'measure'"
-            (click)="toggleTool('measure')"
-          >
-            <app-icon name="ruler" /> Mesurar
+          <button type="button" [disabled]="!startRows().length" (click)="clearStarts()">
+            <app-icon name="trash" /> Treure-les totes
           </button>
         </div>
 
@@ -254,20 +385,55 @@
               </li>
             }
           </ul>
+        } @else {
+          <p class="empty-list">Cap ignició posada.</p>
         }
+      </section>
+
+      <!-- What the extinction services actually do, as the tools they will
+           be. None of them works yet, and none pretends to. -->
+      <section class="control-section">
+        <h3>CONTRAMESURES <span class="tiny-tag warn">AVIAT</span></h3>
+        @for (group of countermeasures; track group.title) {
+          <h4>{{ group.title }}</h4>
+          <div class="measure-grid">
+            @for (measure of group.items; track measure.label) {
+              <button type="button" disabled [title]="measure.note">
+                <app-icon [name]="measure.icon" />
+                <span>
+                  {{ measure.label }}
+                  <small>{{ measure.note }}</small>
+                </span>
+              </button>
+            }
+          </div>
+        }
+        <p class="terrain-note">
+          Les contramesures encara no actuen sobre res: són el lloc on aniran.
+        </p>
       </section>
 
       <div class="simulation-controls">
         <div class="simulation-state">
-          <span class="live-dot waiting"></span>
-          <span>Pendent del model</span>
+          <span class="live-dot" [class.waiting]="!result()"></span>
+          <span>{{ state().short }}</span>
           <span class="elapsed">T + {{ elapsed() }} h</span>
         </div>
+        @if (computing()) {
+          <div class="run-progress"><span [style.width.%]="progress() * 100"></span></div>
+        }
         <div class="play-controls">
-          <button type="button" class="button primary" disabled>
-            <app-icon name="play" /> Iniciar simulació
+          <button type="button" class="button primary" [disabled]="!canStart()" (click)="start()">
+            <app-icon name="play" /> {{ result() ? 'Tornar a calcular' : 'Iniciar simulació' }}
           </button>
-          <button type="button" class="button reset-button" disabled aria-label="Reiniciar">
+          <button
+            type="button"
+            class="button reset-button"
+            [disabled]="!result() && !computing()"
+            aria-label="Reiniciar"
+            title="Treure la simulació"
+            (click)="reset()"
+          >
             <app-icon name="reset" />
           </button>
         </div>
@@ -316,7 +482,7 @@
             <small>TEMPS DE SIMULACIÓ</small>
             <strong>T + {{ elapsed() }} <span>h</span></strong>
           </div>
-          <span class="time-chip-tag">SENSE MODEL</span>
+          <span class="time-chip-tag">{{ state().tag }}</span>
         </div>
 
         <!-- Only the controls that do something here. The zoom has buttons
@@ -366,6 +532,16 @@
           >
             <app-icon name="layers" />
           </button>
+          @if (result()) {
+            <button
+              type="button"
+              title="Veure el foc i la previsió"
+              aria-label="Veure el foc i la previsió"
+              (click)="focusFire()"
+            >
+              <app-icon name="flame" />
+            </button>
+          }
         </div>
 
         @if (layersOpen()) {
@@ -387,6 +563,14 @@
               <input type="checkbox" [checked]="slopes()" (change)="slopes.set(!slopes())" />
               Pendents
             </label>
+            <label>
+              <input
+                type="checkbox"
+                [checked]="forecasts()"
+                (change)="forecasts.set(!forecasts())"
+              />
+              Previsió +30 / +60 / +90 min
+            </label>
           </div>
         }
 
@@ -395,6 +579,27 @@
             <span><i class="legend-domain"></i>Domini</span>
             <span><i class="legend-fire"></i>Centre del domini</span>
           </div>
+          @if (result()) {
+            <div class="map-legend slope-legend">
+              <span>Foc</span>
+              <span><i class="fire-front"></i>Front</span>
+              <span><i class="fire-flames"></i>Flames</span>
+              <span><i class="fire-char"></i>Cremat</span>
+            </div>
+            @if (forecasts()) {
+              <div class="map-legend forecast-legend">
+                <span>Previsió</span>
+                @for (row of forecastRows(); track row.offset) {
+                  <span
+                    [style.opacity]="row.available ? 1 : 0.35"
+                    [title]="row.available ? 'Mateixes condicions' : 'Fora de les 12 h calculades'"
+                  >
+                    <i [style.background]="row.colour"></i>+{{ row.offset }} min
+                  </span>
+                }
+              </div>
+            }
+          }
           @if (slopes()) {
             <div class="map-legend slope-legend">
               <span>Pendent</span>
@@ -411,14 +616,27 @@
           <div>
             <app-icon name="clock" />
             <strong>Evolució temporal</strong>
-            <span class="secondary">Horitzó de simulació · 6 h</span>
+            <span class="secondary">Horitzó de simulació · {{ horizon.hours }} h</span>
           </div>
           <div class="timeline-actions">
-            <button type="button" disabled aria-label="Reproduir"><app-icon name="play" /></button>
-            <select aria-label="Velocitat" [value]="speed()" (change)="setSpeed($event)" disabled>
+            <button
+              type="button"
+              [disabled]="!result()"
+              [attr.aria-label]="playing() ? 'Aturar' : 'Reproduir'"
+              (click)="togglePlay()"
+            >
+              <app-icon [name]="playing() ? 'pause' : 'play'" />
+            </button>
+            <select
+              aria-label="Velocitat"
+              [value]="speed()"
+              [disabled]="!result()"
+              (change)="setSpeed($event)"
+            >
               <option value="1">1×</option>
               <option value="2">2×</option>
               <option value="5">5×</option>
+              <option value="10">10×</option>
             </select>
           </div>
         </div>
@@ -427,172 +645,208 @@
             type="range"
             aria-label="Minuts des de l'inici"
             min="0"
-            max="360"
+            [max]="horizon.minutes"
             step="1"
             [value]="minutes()"
-            [style.--fill]="fill(minutes(), 0, 360)"
+            [style.--fill]="fill(minutes(), 0, horizon.minutes)"
             (input)="setMinutes($event)"
-            disabled
+            [disabled]="!result()"
           />
           <div class="timeline-ticks">
-            <span>Inici</span>
-            <span>+1 h</span>
-            <span>+2 h</span>
-            <span>+3 h</span>
-            <span>+4 h</span>
-            <span>+5 h</span>
-            <span>+6 h</span>
+            @for (tick of horizon.ticks; track tick) {
+              <span>{{ tick }}</span>
+            }
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ───────────────────── dreta: sortides, totes inventades ───────────────────── -->
+    <!-- ───────────────────── dreta: el que surt del càlcul ───────────────────── -->
     <aside class="sidebar right-panel" aria-label="Anàlisi">
       <div class="panel-heading">
         <h2><app-icon name="activity" /> Anàlisi</h2>
-        <span class="tiny-tag warn">EXEMPLE</span>
+        <span class="tiny-tag" [class.warn]="!figures()">{{ state().tag }}</span>
       </div>
 
-      <div class="risk-banner">
-        <app-icon name="warning" />
-        <div>
-          <strong>{{ sample.risk.title }}</strong>
-          <small>{{ sample.risk.detail }}</small>
+      @if (figures(); as now) {
+        <div class="risk-banner calm">
+          <app-icon name="clock" />
+          <div>
+            <strong>T + {{ elapsed() }} h</strong>
+            <small>{{ now.share }} % del terreny combustible del domini</small>
+          </div>
         </div>
-        <span class="risk-level">
-          0{{ sample.risk.level }}<span>/0{{ sample.risk.of }}</span>
-        </span>
-      </div>
 
-      <div class="metric-grid">
-        <div class="metric">
-          <span>Superfície afectada</span>
-          <div>
-            <strong>{{ sample.area }}</strong
-            ><small>ha</small>
+        <div class="metric-grid">
+          <div class="metric">
+            <span>Superfície cremada</span>
+            <div>
+              <strong>{{ now.area }}</strong
+              ><small>ha</small>
+            </div>
+            <em>{{ now.growth }}</em>
           </div>
-          <em>{{ sample.areaTrend }}</em>
+          <div class="metric">
+            <span>Perímetre</span>
+            <div>
+              <strong>{{ now.perimeter }}</strong
+              ><small>km</small>
+            </div>
+            <em class="muted">Vora del foc</em>
+          </div>
+          <div class="metric">
+            <span>Velocitat del front</span>
+            <div>
+              <strong>{{ now.rate }}</strong
+              ><small>m/min</small>
+            </div>
+            <em class="muted">{{ now.rateNote }}</em>
+          </div>
+          <div class="metric">
+            <span>Direcció del front</span>
+            <div>
+              <strong class="direction-metric">{{ now.heading }}</strong>
+            </div>
+            <em class="muted">{{ now.headingNote }}</em>
+          </div>
+          <div class="metric" [class.warning-metric]="now.edgeReached">
+            <span>Arribada a la vora del domini</span>
+            <div>
+              <strong class="text-metric">{{ now.edge }}</strong>
+            </div>
+            <em class="muted">{{ now.edgeNote }}</em>
+          </div>
+          <div class="metric">
+            <span>Sense vent ni pendent</span>
+            <div>
+              <strong>{{ conditions().base }}</strong
+              ><small>m/min</small>
+            </div>
+            <em class="muted">Rang segons els models presents</em>
+          </div>
         </div>
-        <div class="metric">
-          <span>Vel. de propagació</span>
-          <div>
-            <strong>{{ sample.spread }}</strong
-            ><small>m/min</small>
-          </div>
-          <em class="muted">Front principal</em>
-        </div>
-        <div class="metric">
-          <span>Direcció dominant</span>
-          <div>
-            <strong class="direction-metric">↘ {{ sample.heading.short }}</strong>
-          </div>
-          <em class="muted">{{ sample.heading.degrees }}° · cap al {{ sample.heading.name }}</em>
-        </div>
-        <div class="metric">
-          <span>Contenció estimada</span>
-          <div>
-            <strong>{{ sample.containment }}</strong
-            ><small>%</small>
-          </div>
-          <div class="containment-track">
-            <span [style.width.%]="sample.containment"></span>
-          </div>
-        </div>
-        <div class="metric warning-metric">
-          <span>ETA a zona urbana</span>
-          <div>
-            <app-icon name="clock" />
-            <strong>{{ sample.eta }}</strong
-            ><small>min</small>
-          </div>
-          <em class="muted">Segons les condicions d'ara</em>
-        </div>
-        <div class="metric">
-          <span>Habitatges exposats</span>
-          <div>
-            <strong>{{ sample.homes }}</strong
-            ><app-icon name="house" />
-          </div>
-          <em class="muted">Exposició a +90 min</em>
-        </div>
-      </div>
 
+        <section class="chart-section">
+          <div class="chart-heading">
+            <h3>Superfície cremada</h3>
+            <span>{{ horizon.hours }} h · ha</span>
+          </div>
+          <div class="chart">
+            <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
+              <path class="chart-area" [attr.d]="charts().area.area" />
+              <path class="chart-line" [attr.d]="charts().area.line" />
+              <line
+                class="chart-cursor"
+                [attr.x1]="now.cursor"
+                [attr.x2]="now.cursor"
+                y1="0"
+                y2="100"
+              />
+            </svg>
+          </div>
+        </section>
+
+        <section class="chart-section">
+          <div class="chart-heading">
+            <h3>Velocitat del front</h3>
+            <span>{{ horizon.hours }} h · m/min</span>
+          </div>
+          <div class="chart small-chart">
+            <svg viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true">
+              <path class="chart-area muted-area" [attr.d]="charts().rate.area" />
+              <path class="chart-line muted-line" [attr.d]="charts().rate.line" />
+              <line
+                class="chart-cursor"
+                [attr.x1]="now.cursor"
+                [attr.x2]="now.cursor"
+                y1="0"
+                y2="64"
+              />
+            </svg>
+          </div>
+        </section>
+      } @else {
+        <div class="no-run">
+          <app-icon name="flame" />
+          <strong>{{ state().title }}</strong>
+          <p>{{ state().detail }}</p>
+        </div>
+      }
+
+      <!-- What went into the computation, whether or not it has run: these
+           are worked out from the weather in force, not from the fire. -->
       <section class="chart-section">
-        <div class="chart-heading">
-          <h3>Evolució prevista</h3>
-          <span>Pròxims 90 min</span>
-        </div>
-        <div class="chart-key">
-          <span><i class="legend-fire"></i>Superfície afectada</span>
-          <small>ha</small>
-        </div>
-        <div class="chart">
-          <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
-            <path class="chart-area" [attr.d]="forecastChart.area" />
-            <path class="chart-line" [attr.d]="forecastChart.line" />
-          </svg>
-        </div>
-      </section>
-
-      <section class="chart-section">
-        <div class="chart-heading">
-          <h3>Àrea cremada</h3>
-          <span>Acumulada · ha</span>
-        </div>
-        <div class="chart small-chart">
-          <svg viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true">
-            <path class="chart-area muted-area" [attr.d]="historyChart.area" />
-            <path class="chart-line muted-line" [attr.d]="historyChart.line" />
-          </svg>
-        </div>
-      </section>
-
-      <section class="comparison-section">
-        <div class="chart-heading">
-          <h3>Comparació d'escenaris</h3>
-          <span>+90 min</span>
-        </div>
-        @for (row of sample.comparison; track row.id) {
-          <div class="comparison-row" [class.selected]="scenario() === row.id">
-            <span>{{ row.label }}</span>
-            <span class="comparison-bar">
-              <span
-                [style.width.%]="(row.value / row.of) * 100"
-                [style.background]="row.colour"
-              ></span>
-            </span>
-            <b>{{ row.value }} ha</b>
+        @if (result()) {
+          <div class="chart-heading">
+            <h3>Propagació prevista</h3>
+            <span>Des del temps actual</span>
           </div>
+          <dl class="terrain-facts forecast-facts">
+            @for (row of forecastRows(); track row.offset) {
+              <div>
+                <dt><span [style.color]="row.colour">●</span> +{{ row.offset }} min</dt>
+                <dd>
+                  {{ row.area }} ha
+                  @if (row.available) {
+                    <small>(+{{ row.growth }})</small>
+                  }
+                </dd>
+              </div>
+            }
+          </dl>
+          <p class="terrain-note">
+            Superfície acumulada amb les mateixes condicions. Les bandes són temps d'arribada, no
+            probabilitats. «—» indica que supera les {{ horizon.hours }} h calculades.
+          </p>
         }
+        <div class="chart-heading">
+          <h3>Condicions del càlcul</h3>
+          <span>Rothermel</span>
+        </div>
+        <dl class="terrain-facts">
+          <div>
+            <dt>Combustible</dt>
+            <dd>{{ fuelModels().length }} models · per cel·la</dd>
+          </div>
+          <div>
+            <dt>Humitat del combustible mort fi</dt>
+            <dd>{{ conditions().dead }} %</dd>
+          </div>
+          <div>
+            <dt>Humitat del combustible viu</dt>
+            <dd>{{ conditions().live }} %</dd>
+          </div>
+          <div>
+            <dt>Vent a mitja flama</dt>
+            <dd>{{ conditions().midflame }} km/h</dd>
+          </div>
+          <div>
+            <dt>Front en pla, amb aquest vent</dt>
+            <dd>{{ conditions().head }} m/min</dd>
+          </div>
+        </dl>
       </section>
 
-      <!-- The second place, and the one that sits under the numbers. -->
       <div class="model-note">
         <app-icon name="info" />
         <span>
-          Xifres d'exemple, no calculades
+          Un simulacre, no una predicció
           <small>
-            El model de propagació encara no existeix. Aquesta columna ensenya on aniran els
-            resultats, i cap dels seus números surt d'un càlcul.
+            El combustible combina cartografia oficial i estimacions de coberta; la meteorologia no
+            canvia en {{ horizon.hours }} hores; només hi ha foc de superfície, sense capçades ni
+            focus secundaris. No serveix per prendre decisions d'emergència.
           </small>
         </span>
       </div>
     </aside>
   </main>
 
-  <!-- I la tercera. -->
   <footer class="statusbar">
     <div>
-      <span class="live-dot waiting"></span>
-      Sense model de propagació
+      <span class="live-dot" [class.waiting]="!result()"></span>
+      {{ state().short }} · Rothermel · combustible per cel·la
       <span class="status-divider">|</span>
-      <span
-        >Escenari:
-        <strong>{{
-          scenario() === 'base' ? 'Base' : scenario() === 'wind' ? 'Vent fort' : 'Humitat alta'
-        }}</strong></span
-      >
+      <span>Escenari: <strong>sense desar</strong></span>
     </div>
     <div>
       <span>WGS 84</span>

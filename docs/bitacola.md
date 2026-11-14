@@ -3,7 +3,7 @@
 Registre de **decisions preses**: què s'ha decidit i per quins motius. Material
 de base per a la memòria del TFG.
 
-Darrera actualització: 13 de novembre de 2026.
+Darrera actualització: 14 de novembre de 2026.
 
 **Fase tancada el 5 de novembre de 2026.** Entrega la portada de focus actius,
 el formulari de quatre nivells fins al punt d'ignició, el domini dibuixat al
@@ -1275,11 +1275,12 @@ Coses que han costat temps i convé no redescobrir.
 | Eurostat GISCO — NUTS 2024 | Regions i províncies | UE | En ús (nivells 2 i 3) |
 | Eurostat GISCO — LAU 2024 | Municipis i freguesies | UE | En ús |
 | NASA FIRMS (VIIRS 375 m) | Focus actius | Global | En ús (1 dia) |
-| IDEIB — IV Inventari Forestal | Model de combustible | Balears | Investigada |
-| MFE25 (MITECO) | Espècies i estructura | Espanya | Pendent |
+| IDEIB — IV Inventari Forestal | Model de combustible | Balears | En ús (§11.21) |
+| ESA WorldCover 2021 v200 | Coberta del sòl, convertida a model de combustible | Global | En ús, com a estimació (§11.21) |
+| MFE25 (MITECO) | Espècies, estructura i `ModComb` | Espanya | Pendent d'auditar |
 | COS (DGT) | Ús i ocupació del sòl | Portugal | Pendent |
-| AEMET OpenData | Meteorologia | Espanya | Pendent |
-| IPMA | Meteorologia | Portugal | Pendent |
+| AEMET OpenData | Meteorologia | Espanya | En ús (§11.18) |
+| IPMA | Meteorologia | Portugal | En ús (§11.18) |
 | OpenStreetMap (Overpass) | Topònims i cims | ES i PT | En ús (pantalla de simulació) |
 
 **FIRMS.** L'API d'àrea és `/api/area/csv/[MAP_KEY]/[FONT]/[o,s,e,n]/[DIES]`, amb
@@ -1304,6 +1305,17 @@ d'inventada. Es descarrega per pàgines amb `outSR=4326` i
 península i Portugal no el porten assignat: caldrà reclassificar a partir de
 l'espècie i l'estructura, i serà la part metodològicament més discutible.
 
+Esmena del 14/11/2026: la darrera frase era massa general. El documentador SIG
+de l'IFN4 defineix `ModComb` —el model predominant fotointerpretat, codis 1 a
+13— també per a la península, amb falta d'informació declarada a cinc
+províncies (15, 27, 31, 32 i 36). El que no s'ha fet és baixar cap entrega
+peninsular i mirar quants zeros porta. Mentrestant, fora de Balears el
+combustible surt de la coberta del sòl (§11.21).
+
+**ESA WorldCover.** CC BY 4.0. L'atribució viatja a cada resposta de l'API i
+la pantalla l'escriu: «© ESA WorldCover project 2021 / Contains modified
+Copernicus Sentinel data (2021) processed by ESA WorldCover consortium».
+
 ---
 
 ## 6. Recursos de tercers i llicències
@@ -1322,6 +1334,10 @@ font es marca **per confirmar** en lloc d'endevinar-ho.
 | TypeScript | 6.0.3 | Apache-2.0 |
 | Fastify | 5.12.7 | MIT |
 | pino | 10.4.0 | MIT |
+| geotiff | 3.0.5 | MIT |
+| proj4 | 2.23.0 | MIT |
+| shapefile | 0.6.6 | BSD-3-Clause |
+| fflate | 0.8.3 | MIT |
 | @types/geojson | 7946.0.16 | MIT |
 | Material Symbols «mode_heat» | — | Apache-2.0 |
 | DM Sans (variable, latin i latin-ext) | v17 | OFL-1.1 |
@@ -1344,6 +1360,8 @@ Les dades no tenen cap llicència amb nom, i això és una troballa:
 | Mapzen / AWS Terrain Tiles | Cap llicència conjunta: cada font té la seva | Per font; a Europa, Copernicus EU-DEM |
 | NASA FIRMS | Cap llicència amb nom; dades obertes | Text d'agraïment publicat (vegeu sota) |
 | OpenStreetMap | ODbL 1.0 | «© OpenStreetMap contributors», amb la llicència al costat |
+| ESA WorldCover 2021 | CC BY 4.0 | «© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium» |
+| IDEIB — IV Inventari Forestal | Per confirmar: el servei no en publica cap | «Govern de les Illes Balears–SITIBSA», el crèdit que declara la capa |
 
 **GISCO.** La nota de copyright «© EuroGeographics for the administrative
 boundaries» i la clàusula explícita de no comercial són a la pàgina d'*unitats

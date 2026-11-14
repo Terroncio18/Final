@@ -1,7 +1,7 @@
 import { Marker, type Map as MapLibreMap } from 'maplibre-gl';
 
 /**
- * Where a fire starts, as a mark that stands on the relief.
+ * A location mark that stands on the relief: ignition or simulation centre.
  *
  * Three parts, and two MapLibre markers to carry them, because they do not
  * face the same way:
@@ -20,8 +20,7 @@ import { Marker, type Map as MapLibreMap } from 'maplibre-gl';
  * and nothing else. MapLibre places a marker at the height of the terrain and
  * dims it when a ridge is in front, so nothing is lost by it.
  *
- * It pulses on purpose. §2.22 kept the blinking out of navigation because on a
- * fire map what blinks means fire —and this is the one thing here that does.
+ * Ignitions bounce; the white centre needle stays still, keeping its halo.
  * The stylesheet stops every animation under `prefers-reduced-motion`.
  *
  * MapLibre writes the `transform` of each marker's root element to position
@@ -43,13 +42,14 @@ export function addSpawnMarker(
   map: MapLibreMap,
   point: readonly [number, number],
   label: string,
+  variant: 'ignition' | 'centre' = 'ignition',
 ): SpawnMarker {
   const ring = document.createElement('div');
-  ring.className = 'spawn-ring';
+  ring.className = variant === 'centre' ? 'spawn-ring spawn-centre' : 'spawn-ring';
   ring.innerHTML = '<span class="spawn-pulse"></span><span class="spawn-pulse late"></span>';
 
   const pin = document.createElement('div');
-  pin.className = 'spawn-pin';
+  pin.className = variant === 'centre' ? 'spawn-pin spawn-centre' : 'spawn-pin';
   const float = document.createElement('div');
   float.className = 'spawn-float';
   const text = document.createElement('span');

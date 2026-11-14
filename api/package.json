@@ -5,14 +5,21 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "test:fuels": "npm run build && node --test tests/fuels.test.mjs",
+    "fuels:prepare": "npm run build && node scripts/prepare-fuels.mjs",
     "start": "node --env-file=.env dist/server.js",
     "dev": "tsc --watch --preserveWatchOutput & node --env-file=.env --watch dist/server.js"
   },
   "dependencies": {
-    "fastify": "^5.6.1"
+    "fastify": "^5.6.1",
+    "fflate": "^0.8.3",
+    "geotiff": "^3.0.5",
+    "proj4": "^2.23.0",
+    "shapefile": "^0.6.6"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/shapefile": "^0.6.4",
     "typescript": "~6.0.2"
   }
 }

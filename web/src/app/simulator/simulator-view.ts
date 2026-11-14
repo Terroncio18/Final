@@ -17,13 +17,27 @@ import { Chrome } from '../chrome';
 import { MapService } from '../map/map.service';
 import { PlacesService } from '../map/places.service';
 import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from '../simulation/domain';
+import { FireSurface } from '../simulation/fire-surface';
+import { FORECASTS, FORECAST_COLOURS, forecastOffsets } from '../simulation/fire-display';
+import { frontEmitters } from '../simulation/fire-emitters';
+import { spread, type SpreadResult } from '../simulation/fire-spread';
 import { MunicipalitiesService } from '../simulation/municipalities.service';
 import { formatPoints, parsePoint, parsePoints, type Point } from '../simulation/point';
 import { ProvincesService } from '../simulation/provinces.service';
+import {
+  FUEL_MODELS,
+  fuelBed,
+  M_PER_FT,
+  midflameWind,
+  moisturesFor,
+  windFactor,
+} from '../simulation/rothermel';
 import { SLOPE_CLASSES, slopeImage } from '../simulation/slope-classes';
-import { groundAt } from '../simulation/terrain';
+import { cellOf, groundAt } from '../simulation/terrain';
 import { TerrainService } from '../simulation/terrain.service';
+import { FuelService } from '../simulation/fuel.service';
 import { Icon } from './icon';
+import { WeatherService } from './weather.service';
 
 /** The eight points of the compass, as the wind selector offers them. */
 const DIRECTIONS = [
@@ -37,49 +51,65 @@ const DIRECTIONS = [
   { degrees: 315, short: 'NO', name: 'nord-oest' },
 ] as const;
 
-const FUELS = [
-  { id: 'pine', label: 'Pinar mediterrani', note: 'Continuïtat alta', load: 'Càrrega alta' },
-  { id: 'scrub', label: 'Matollar i brossa', note: 'Propagació ràpida', load: 'Càrrega mitjana' },
-  { id: 'mixed', label: 'Bosc mixt', note: 'Continuïtat irregular', load: 'Càrrega mitjana' },
-  { id: 'oak', label: 'Alzinar', note: 'Continuïtat baixa', load: 'Càrrega baixa' },
-] as const;
-
-const SCENARIOS = [
-  { id: 'base', label: 'Base', icon: 'sun' },
-  { id: 'wind', label: 'Vent fort', icon: 'wind' },
-  { id: 'humid', label: 'Humitat alta', icon: 'droplet' },
+/**
+ * What the extinction services do to a fire, as the tools the sandbox will
+ * offer. The list is the real one —what Spanish and Portuguese services
+ * actually deploy— and none of it acts on anything yet: with no model there is
+ * nothing for a firebreak to stop.
+ *
+ * Two groups because they are two kinds of thing for a model: the ground ones
+ * change the fuel of a strip of cells and stay changed, and the aerial ones
+ * wet or coat an area for a while and wear off.
+ */
+const COUNTERMEASURES = [
+  {
+    title: 'Mitjans terrestres',
+    items: [
+      { label: 'Línia de defensa', note: 'Brigada amb eines manuals', icon: 'ruler' },
+      { label: 'Tallafoc', note: 'Maquinària pesant', icon: 'minus' },
+      { label: 'Tala i desbrossament', note: 'Treure combustible', icon: 'trees' },
+      { label: "Línia d'aigua", note: 'Autobomba i mànegues', icon: 'droplet' },
+      { label: 'Contrafoc', note: "Crema d'eixamplament", icon: 'flame' },
+    ],
+  },
+  {
+    title: 'Mitjans aeris',
+    items: [
+      { label: 'Helicòpter', note: "Descàrrega d'aigua", icon: 'droplet' },
+      { label: 'Avió amfibi', note: "Descàrrega d'aigua", icon: 'plane' },
+      { label: 'Retardant', note: "Línia des de l'aire", icon: 'plane' },
+    ],
+  },
 ] as const;
 
 /**
- * The figures the right-hand column shows while there is no model.
+ * How far the timeline runs.
  *
- * Every one of them is invented, and that is the whole reason they are in one
- * place with this name on it: a number that comes from here must never be able
- * to pass for one that came from a computation. The screen says so three
- * times —in the heading, in the note under the analysis, and in the status
- * bar— and the day the model lands this constant is what disappears.
- *
- * The shapes are plausible rather than arbitrary: a front that accelerates and
- * then eases, and a burned area that accumulates. A flat line would make the
- * layout look right for the wrong reason.
+ * Twelve hours, and the domain is why. From the centre to the edge of the
+ * square there are 15,4 km (§2.27), and a head fire running at 20 m/min —fast,
+ * and not exceptional in a wind-driven Mediterranean fire— covers that in a
+ * little under thirteen hours: past twelve, a fire that matters has left the
+ * ground the model knows. It is also about one burning period, which is as
+ * long as a single set of weather can honestly be held constant.
  */
-const SAMPLE = {
-  risk: { title: 'Risc alt', detail: 'Propagació cap a zona urbana', level: 4, of: 5 },
-  area: '48,0',
-  areaTrend: '+14,8 ha en 30 min',
-  spread: '8,2',
-  heading: { short: 'SE', degrees: 135, name: 'sud-est' },
-  containment: 18,
-  eta: 46,
-  homes: 24,
-  forecast: [12, 18, 26, 31, 39, 44, 48, 55, 63, 68, 71, 74],
-  history: [2, 6, 11, 15, 22, 29, 34, 41, 48],
-  comparison: [
-    { id: 'base', label: 'Base', value: 74, of: 120, colour: '#f7a541' },
-    { id: 'wind', label: 'Vent fort', value: 118, of: 120, colour: '#ed6547' },
-    { id: 'humid', label: 'Humitat alta', value: 46, of: 120, colour: '#8fbb94' },
-  ],
-} as const;
+const HORIZON_HOURS = 12;
+
+/**
+ * Live fuel moisture, as a fraction: 100 %, Anderson's own reference value.
+ * Not measured and not derived from the weather; a constant until something
+ * better than a constant is available.
+ */
+const LIVE_MOISTURE = 1.0;
+
+/** Simulated minutes per second of playback at 1×: twelve hours in two minutes. */
+const PLAYBACK = 6;
+
+/** Latitude first for reading, longitude first for the URL: see point.ts. */
+function readable(point: Point): string {
+  const ns = point[1] >= 0 ? 'N' : 'S';
+  const ew = point[0] >= 0 ? 'E' : 'O';
+  return `${Math.abs(point[1]).toFixed(4)}° ${ns}, ${Math.abs(point[0]).toFixed(4)}° ${ew}`;
+}
 
 /**
  * A line and the area under it, as two SVG paths.
@@ -89,15 +119,9 @@ const SAMPLE = {
  * the thing it draws. `preserveAspectRatio="none"` lets the viewBox stretch to
  * whatever width the column has.
  */
-/** Latitude first for reading, longitude first for the URL: see point.ts. */
-function readable(point: Point): string {
-  const ns = point[1] >= 0 ? 'N' : 'S';
-  const ew = point[0] >= 0 ? 'E' : 'O';
-  return `${Math.abs(point[1]).toFixed(4)}° ${ns}, ${Math.abs(point[0]).toFixed(4)}° ${ew}`;
-}
-
 function chartPaths(values: readonly number[], width = 300, height = 100) {
-  const top = Math.max(...values);
+  // A fire that has not moved is a flat line at the bottom, not a division by zero.
+  const top = Math.max(...values) || 1;
   const step = width / (values.length - 1);
   const points = values.map(
     (value, i) => [i * step, height - (value / top) * (height - 10)] as const,
@@ -122,11 +146,11 @@ function chartPaths(values: readonly number[], width = 300, height = 100) {
  * in a tab of its own: going back to the form must not mean losing the point
  * that was chosen.
  *
- * **The model does not exist yet** (§12.5). What is real here is the ground,
- * the place, the domain and the controls that will feed it; what is invented
- * is everything the analysis column shows, and it comes from one constant
- * called SAMPLE so that it cannot be mistaken for anything else. The layout is
- * the FireCast prototype's, as §11.7 settled.
+ * **What it runs is a drill** (§11.19): Rothermel's surface fire, spread over
+ * the real slope of each cell with the weather in force, on a fuel that is
+ * assumed and the same everywhere. The ground, the weather and the arithmetic
+ * are real; the fuel is not yet, and the screen says so. The layout is the
+ * FireCast prototype's, as §11.7 settled.
  */
 @Component({
   selector: 'app-simulator-view',
@@ -140,6 +164,9 @@ export class SimulatorView {
   private readonly provinces = inject(ProvincesService);
   private readonly places = inject(PlacesService);
   private readonly terrain = inject(TerrainService);
+  protected readonly fuels = inject(FuelService);
+  protected readonly runError = signal<string | null>(null);
+  private readonly weather = inject(WeatherService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -155,19 +182,30 @@ export class SimulatorView {
   readonly ignicions = input<string>();
 
   protected readonly ready = this.maps.ready;
-  protected readonly sample = SAMPLE;
   protected readonly directions = DIRECTIONS;
-  protected readonly fuels = FUELS;
-  protected readonly scenarios = SCENARIOS;
+  protected readonly countermeasures = COUNTERMEASURES;
 
-  // ---- What the user can set. None of it feeds anything yet. ----
+  /** The timeline's length, with a tick every two hours. */
+  protected readonly horizon = {
+    hours: HORIZON_HOURS,
+    minutes: HORIZON_HOURS * 60,
+    ticks: Array.from({ length: HORIZON_HOURS / 2 + 1 }, (_, i) => (i ? `+${i * 2} h` : 'Inici')),
+  };
+
+  // ---- What the user can set. ----
 
   protected readonly wind = signal(22);
   protected readonly direction = signal(315);
   protected readonly humidity = signal(28);
   protected readonly temperature = signal(32);
-  protected readonly fuel = signal<string>('pine');
-  protected readonly scenario = signal<string>('base');
+
+  /**
+   * Where the weather comes from: an observation, or the sliders.
+   *
+   * Manual by default because it is the only one that is true today. The live
+   * one is laid out and not connected, and says so where it is shown.
+   */
+  protected readonly weatherMode = signal<'live' | 'manual'>('manual');
   protected readonly tool = signal<string | null>(null);
   /**
    * Where the fire starts: the places the ignition tool has been clicked on.
@@ -209,11 +247,44 @@ export class SimulatorView {
   });
 
   /**
-   * At zero and not movable until there is a model: a clock that could be
-   * dragged to «T + 02:00» with nothing running would be a time of nothing.
+   * The minute of the simulation being looked at. Not movable until there is
+   * a result: a clock that could be dragged to «T + 02:00» with nothing
+   * computed would be a time of nothing.
    */
   protected readonly minutes = signal(0);
   protected readonly speed = signal('1');
+
+  // ---- The simulation. ----
+
+  /** The last fire computed, or nothing: when each cell burns (fire-spread.ts). */
+  protected readonly result = signal<SpreadResult | null>(null);
+  protected readonly computing = signal(false);
+  /** How far the computation has got, from 0 to 1. */
+  protected readonly progress = signal(0);
+  protected readonly playing = signal(false);
+
+  /** Counts the runs, so one that was abandoned cannot publish over a newer one. */
+  private run = 0;
+
+  /** The picture of the fire MapLibre reads: one pixel per cell. */
+  protected readonly forecasts = signal(true);
+  private redrawFire: ((minute: number, forecast: boolean) => void) | null = null;
+  protected readonly forecastRows = computed(() => {
+    const result = this.result();
+    if (!result) return [];
+    const minute = Math.floor(this.minutes());
+    const available = forecastOffsets(this.minutes(), result.horizon);
+    const format = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
+    return FORECASTS.map((offset, index) => ({
+      offset,
+      colour: FORECAST_COLOURS[index],
+      available: available.includes(offset),
+      area: available.includes(offset) ? format.format(result.series.area[minute + offset]) : '—',
+      growth: available.includes(offset)
+        ? format.format(result.series.area[minute + offset] - result.series.area[minute])
+        : '—',
+    }));
+  });
 
   /** The relief is on by default: it is what this screen exists to show. */
   protected readonly relief = signal(true);
@@ -308,33 +379,376 @@ export class SimulatorView {
 
   // ---- Derived from the controls. ----
 
-  protected readonly from = computed(
-    () => DIRECTIONS.find((d) => d.degrees === this.direction()) ?? DIRECTIONS[7],
-  );
+  /**
+   * The weather in force: the station's, or the sliders'.
+   *
+   * One place decides which, so that everything that shows or will use the
+   * weather —the rose, the figures, the summary of a scenario, the model—
+   * reads the same four numbers and none of them has to ask what mode this
+   * is. In live mode with nothing read yet, it is the manual values: the
+   * card above says so, and a blank would be a wind of zero.
+   *
+   * The manual signals are never overwritten by an observation, so going back
+   * to manual finds the sliders where they were left.
+   */
+  protected readonly now = computed(() => {
+    const seen = this.weatherMode() === 'live' ? this.weather.observation() : null;
+    const wind = seen ? Math.round(seen.windKmh) : this.wind();
+    const fromDeg = seen ? seen.windFromDeg : this.direction();
+    const temperature = seen ? seen.temperature : this.temperature();
+    return {
+      live: seen !== null,
+      wind,
+      fromDeg,
+      // Where the wind takes the fire: the opposite of where it comes from.
+      towardsDeg: (fromDeg + 180) % 360,
+      humidity: seen ? Math.round(seen.humidity) : this.humidity(),
+      temperature,
+      temperatureText: new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 }).format(
+        temperature,
+      ),
+    };
+  });
+
+  /** The point of the compass a bearing is nearest to. */
+  private compass(degrees: number) {
+    const index = Math.round((((degrees % 360) + 360) % 360) / 45) % 8;
+    return DIRECTIONS[index];
+  }
+
+  /** Where the wind comes from, by name: a station reports 183° and that is «sud». */
+  protected readonly from = computed(() => this.compass(this.now().fromDeg));
 
   /**
-   * Where the wind takes the fire, which is the opposite of where it comes
-   * from. Spelled out because the two readings of «vent del nord-oest» are
-   * 180° apart and only one of them is the fire's.
+   * Where the wind takes the fire. Spelled out because the two readings of
+   * «vent del nord-oest» are 180° apart and only one of them is the fire's.
    */
-  protected readonly towards = computed(() => {
-    const degrees = (this.direction() + 180) % 360;
-    return DIRECTIONS.find((d) => d.degrees === degrees) ?? DIRECTIONS[3];
-  });
+  protected readonly towards = computed(() => this.compass(this.now().towardsDeg));
 
-  protected readonly fuelDetail = computed(
-    () => FUELS.find((f) => f.id === this.fuel()) ?? FUELS[0],
+  /**
+   * Who would be asked for the weather here: the country decides.
+   *
+   * AEMET for Spain and IPMA for Portugal, each the state service of its
+   * side of the border (§5). The first segment of the address says which,
+   * because a NUTS code starts with the country.
+   */
+  protected readonly weatherSource = computed(() =>
+    this.country() === 'PT'
+      ? { name: 'IPMA', short: "l'IPMA" }
+      : { name: 'AEMET OpenData', short: "l'AEMET" },
   );
 
-  /** `T + 02:00`, from the timeline's minutes. */
-  protected readonly elapsed = computed(() => {
-    const total = this.minutes();
-    const hours = Math.floor(total / 60);
-    return `${String(hours).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  private readonly country = computed<'ES' | 'PT'>(() =>
+    this.region().startsWith('PT') ? 'PT' : 'ES',
+  );
+
+  protected readonly weatherLoading = this.weather.loading;
+
+  /** The station that is speaking for the domain, in the words the card uses. */
+  protected readonly station = computed(() => {
+    const seen = this.weather.observation();
+    if (!seen) return null;
+    const when = new Intl.DateTimeFormat('ca-ES', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'UTC',
+    }).format(new Date(seen.observedAt));
+    return {
+      name: seen.station.name,
+      distance:
+        new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 }).format(seen.distanceKm) +
+        ' km',
+      observedAt: `${when} UTC`,
+    };
   });
 
-  protected readonly forecastChart = chartPaths(SAMPLE.forecast);
-  protected readonly historyChart = chartPaths(SAMPLE.history, 300, 64);
+  /**
+   * What the live card says about itself: a tag and a sentence.
+   *
+   * Four states and each one says what the figures below are, because that is
+   * the one thing this card must never leave unsaid: an observation, an old
+   * observation, or the manual values standing in for one.
+   */
+  protected readonly liveState = computed(() => {
+    const seen = this.weather.observation();
+    const service = this.weatherSource().short;
+    if (this.weather.loading() && !seen) {
+      return { tag: 'LLEGINT', warn: false, note: `Demanant l'observació a ${service}…` };
+    }
+    if (!seen) {
+      return {
+        tag: 'SENSE CONNEXIÓ',
+        warn: true,
+        note: `No s'ha pogut llegir ${service}. Els valors de sota són els manuals i no una observació.`,
+      };
+    }
+    if (this.weather.failed() || seen.stale) {
+      return {
+        tag: 'DADA ANTIGA',
+        warn: true,
+        note: `${service} no respon ara: es manté la darrera observació llegida.`,
+      };
+    }
+    return {
+      tag: 'EN DIRECTE',
+      warn: false,
+      note: 'Una sola estació parla per tot el domini: la més propera al centre, sense interpolar.',
+    };
+  });
+
+  protected readonly fuelModels = computed(() =>
+    (this.fuels.grid()?.counts ?? []).map(({ id, cells }) => ({
+      id,
+      name: FUEL_MODELS[id].name,
+      share: this.fuelPercent(cells),
+    })),
+  );
+
+  protected fuelPercent(cells: number): string {
+    return `${((100 * cells) / (GRID * GRID)).toLocaleString('ca-ES', { maximumFractionDigits: 1 })} %`;
+  }
+
+  protected retryFuels(): void {
+    const centre = this.ignition();
+    if (centre) void this.fuels.read(centre, true);
+  }
+
+  /** What saving a scenario would keep, read from what is set right now. */
+  protected readonly scenarioSummary = computed(() => {
+    const starts = this.starts().length;
+    const fires = starts === 1 ? '1 ignició' : `${starts} ignicions`;
+    return (
+      `${fires} · vent ${this.now().wind} km/h ${this.from().short} · ` +
+      `${this.now().humidity} % · ${this.now().temperatureText} °C`
+    );
+  });
+
+  /** `T + 02:00`, from the timeline's minutes. */
+  protected readonly elapsed = computed(() => this.clock(this.minutes()));
+
+  private clock(minutes: number): string {
+    const total = Math.floor(minutes);
+    const hours = Math.floor(total / 60);
+    return `${String(hours).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+  }
+
+  /**
+   * What Rothermel is given, and what it answers before any terrain: the
+   * fuel bed for the weather in force.
+   *
+   * Worked out whether or not a simulation has run, because it is what the
+   * weather *means* for a fire —28 % of humidity is 5 % of moisture in the
+   * fine dead fuel— and that is worth seeing while the sliders move.
+   */
+  private readonly fuelState = computed(() => {
+    const now = this.now();
+    const moistures = moisturesFor(now.temperature, now.humidity, LIVE_MOISTURE);
+    const beds = Object.fromEntries(
+      Object.values(FUEL_MODELS).map((model) => [
+        model.id,
+        {
+          bed: fuelBed(model, moistures),
+          midflame: midflameWind(model, now.wind),
+        },
+      ]),
+    );
+    return { moistures, beds };
+  });
+
+  protected readonly conditions = computed(() => {
+    const { moistures, beds } = this.fuelState();
+    const present = (this.fuels.grid()?.counts ?? []).map(({ id }) => beds[id]);
+    const one = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
+    const two = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 2 });
+    const range = (values: number[], format: Intl.NumberFormat): string => {
+      if (!values.length) return '—';
+      const low = format.format(Math.min(...values)),
+        high = format.format(Math.max(...values));
+      return low === high ? low : `${low}–${high}`;
+    };
+    return {
+      dead: one.format(moistures.dead1 * 100),
+      live: Math.round(moistures.live * 100),
+      // Feet per minute back to the unit the station gave.
+      midflame: range(
+        present.map(({ midflame }) => (midflame * M_PER_FT * 60) / 1000),
+        one,
+      ),
+      base: range(
+        present.map(({ bed }) => bed.r0 * M_PER_FT),
+        two,
+      ),
+      head: range(
+        present.map(({ bed, midflame }) => bed.r0 * M_PER_FT * (1 + windFactor(bed, midflame))),
+        one,
+      ),
+    };
+  });
+
+  /** How much of the square is ground, which is how much of it can burn. */
+  protected readonly burnableShare = computed(() => {
+    const terrain = this.terrain.terrain();
+    const fuels = this.fuels.grid();
+    if (!terrain || !fuels) return '—';
+    let land = 0;
+    for (let i = 0; i < terrain.elevation.length; i += 1)
+      if (terrain.elevation[i] > 0 && fuels.models[i] >= 1 && fuels.models[i] <= 13) land += 1;
+    return `${Math.round((land / terrain.elevation.length) * 100)} %`;
+  });
+
+  private readonly unknownLand = computed(() => {
+    const terrain = this.terrain.terrain(),
+      fuels = this.fuels.grid();
+    if (!terrain || !fuels) return 0;
+    let count = 0;
+    for (let i = 0; i < fuels.models.length; i++)
+      if (terrain.elevation[i] > 0 && fuels.models[i] === 255) count++;
+    return count;
+  });
+
+  protected readonly fuelIssue = computed(() => {
+    if (this.fuels.reading()) return 'Llegint els combustibles del domini…';
+    if (this.fuels.error()) return this.fuels.error();
+    const fuels = this.fuels.grid(),
+      terrain = this.terrain.terrain(),
+      centre = this.ignition();
+    if (!fuels) return 'Falta la cartografia de combustibles.';
+    if (this.unknownLand())
+      return 'Hi ha terreny sense dades de combustible. Torna a carregar la cartografia.';
+    if (
+      terrain &&
+      centre &&
+      this.starts().some((point) => {
+        const cell = cellOf(centre, point);
+        return cell === null || terrain.elevation[cell] <= 0 || fuels.models[cell] === 0;
+      })
+    )
+      return 'Mou la ignició a una cel·la amb combustible.';
+    return null;
+  });
+
+  protected readonly canStart = computed(
+    () =>
+      !this.computing() &&
+      this.terrain.terrain() !== null &&
+      this.starts().length > 0 &&
+      !this.fuelIssue(),
+  );
+
+  /** Where the simulation stands, in the three lengths the screen says it in. */
+  protected readonly state = computed(() => {
+    if (this.computing()) {
+      return {
+        tag: 'CALCULANT',
+        short: `Calculant… ${Math.round(this.progress() * 100)} %`,
+        title: 'Calculant la propagació',
+        detail: "El foc es calcula en l'ordre en què crema.",
+      };
+    }
+    if (this.result()) {
+      return { tag: 'SIMULACRE', short: 'Simulacre calculat', title: '', detail: '' };
+    }
+    if (!this.terrain.terrain()) {
+      return {
+        tag: 'SENSE CÀLCUL',
+        short: 'Llegint el terreny',
+        title: 'Llegint el terreny',
+        detail: 'La pendent de cada cel·la és una entrada del model.',
+      };
+    }
+    if (!this.starts().length) {
+      return {
+        tag: 'SENSE CÀLCUL',
+        short: 'Falta una ignició',
+        title: 'Posa una ignició',
+        detail: "Amb l'eina «Punt d'ignició», fes clic al terreny on comença el foc.",
+      };
+    }
+    const issue = this.fuelIssue() ?? this.runError();
+    if (issue)
+      return { tag: 'SENSE CÀLCUL', short: issue, title: 'Combustibles del domini', detail: issue };
+    return {
+      tag: 'SENSE CÀLCUL',
+      short: 'A punt',
+      title: 'A punt per calcular',
+      detail: 'Inicia la simulació per veure com avança el foc en dotze hores.',
+    };
+  });
+
+  /**
+   * The figures of the fire at the minute the timeline is on.
+   *
+   * Read out of the result's minute-by-minute series, so moving the timeline
+   * costs a few array reads. The rate and the heading look back over the last
+   * ten minutes: the front is what has just burned, and a single minute can
+   * be a handful of cells.
+   */
+  protected readonly figures = computed(() => {
+    const result = this.result();
+    if (!result) return null;
+    const { area, perimeter, rate, heading } = result.series;
+    const minute = Math.min(Math.floor(this.minutes()), area.length - 1);
+    const one = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
+    const whole = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 0 });
+    const size = (value: number) => (value < 100 ? one : whole).format(value);
+
+    let fastest = 0;
+    let bearing = NaN;
+    for (let m = minute; m >= Math.max(minute - 10, 0); m -= 1) {
+      if (rate[m] > fastest) fastest = rate[m];
+      if (Number.isNaN(bearing) && !Number.isNaN(heading[m])) bearing = heading[m];
+    }
+
+    const back = Math.max(minute - 30, 0);
+    const perHour = minute > back ? ((area[minute] - area[back]) / (minute - back)) * 60 : 0;
+    const total = result.burnable * ((CELL_M * CELL_M) / 10_000);
+    const towards = Number.isNaN(bearing) ? null : this.compass(bearing);
+    const edgeReached = result.reachedEdge <= minute;
+
+    return {
+      area: size(area[minute]),
+      growth: `+${size(perHour)} ha/h ara`,
+      share: one.format(total ? (area[minute] / total) * 100 : 0),
+      perimeter: one.format(perimeter[minute]),
+      rate: one.format(fastest),
+      rateNote: fastest
+        ? `${one.format((fastest * 60) / 1000)} km/h · darrers 10 min`
+        : 'Front aturat',
+      heading: towards ? towards.short : '—',
+      headingNote: towards
+        ? `${Math.round(bearing)}° · cap al ${towards.name}`
+        : 'Sense front actiu',
+      edge: Number.isFinite(result.reachedEdge)
+        ? `T + ${this.clock(result.reachedEdge)}`
+        : 'No hi arriba',
+      edgeNote: !Number.isFinite(result.reachedEdge)
+        ? `En ${this.horizon.hours} h el foc no surt del domini`
+        : edgeReached
+          ? "A partir d'aquí el foc surt del que es calcula"
+          : 'Més enllà el foc surt del que es calcula',
+      edgeReached,
+      cursor: (minute / (area.length - 1)) * 300,
+    };
+  });
+
+  /** The two curves of the column, sampled every five minutes. */
+  protected readonly charts = computed(() => {
+    const result = this.result();
+    if (!result) return { area: chartPaths([0, 0]), rate: chartPaths([0, 0], 300, 64) };
+    const { area, rate } = result.series;
+    const areas: number[] = [];
+    const rates: number[] = [];
+    for (let minute = 0; minute < area.length; minute += 5) {
+      areas.push(area[minute]);
+      let fastest = 0;
+      for (let m = Math.max(minute - 4, 0); m <= minute; m += 1)
+        fastest = Math.max(fastest, rate[m]);
+      rates.push(fastest);
+    }
+    return { area: chartPaths(areas), rate: chartPaths(rates, 300, 64) };
+  });
 
   constructor() {
     const chrome = inject(Chrome);
@@ -418,8 +832,23 @@ export class SimulatorView {
     // map is already fetching for the relief.
     effect(() => {
       const point = this.ignition();
-      if (point) this.terrain.read(point);
-      else this.terrain.clear();
+      if (point) {
+        this.terrain.read(point);
+        void this.fuels.read(point);
+      } else {
+        this.terrain.clear();
+        this.fuels.clear();
+      }
+    });
+
+    // The live weather is asked for on entering the mode and whenever the
+    // domain is another one; «Actualitzar» asks again. Not on a timer: the
+    // services publish once an hour and the server already holds the answer
+    // for twenty minutes.
+    effect(() => {
+      const centre = this.ignition();
+      if (this.weatherMode() !== 'live' || !centre) return;
+      this.weather.load(this.country(), centre);
     });
 
     // The ignition tool. While it is on, a click on the ground is a place
@@ -456,8 +885,151 @@ export class SimulatorView {
       }
     });
 
+    // A result answers for the inputs it was computed with. Change any of them
+    // —an ignition, the weather, the domain— and it is the fire of another
+    // question: it is taken off rather than left on screen under new sliders.
+    effect(() => {
+      this.starts();
+      this.fuelState();
+      this.now().towardsDeg;
+      this.terrain.terrain();
+      this.fuels.grid();
+      untracked(() => {
+        if (this.result() || this.computing()) this.reset();
+      });
+    });
+
+    // Both clocks are independent: scrub simulation time without altering arrivals;
+    // pause propagation while the FireCast flames, smoke and shimmer stay alive.
+    effect((onCleanup) => {
+      const result = this.result(),
+        centre = this.ignition();
+      const terrain = untracked(() => this.terrain.terrain());
+      if (!result || !centre || !terrain) {
+        this.maps.setFire(null);
+        this.maps.setFireParticles(null);
+        return;
+      }
+      let painter: FireSurface;
+      try {
+        painter = new FireSurface(result.arrival, result.horizon);
+      } catch (error) {
+        this.runError.set('No s’ha pogut dibuixar el foc.');
+        console.error(error);
+        return;
+      }
+      const bounds = domainAround(centre),
+        weather = untracked(this.now);
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+      painter.paint(untracked(this.minutes), 0, untracked(this.forecasts));
+      this.maps.setFire(painter.canvas, painter.bounds(bounds));
+      let frame = 0,
+        last = performance.now(),
+        lastPaint = -Infinity,
+        lastEmitters = -Infinity;
+      let visualSeconds = 0,
+        emittersMinute = NaN,
+        previousMinute = NaN;
+      let paintedMinute = NaN,
+        paintedForecast: boolean | undefined,
+        motionWas: boolean | undefined;
+      this.redrawFire = (minute, forecast) => {
+        painter.paint(minute, reduced.matches ? 0 : visualSeconds, forecast);
+        this.maps.refreshFire();
+        this.maps.resetFireParticles();
+        this.maps.setFireParticles(
+          frontEmitters(result.arrival, terrain.elevation, minute, bounds),
+          weather.towardsDeg,
+          weather.wind,
+        );
+        paintedMinute = minute;
+        paintedForecast = forecast;
+        emittersMinute = minute;
+      };
+      const draw = (now: number) => {
+        const dt = Math.min(Math.max((now - last) / 1000, 0), 0.1);
+        last = now;
+        const motion = !reduced.matches;
+        if (!document.hidden) {
+          if (motion) visualSeconds += dt;
+          const minute = untracked(this.minutes),
+            forecast = untracked(this.forecasts);
+          const jumped =
+            Number.isFinite(previousMinute) &&
+            (minute < previousMinute || minute - previousMinute > 3);
+          if (
+            now - lastPaint >= 33 &&
+            (motion ||
+              minute !== paintedMinute ||
+              forecast !== paintedForecast ||
+              motion !== motionWas)
+          ) {
+            painter.paint(minute, motion ? visualSeconds : 0, forecast);
+            this.maps.refreshFire();
+            lastPaint = now;
+            paintedMinute = minute;
+            paintedForecast = forecast;
+          }
+          if (minute !== emittersMinute && (now - lastEmitters >= 100 || jumped)) {
+            if (jumped) this.maps.resetFireParticles();
+            this.maps.setFireParticles(
+              frontEmitters(result.arrival, terrain.elevation, minute, bounds),
+              weather.towardsDeg,
+              weather.wind,
+            );
+            emittersMinute = minute;
+            lastEmitters = now;
+          }
+          this.maps.setFireMotion(motion);
+          motionWas = motion;
+          previousMinute = minute;
+        }
+        frame = requestAnimationFrame(draw);
+      };
+      draw(performance.now());
+      onCleanup(() => {
+        this.redrawFire = null;
+        cancelAnimationFrame(frame);
+        this.maps.setFireParticles(null);
+        this.maps.setFire(null);
+        painter.dispose();
+      });
+    });
+
+    // Explicit timeline/layer edits must redraw even while an inactive tab's
+    // animation clock is suspended (e.g. a background preview).
+    effect(() => {
+      const minute = this.minutes(),
+        forecast = this.forecasts();
+      if (document.hidden) untracked(() => this.redrawFire?.(minute, forecast));
+    });
+
+    // Playback: the clock advances with real time, at the speed chosen.
+    effect((onCleanup) => {
+      if (!this.playing()) return;
+      let last = performance.now();
+      let frame = 0;
+      const step = (time: number) => {
+        const seconds = (time - last) / 1000;
+        last = time;
+        const next = untracked(this.minutes) + seconds * PLAYBACK * Number(untracked(this.speed));
+        if (next >= this.horizon.minutes) {
+          this.minutes.set(this.horizon.minutes);
+          this.playing.set(false);
+          return;
+        }
+        this.minutes.set(next);
+        frame = requestAnimationFrame(step);
+      };
+      frame = requestAnimationFrame(step);
+      onCleanup(() => cancelAnimationFrame(frame));
+    });
+
     inject(DestroyRef).onDestroy(() => {
+      this.run += 1;
       this.terrain.clear();
+      this.fuels.clear();
+      this.weather.clear();
       chrome.visible.set(true);
       this.maps.destroy();
     });
@@ -472,12 +1044,114 @@ export class SimulatorView {
     this.direction.set(Number((event.target as HTMLSelectElement).value));
   }
 
-  protected setFuel(event: Event): void {
-    this.fuel.set((event.target as HTMLSelectElement).value);
+  protected setMinutes(event: Event): void {
+    // Dragging the clock is taking it over: the playback stops.
+    this.playing.set(false);
+    this.minutes.set(Number((event.target as HTMLInputElement).value));
   }
 
-  protected setMinutes(event: Event): void {
-    this.minutes.set(Number((event.target as HTMLInputElement).value));
+  protected focusFire(): void {
+    const result = this.result(),
+      centre = this.ignition();
+    if (!result || !centre) return;
+    const until = Math.min(this.minutes() + (this.forecasts() ? 90 : 0), result.horizon);
+    let left = GRID,
+      right = 0,
+      top = GRID,
+      bottom = 0;
+    for (let i = 0; i < result.arrival.length; i++) {
+      if (result.arrival[i] > until) continue;
+      const x = i % GRID,
+        y = Math.floor(i / GRID);
+      left = Math.min(left, x);
+      right = Math.max(right, x + 1);
+      top = Math.min(top, y);
+      bottom = Math.max(bottom, y + 1);
+    }
+    if (left === GRID) return;
+    const [w, s, e, n] = domainAround(centre);
+    this.maps.focusFire([
+      w + (left / GRID) * (e - w),
+      n - (bottom / GRID) * (n - s),
+      w + (right / GRID) * (e - w),
+      n - (top / GRID) * (n - s),
+    ]);
+  }
+
+  /**
+   * Computes the fire for what is on screen now, and plays it.
+   *
+   * The inputs are read once, here, and handed over as plain data: the
+   * weather in force, the fuel bed it gives, the elevation of the domain and
+   * the cells the ignitions fall in. Nothing is read again while it runs, so
+   * what is computed is one consistent question.
+   */
+  protected async start(): Promise<void> {
+    const terrain = this.terrain.terrain();
+    const centre = this.ignition();
+    const fuels = this.fuels.grid();
+    if (!terrain || !centre || !fuels || !this.canStart()) return;
+
+    const { beds } = this.fuelState();
+    const { bed, midflame } = beds[1];
+    const ignitions = this.starts()
+      .map((point) => cellOf(centre, point))
+      .filter((cell): cell is number => cell !== null);
+
+    const mine = (this.run += 1);
+    this.playing.set(false);
+    this.result.set(null);
+    this.minutes.set(0);
+    this.progress.set(0);
+    this.computing.set(true);
+    this.runError.set(null);
+
+    try {
+      const result = await spread(
+        {
+          elevation: terrain.elevation,
+          bed,
+          midflame,
+          fuels: fuels.models,
+          fuelBeds: beds,
+          towardsDeg: this.now().towardsDeg,
+          ignitions,
+          horizon: this.horizon.minutes,
+        },
+        (share) => {
+          if (mine === this.run) this.progress.set(share);
+        },
+      );
+      if (mine !== this.run) return;
+
+      this.computing.set(false);
+      this.result.set(result);
+      this.playing.set(true);
+    } catch (error) {
+      if (mine === this.run)
+        this.runError.set(
+          error instanceof Error ? error.message : 'No s’ha pogut calcular el foc.',
+        );
+    } finally {
+      if (mine === this.run) this.computing.set(false);
+    }
+  }
+
+  /** Takes the simulation off, whether it has finished or not. */
+  protected reset(): void {
+    this.runError.set(null);
+    this.run += 1;
+    this.playing.set(false);
+    this.computing.set(false);
+    this.result.set(null);
+    this.minutes.set(0);
+  }
+
+  protected togglePlay(): void {
+    if (!this.result()) return;
+    // Pressing play at the end starts over, which is what the button means there.
+    if (!this.playing() && this.minutes() >= this.horizon.minutes) this.minutes.set(0);
+    this.playing.update((on) => !on);
   }
 
   protected setSpeed(event: Event): void {
@@ -498,6 +1172,15 @@ export class SimulatorView {
   /** Takes one ignition off; the ones after it are renumbered. */
   protected removeStart(index: number): void {
     this.writeStarts(this.starts().filter((_, i) => i !== index));
+  }
+
+  protected refreshWeather(): void {
+    const centre = this.ignition();
+    if (centre) this.weather.load(this.country(), centre);
+  }
+
+  protected clearStarts(): void {
+    this.writeStarts([]);
   }
 
   /**
@@ -524,6 +1207,9 @@ export class SimulatorView {
 
   /** How full the range's track is painted, as a percentage. */
   protected fill(value: number, min: number, max: number): string {
-    return `${((value - min) / (max - min)) * 100}%`;
+    // Clamped: a station can report 97 % of humidity or 8 °C, outside what the
+    // sliders offer, and the track must not paint past its own ends.
+    const share = Math.min(Math.max((value - min) / (max - min), 0), 1);
+    return `${share * 100}%`;
   }
 }

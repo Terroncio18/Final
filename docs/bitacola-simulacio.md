@@ -6,7 +6,7 @@ de base per a la memòria del TFG.
 Continuació de [bitacola.md](bitacola.md), la fase 1 —el mapa i el formulari—,
 tancada el 5 de novembre de 2026.
 
-Darrera actualització: 13 de novembre de 2026.
+Darrera actualització: 14 de novembre de 2026.
 
 Les seccions van numerades **des del §10**. El codi cita les decisions pel seu
 número als comentaris —§2.29, §3.4— i dos documents que comencessin tots dos a
@@ -833,9 +833,581 @@ Comprovat al navegador: un enllaç amb dues ignicions bones, una a 45° N i un
 `xx` en dibuixa dues; treure'n una deixa `?ignicions=2.66240,39.72760`; un
 clic n'hi afegeix una altra; i `history.length` no es mou de 2.
 
+### 11.17. La columna de configuració, sencera: què hi haurà i què no es tria
+
+Decidit el 13/11/2026. La columna esquerra era la de la §11.7 —vent, humitat,
+temperatura, un desplegable de combustible, tres escenaris de mostra i dues
+eines— i ara porta tot el que el simulador tindrà, **maquetat i sense
+funcionar** llevat del que ja funcionava. Cada bloc que no fa res ho diu al
+costat, amb l'etiqueta «AVIAT», «EXEMPLE» o «SENSE CONNEXIÓ».
+
+**Meteorologia: en directe o manual.** Un commutador de dues posicions.
+
+- **Manual** és el que hi havia: les quatre entrades, editables. És la
+  posició per defecte perquè és l'única que avui és certa.
+- **En directe** ensenya d'on vindran les dades i res que no s'hagi llegit:
+  el servei, l'estació més propera i la darrera observació amb un guió, i les
+  entrades bloquejades. Diu, amb aquestes paraules, que els valors que es
+  veuen són els manuals i no una observació.
+- **Qui es consulta ho decideix el país**, pel primer segment de l'adreça: un
+  codi NUTS comença pel país. **AEMET OpenData** a Espanya, que demana clau i
+  per tant passarà pel servidor (§2.1); **IPMA** a Portugal.
+- **L'API de Portugal existeix i és oberta.** Comprovat el 13/11/2026:
+  `api.ipma.pt/open-data/observation/meteorology/stations/observations.json`
+  respon sense clau, hora a hora i per estació, amb `intensidadeVentoKM`,
+  `idDireccVento`, `temperatura` i `humidade` —les quatre entrades d'aquí— i
+  `stations.json` en dona les coordenades. La direcció és un índex de rumb i
+  no graus; caldrà la taula.
+
+**El combustible no es tria.** El desplegable «coberta predominant» es treu:
+el combustible és del terreny, cada cel·la de 30 m porta el seu model i la
+seva càrrega, i un selector per a tot el domini deia el contrari. El bloc
+ensenya com es reparteix el domini entre models, amb la càrrega de cadascun,
+què té la cel·la de sota del cursor, i de quina cartografia sortirà segons el
+territori (§5): IDEIB a Balears, MFE25 a la resta d'Espanya, COS a Portugal.
+**El repartiment és d'exemple** i surt de `SAMPLE`, amb l'etiqueta al costat:
+la cartografia encara no es llegeix (§12.2) i els números no són d'aquest
+domini.
+
+**Els escenaris es desen i es carreguen.** Es treuen els tres botons —Base,
+Vent fort, Humitat alta—, que eren escenaris inventats per la pantalla. Un
+escenari és ara el que l'usuari ha posat: **on són les ignicions i quina
+meteorologia hi ha**. El bloc ensenya què es desaria ara mateix, llegit de
+l'estat real, i porta el nom, «Desar» i «Carregar» desactivats i la llista
+buida. La comparació d'escenaris de la columna dreta segueix sent de mostra.
+
+**Dues menes d'eines.**
+
+- **D'ignició**, que funcionen: el punt d'ignició (§11.15) i «Treure-les
+  totes». «Mesurar» es treu: no feia res i no és de cap de les dues menes.
+- **Contramesures**, que no: les que els serveis d'extinció fan servir de
+  debò, en dos grups perquè per a un model són dues coses diferents. Les
+  **terrestres** canvien el combustible d'una franja de cel·les i es queden
+  —línia de defensa amb eines manuals, tallafoc amb maquinària, tala i
+  desbrossament, línia d'aigua amb autobomba, contrafoc—; les **aèries**
+  mullen o cobreixen una àrea una estona i es gasten —helicòpter, avió amfibi,
+  retardant. Tornen aquí els tallafocs que la §11.1 va deixar per al model.
+
+**L'evolució temporal arriba a 12 hores**, i no a 6. El motiu és el domini:
+del centre a la vora hi ha 15,4 km (§2.27), i un front a 20 m/min —ràpid, i
+no excepcional en un incendi mediterrani empès pel vent— els fa en poc menys
+de tretze hores; més enllà, un foc que importi ja és fora del terreny que el
+model coneix. I és, a més, un període de crema: el que es pot sostenir
+honestament amb una sola meteorologia.
+
+El que això obre, i no es decideix aquí: on es desen els escenaris, com
+s'enllaça l'estació amb el domini, i què fa cada contramesura a una cel·la.
+Són les 12.10, 12.11 i 12.12.
+
+Comprovat al navegador amb Sóller: el commutador bloqueja i desbloqueja les
+entrades; el bloc d'escenaris diu «1 ignició · vent 22 km/h NO · 28 % ·
+32 °C» i canvia en moure el vent; «Treure-les totes» buida la llista i
+l'adreça; la línia temporal marca de dues en dues hores fins a +12 h.
+
+### 11.18. La meteorologia en directe: l'estació més propera, i prou
+
+Decidit el 13/11/2026, i tanca la part de la 12.10 que es podia tancar. El mode
+«En directe» de la §11.17 era una targeta amb guions; ara demana l'observació.
+
+**Un sol endpoint al servidor, `/api/weather?country=&lon=&lat=`**, que respon
+igual per als dos països: estació, hora, vent en km/h, d'on ve en graus,
+humitat i temperatura, i a quina distància és l'estació.
+
+- **AEMET va pel servidor perquè demana clau** (§2.1), que viu a `api/.env`
+  com la de FIRMS i no surt mai cap al navegador. **IPMA no en demana i té el
+  CORS obert** —comprovat—, de manera que el navegador l'hi podria demanar
+  directament; passa igualment pel servidor perquè els dos països responguin
+  amb una sola forma i des d'una sola memòria cau.
+- **El país el diu el client**, pel codi NUTS de l'adreça, i no es dedueix de
+  les coordenades: el servidor no té les fronteres.
+
+El que s'ha après de cada servei, mirant les respostes i no la documentació:
+
+| | AEMET | IPMA |
+| --- | --- | --- |
+| Petició | Dues: la primera torna l'adreça de les dades | Una, més la llista d'estacions |
+| Mida | 3,5 MB: totes les estacions d'Espanya, unes 12 hores | Un dia, hora a hora |
+| Estacions | 855 | 227 |
+| Vent | `vv` en **m/s**, `dv` en graus | `intensidadeVentoKM` en km/h, `idDireccVento` en **vuit rumbs** |
+| Paranys | El cos és **ISO-8859-15** i no UTF-8; els errors arriben dins d'un 200 | `-99` vol dir sense dada; rumb `0` és calma; `9` és nord, com l'`1` |
+
+La codificació d'AEMET es desfà a mà amb `TextDecoder`: `response.json()`
+ignora la capçalera i «SÓLLER» arriba trencat.
+
+**Quina estació parla pel domini: la més propera al centre que tingui les
+quatre dades, i res més.** Sense interpolar entre estacions i sense corregir
+per l'altitud. Una vall i la carena de sobre no comparteixen vent, i un número
+barrejat de tres estacions ho amagaria darrere d'un decimal. El que es fa és
+**dir a quina distància és** —la targeta ho escriu— i dir, amb aquestes
+paraules, que una sola estació parla per tot el domini. Una estació que dona
+temperatura i no vent se salta: no pot dir com correria un foc.
+
+**Memòria cau de vint minuts**, i dada vella abans que cap dada, que és el
+mateix tracte que els focus (§2.15): els dos serveis publiquen un cop per hora,
+i la petició d'AEMET són 3,5 MB que no es repeteixen per visitant. La pantalla
+no refresca sola: es demana en entrar al mode, en canviar de domini i amb
+«Actualitzar».
+
+**L'observació no trepitja els valors manuals.** Un sol lloc, `now()`,
+decideix quina meteorologia mana —la de l'estació o la dels lliscadors— i tot
+el que la mostra o la farà servir llegeix d'allà. Tornar a «Manual» troba els
+lliscadors on s'havien deixat. Si l'estació no respon, la targeta diu «SENSE
+CONNEXIÓ» i que els valors de sota són els manuals; si respon amb una dada
+vella, «DADA ANTIGA».
+
+Comprovat contra el servidor el 13/11/2026: Sóller dona l'estació d'AEMET
+«SÓLLER» a 3,8 km (4,7 km/h de 183°, 57 %, 21,2 °C); Coimbra, la d'IPMA
+«Coimbra, Bencanta» a 4,9 km; la Cruz de Tejeda, la seva a 0,8 km; un país que
+no és ES ni PT, un 400; i la segona petició surt de la memòria cau en 2 ms.
+**A la pantalla només s'ha comprovat el camí d'error** —«SENSE CONNEXIÓ» amb
+els valors manuals—, perquè el servidor que corria era la versió d'abans i
+calia reiniciar-lo.
+
+El que queda de la 12.10: què es fa quan l'estació més propera és lluny —no
+hi ha cap llindar— i si el vent d'una estació de fons de vall s'ha de corregir
+per al relleu.
+
+---
+
+### 11.19. El primer simulacre: Rothermel sobre combustible suposat
+
+Decidit el 14/11/2026. Obre la 12.5 —el model de propagació— amb una primera
+versió que corre, i tanca la 12.8. **És un simulacre i no una predicció**, i la
+pantalla ho diu a la capçalera, a la columna d'anàlisi i a la barra d'estat.
+
+**Què es calcula.** Amb almenys una ignició posada (§11.15), «Iniciar
+simulació» calcula a quin minut arriba el foc a cada cel·la del domini durant
+dotze hores (§11.17), el pinta sobre el relleu i el reprodueix. La columna
+dreta deixa de ser de mostra: `SAMPLE` desapareix, com la §11.7 deia que
+passaria.
+
+**La velocitat de propagació és la de Rothermel** (1972), amb les esmenes
+d'Albini (1976), escrita seguint Andrews (2018, RMRS-GTR-371) i amb els noms
+de variables d'aquell informe. Tres decisions a dins:
+
+- **En les unitats en què es va publicar** —peus, lliures, minuts, BTU— i
+  convertint només a les vores. Les constants del model són ajustos empírics
+  en aquestes unitats; reescriure-les en SI és una segona oportunitat
+  d'equivocar-ne cadascuna.
+- **Amb la ponderació per superfície** entre classes de partícula, mortes i
+  vives, que és la part del model que més sovint se simplifica.
+- **El que no hi és:** foc de capçades, focus secundaris i el límit de vent de
+  Rothermel. És el foc de superfície i res de sobre.
+
+**Comprovat abans de fer-lo servir**, i és el que permet defensar-lo:
+
+| Contra què | Resultat |
+| --- | --- |
+| Les velocitats de referència d'Anderson (1982) per a onze models —mort al 8 %, viu al 100 %, 5 mi/h a mitja flama, sense pendent | Nou dins del 10 %; totes les longituds de flama dins de mig peu |
+| Els dos que no: model 5 (−19 %) i model 7 (+30 %) | Vegeu la fila següent |
+| Les taules de referència del Southwest Coordination Center per al model 7 —humitat d'1 h del 6, 9 i 12 %, vent de 4 i 6 mi/h, viu del 90 al 120 % | **Reproduïdes cel·la per cel·la**: 17–20 on la taula diu 17–20, 29–33 on diu 29–33 |
+
+La xifra que Anderson va imprimir per al model 7 el 1982 és la que ha envellit,
+no les equacions.
+
+**El combustible és un sol model per a tot el domini, i és un supòsit.** No hi
+ha cartografia de combustible (§12.2), i un model que en demana un a cada
+cel·la no pot esperar-la per provar-se. El **model 7 d'Anderson**, matollar
+sota arbrat, per ser el més proper dels tretze a una pineda mediterrània amb
+sotabosc. La secció de combustible de la columna esquerra porta l'etiqueta
+«SUPÒSIT» i deixa d'ensenyar el repartiment inventat de la §11.17.
+**Esmenat el mateix dia per la §11.21**: el combustible ja és de cada cel·la.
+
+**El mar no crema: altitud ≤ 0.** Tanca la 12.8 amb el mateix criteri que les
+corbes de nivell (§11.6). Terrarium dona el fons marí negatiu i la superfície
+a zero. A Sóller pot cremar el 64 % del quadrat. Les xifres d'altitud i
+pendent del domini (§11.12) **encara compten el mar**: no s'han tocat.
+
+**De la meteorologia al model**, tres passos que són tres supòsits:
+
+- **Humitat del combustible mort fi**: el contingut d'humitat d'equilibri de
+  Simard (1968), el del NFDRS, a partir de la temperatura i la humitat
+  relativa. És la humitat a què s'estabilitza el combustible si l'aire es
+  queda com està: sense sol damunt, sense pluja d'ahir. Les classes de 10 i
+  100 hores, un i dos punts més humides, que és una regla i no una mesura.
+- **Humitat del combustible viu**: 100 %, constant. No es mesura ni es deriva
+  de res.
+- **Vent a mitja flama**: l'estació mesura a 10 m i el foc el nota a l'alçada
+  de la flama. De 10 m a 20 peus (÷ 1,15) i de 20 peus a mitja flama amb
+  l'ajust **sense abric** d'Albini i Baughman (1979). Sota una capçada tancada
+  el vent a terra és una fracció d'això, i aquí res no sap de la capçada. Amb
+  22 km/h a l'estació, són 8,4 a mitja flama.
+
+**La propagació és un temps mínim de viatge, no un autòmat que fa passos.**
+Cada cel·la té una velocitat en cada direcció —la de Rothermel per a la seva
+pendent i el vent, estirada en el·lipse— i el foc arriba a una cel·la pel camí
+que hi arriba abans. És el camí més curt de Dijkstra amb temps per distància,
+la idea del *Minimum Travel Time* de Finney (2002). Motius:
+
+- **El resultat no depèn de cap pas de temps** i **és el mateix cada vegada**:
+  un enllaç reprodueix un incendi i no només el descriu (§2.26, §11.16).
+- **El que en surt és un número per cel·la**, el minut d'arribada. Tota
+  l'evolució és en aquella graella: el foc a l'instant T són les cel·les amb
+  un número per sota de T, de manera que la línia temporal és un llindar i no
+  una nova execució.
+- **Vent i pendent se sumen com a vectors** (Rothermel 1983): un vent de
+  través a un vessant dona un foc que corre en diagonal a tots dos. La forma
+  de l'el·lipse és la d'Anderson (1983), amb la relació llarg-ample tallada a 8.
+
+**Corre al navegador, al fil de la pàgina i a trossos**, i no en un *worker*
+com s'havia proposat: un milió de cel·les triguen **0,2 segons**, i això no
+justifica la configuració de compilació d'un *worker*. La GPU (§2.1) queda
+per quan el combustible variï i calgui.
+
+Dues coses que només van sortir provant-ho sobre terreny pla, on la resposta
+exacta és una el·lipse:
+
+- **Un arrodoniment aturava el foc.** La graella d'arribades és de 32 bits i
+  la cua de prioritats guardava els temps en 64: la meitat de les entrades
+  semblaven més velles que la cel·la a què pertanyien i es llençaven. El front
+  avançava 450 m on n'havia de fer 1.244. Ara el temps s'arrodoneix abans
+  d'entrar a la cua.
+- **Vuit veïns fan un foc massa prim.** Amb un vent fort l'el·lipse és
+  estreta i el camí més ràpid cap al flanc surt deu o vint graus de l'eix; si
+  no hi ha cap pas en aquella direcció, el camí fa ziga-zaga i arriba tard.
+  Mesurat contra l'àrea de l'el·lipse exacta (1.352 ha, 22 km/h, dotze hores):
+
+  | Passos fins a | Direccions | Àrea | Error |
+  | --- | --- | --- | --- |
+  | 2 cel·les | 16 | 874 ha | −35 % |
+  | 3 | 32 | 1.070 ha | −21 % |
+  | 4 | 48 | 1.181 ha | −13 % |
+  | **5** | **80** | **1.245 ha** | **−8 %** |
+
+  El cap del foc és correcte a qualsevol abast, amb un error d'una cel·la; el
+  que millora és el flanc. Es queda en cinc: més enllà els passos són més
+  llargs que les formes del terreny que saltarien. **L'àrea surt, doncs, un
+  8 % curta amb vent fort**, i és un error conegut i no amagat. Un pas llarg
+  no pot saltar una cel·la que no crema: la del mig també ha de cremar.
+
+**Les mètriques, i d'on surten.** Totes es treuen de la graella d'arribades,
+minut a minut i d'un sol cop:
+
+- **Superfície cremada**: cel·les per 0,09 ha, i el ritme dels darrers 30 min.
+- **Perímetre**: costats entre una cel·la cremada i una que no, per 30 m i
+  per **π/4**. Una línia dibuixada a graons és més llarga que la que
+  representa, 4/π de mitjana en totes les direccions; sense la correcció un
+  foc rodó donaria el perímetre del quadrat que l'envolta.
+- **Velocitat i direcció del front**: les de les cel·les que el foc ha
+  assolit en els darrers deu minuts, no una mitjana de tot l'incendi.
+- **Arribada a la vora del domini**: quan el foc toca el límit del quadrat,
+  que és quan el càlcul deixa de veure'l sencer.
+- **Sense vent ni pendent**: el que fa el combustible sol, com a referència.
+
+El que la columna **ja no diu**, perquè no es pot calcular: risc, contenció,
+arribada a zona urbana, habitatges exposats i comparació d'escenaris. Eren de
+`SAMPLE`, i demanen dades —on hi ha cases— o un model d'extinció que no hi són.
+
+**El resultat respon per les entrades amb què es va calcular.** Canviar una
+ignició, la meteorologia o el domini el treu de la pantalla en lloc de
+deixar-lo sota uns lliscadors que ja diuen una altra cosa.
+
+**El foc es pinta en tres edats** —front, flames i cremat— en un `canvas`
+d'un píxel per cel·la que MapLibre llegeix com a font i drapeja com a capa
+`raster` (§13.1), per sota de les corbes i del contorn.
+
+Comprovat el 14/11/2026 amb Sóller, una ignició a 39,745° N, 2,720° E i la
+meteorologia manual (22 km/h del NO, 28 %, 32 °C): el càlcul triga 0,2 s; a
+T + 09:05 hi ha 789 ha cremades, 12,4 km de perímetre i un front de
+15,3 m/min cap al sud-est, que és cap on el vent el porta; en dotze hores no
+arriba a la vora. **El que no s'ha pogut comprovar és el dibuix del foc sobre
+el mapa**: el navegador de proves no pintava el relleu aquell dia. Les xifres
+i la reproducció, sí.
+
+El que queda obert de la 12.5: el combustible real per cel·la (§12.2), la
+humitat del viu, l'abric del vent sota capçada, i validar un incendi sencer
+contra un de real, que és l'única comprovació que encara no s'ha fet.
+
+---
+
+### 11.20. El foc es veu com un foc: brasa a terra, flames i fum a l'aire
+
+Decidit el 14/11/2026. El simulacre de la §11.19 pintava tres colors plans
+sobre el relleu: es llegia on havia cremat i no semblava un foc. La referència
+és l'animació del prototip FireCast (§11.7), i la pregunta era si es podia
+igualar. Es pot igualar l'aspecte, i el que hi ha a sota és millor: allà les
+flames segueixen una el·lipse dibuixada, i aquí segueixen el front que el
+model ha calculat.
+
+**Dues capes, perquè el foc és dues coses.** El que ha cremat és a terra i una
+flama no: pintada a la capa drapejada (§13.1) quedaria ajaguda sobre el
+vessant.
+
+**El terra és el pintor de Codex**, `fire-appearance.ts`, fet a petició de Pere
+i documentat a [ajuda-foc-codex.md](ajuda-foc-codex.md); s'ha connectat tal com
+aquell document proposa, i substitueix el `paintFire` de la §11.19, que es
+treu. Del front groc a la brasa i al carbó amb transicions suaus, una textura
+de cendra que no canvia en tornar enrere per la línia temporal, i un
+parpelleig desfasat cel·la a cel·la. Porta set proves, que passen.
+
+**Esmena del mateix dia: el terra passa a ser un camp continu.** Vist a la
+pantalla, el pintor per cel·les no donava la fluïdesa del prototip: el foc
+**s'estenia per quadrats**, una cel·la encenent-se darrere de l'altra. És
+exacte i sembla un full de càlcul cremant. Un front és una línia que es mou, i
+el que el fa moure bé és que tot el que es pinta sigui continu. El nou pintor
+és `fire-field.ts`:
+
+- **Continu en l'espai.** La distància d'una cel·la al front es mesura en
+  cel·les: el temps que li falta, dividit pel que el front triga a travessar-la
+  allà —el gradient del temps d'arribada, calculat un cop. Una cel·la no
+  s'encén: s'escalfa quan el front s'acosta, fa el màxim quan passa i es
+  refreda al darrere. Amb el filtre lineal de la capa —que substitueix el
+  `nearest`— la línia brillant queda *entre* cel·les i llisca.
+- **Continu en el temps.** Els colors són funcions de l'edat sense cap graó.
+- **Continu en el parpelleig.** És un soroll suau sobre el terreny, més ample
+  que una cel·la i que deriva, en lloc d'un escaquer de píxels independents.
+
+L'aspecte és el del *shader* del prototip —una resplendor, una línia calenta
+fina i carbó amb brases— refet sobre els temps d'arribada del model.
+
+**El que es paga, i s'ha de dir:** el dibuix **ja no és la petjada exacta**.
+Hi ha resplendor unes quantes cel·les *per davant* del front, on encara no ha
+cremat res. Les xifres de la columna d'anàlisi no surten del dibuix i no
+canvien. El pintor exacte de Codex, `fire-appearance.ts`, es queda al
+repositori amb les seves set proves, sense fer-se servir: és el que caldria
+si mai es vol ensenyar la petjada cel·la a cel·la.
+
+Una passada sencera del pintor són 7 ms, i un fotograma amb el minut aturat,
+0,2 ms; el ràster puja de 20 a 30 fotogrames per segon.
+
+**I les flames ja no parpellegen.** També vist a la pantalla: apareixien i
+desapareixien. Dues causes. Cada partícula buscava el seu emissor a cada
+fotograma, i la llista d'emissors es refà diverses vegades per segon: saltava
+a un altre tros del front a mig vol. Ara **una partícula conserva el lloc on
+neix** durant tota la vida i en tria un de nou només en renéixer, de manera
+que les flames segueixen el front d'un naixement en un altre. I l'altitud de
+la partícula ve de la graella de la simulació mentre que el relleu de la
+pantalla és la malla de MapLibre, més grollera al zoom d'obertura: en un
+vessant dret difereixen de desenes de metres i la flama s'hi enfonsava. Ara
+s'acosta una mica a la càmera abans de la prova de profunditat. A més,
+s'encén de mica en mica en lloc d'aparèixer de cop.
+
+**L'aire són partícules**, `fire-particles.ts`, una capa pròpia de MapLibre
+(`CustomLayerInterface`, en mode `3d`) que dibuixa punts en el mateix espai
+que el terreny —coordenades Mercator amb l'altitud per tercera— de manera que
+comparteixen càmera i profunditat, i una carena que queda al davant les tapa.
+
+- **1.400 flames**: punts brillants que pugen, s'inclinen cap on bufa el vent
+  i s'apaguen, amb mescla additiva perquè on se superposen facin resplendor.
+- **220 de fum**: grans, grises, amb soroll, que deriven a favor del vent i
+  pugen fins a uns 500 m.
+- **Neixen a les cel·les que el model acaba d'assolir**, les dels darrers sis
+  minuts —les mateixes que el ràster pinta com a front. Un front més ràpid és
+  una banda més ampla de cel·les joves i en rep més sense que ningú ho hagi
+  dit. Quina cel·la munta cada partícula la fixa el seu número, de manera que
+  quan el front es mou la partícula el segueix en lloc de saltar.
+- **`towardsDeg` ja és cap on va el vent** i no es torna a girar: és
+  l'advertència del document de Codex, i és l'error de l'agulla de la §11.14.
+
+**Un rellotge per a la simulació i un altre per a l'aspecte.** La línia
+temporal decideix quines cel·les han cremat i res més; el parpelleig i les
+flames es mouen sols, també en pausa, perquè un foc aturat i immòbil es
+llegeix com una fotografia. Cap de les dues capes canvia quines cel·les han
+cremat ni alimenta cap xifra de la columna d'anàlisi.
+
+**És presentació, i s'ha de dir.** L'alçada, la mida i la vida d'una partícula
+es trien perquè es vegin des de trenta quilòmetres: una flama real a aquesta
+escala fa menys d'un píxel, i per això cap partícula baixa de tres. **No són
+longituds de flama calculades per Rothermel**, i els colors del ràster són
+edats des de l'arribada, no temperatures.
+
+El que es respecta:
+
+- **`prefers-reduced-motion`**: el parpelleig es congela i les partícules no
+  es dibuixen; la línia temporal segueix funcionant.
+- **Pestanya amagada**: no es puja cap textura.
+- **El cost**: el ràster es repinta a 20 fotogrames per segon —és una textura
+  d'un megapíxel cada vegada— i les partícules fan que el mapa es redibuixi a
+  cada fotograma mentre hi ha foc, i només llavors.
+- **Si un *shader* no compila** en alguna targeta, es perden les flames i no
+  el mapa: la capa no dibuixa res i el ràster de sota segueix dient on és el
+  foc.
+
+El que el prototip té i aquí encara no: les isòcrones de predicció a +30, +60
+i +90 minuts. Aquí sortirien del model i no d'una el·lipse, i són el pas
+següent natural.
+
+Comprovat, pel pintor continu: renderitzat fora del mapa sobre un terreny
+ondulat, el front surt com una línia incandescent contínua amb resplendor i
+sense cap quadrat, a l'escala del mapa i ampliat nou vegades.
+
+Comprovat el 14/11/2026: compila, les set proves del pintor passen, i els dos
+*shaders* compilen i dibuixen en un llenç WebGL2 a part —un punt de prova dona
+el groc de flama al centre i res a la vora, sense errors de GL. **No s'ha
+pogut veure sobre el mapa**: el navegador de proves tenia el panell amagat i
+el relleu no s'hi carrega. Queda per mirar amb el mapa a la vista: que les
+partícules caiguin sobre el front i no desplaçades, que el relleu les tapi, i
+el rendiment amb el foc gran.
+
+---
+
+### 11.21. El combustible és de cada cel·la: cartografia oficial on n'hi ha, coberta del sòl on no
+
+Escrit el 14/11/2026, **després de fer-ho i no abans**: la integració és de
+Codex, a petició de Pere, i aquesta secció la recull un cop revisada contra el
+codi. El detall d'operació —com s'arrenca, com s'importa una entrega nova, què
+respon l'API— és a
+[combustibles/IMPLEMENTACION.md](combustibles/IMPLEMENTACION.md), i la recerca
+de fonts a [combustibles/README.md](combustibles/README.md). Aquí hi ha el que
+s'ha decidit i el que encara s'ha de decidir.
+
+Tanca el supòsit de la §11.19 —un sol model 7 per a tot el domini— i la part
+de la 12.2 que es podia tancar. Cada cel·la de 30 m porta ara el seu model
+d'Anderson, i Rothermel es calcula amb el d'aquella cel·la.
+
+**Dues fonts, amb prioritat, i cada cel·la recorda d'on ve.**
+
+- **Cartografia oficial on n'hi ha.** Avui, Balears: l'inventari de l'IDEIB,
+  que publica `MODCOMB` amb el model ja assignat pels autors (§5). 11.654
+  polígons, dels quals 6.183 porten model.
+- **Coberta del sòl a tot arreu més.** ESA WorldCover 2021 (v200, 10 m,
+  CC BY 4.0), convertida a model d'Anderson amb una taula que és d'aquest
+  treball. Cobreix Espanya i Portugal sencers, illes incloses, sense clau i
+  sense preparar res.
+- **L'oficial trepitja l'estimat**, cel·la a cel·la, i la resposta porta una
+  segona graella amb la procedència: oficial, estimat o desconegut. La
+  pantalla en diu els percentatges i l'etiqueta de la secció —«CARTOGRAFIAT»,
+  «MIXT», «ESTIMAT», «INCOMPLET»— surt d'aquí. **Un model estimat no es pot
+  fer passar per un de cartografiat**, que és el mateix tracte que `SAMPLE`
+  va tenir mentre va existir (§11.7).
+
+**El zero de l'IDEIB vol dir «no ho sabem», i així es tracta.** És la 12.2.
+Els 5.471 polígons amb `MODCOMB = 0` —el 46,95 %— porten al camp `M_COMBU` el
+text «No se dispone de información»; n'hi ha d'agrícoles i d'artificials, però
+el codi no diu quins. No s'importen com a no combustible, que hauria convertit
+mitja illa en tallafocs: es deixen com a desconeguts i la coberta del sòl de
+sota hi respon. A Sóller, d'un milió de cel·les, 410.097 surten de l'inventari
+i 638.479 de WorldCover (xifra de Codex, no repetida).
+
+**Tres estats que no són el mateix**, i tres números per dir-los: de l'1 al 13
+un model; **0, no combustible** amb evidència —construït, aigua, neu—; **255,
+desconegut**. Un codi de coberta que la taula no reconeix és 255 i mai 0.
+
+**La taula de conversió, i el que val.** WorldCover diu què cobreix el terra,
+no què hi crema:
+
+| WorldCover | Model | Supòsit |
+| --- | --- | --- |
+| Arbres | 8 | Fullaraca compacta; no se sap res del sotabosc |
+| Matollar | 5 | Matollar baix |
+| Herbàcies, conreus | 1 | Combustible fi curat; no sap de fenologia ni de collita |
+| Molses i líquens | 1 | Gairebé absent a l'àmbit |
+| Aiguamoll herbaci | 3 | Herba alta; la humitat no s'observa |
+| Sòl nu o vegetació esparsa | 0 | Menys d'un 10 % de coberta: no porta un foc de superfície |
+| Construït, neu, aigua | 0 | No combustible a aquesta resolució |
+
+La pantalla ho escriu amb aquestes paraules quan hi ha cel·les estimades. La
+taula porta versió (`anderson13-worldcover2021-v2`), i canviar-ne una fila ha
+de canviar la versió, perquè és el que invalida les respostes desades.
+
+**L'arbrat és el model 8, i no el 7.** Decidit el 14/11/2026, i tanca la
+12.13. La §11.19 havia triat el 7 per a la pineda mediterrània amb sotabosc,
+però allà era un supòsit dit en veu alta per a tot un domini; aquí és una
+fila que s'aplica a cada cel·la que un satèl·lit ha vist amb arbres, sense
+saber què hi ha a sota. El 8 és el que no afirma un sotabosc que la dada no
+ha vist. **El preu:** el 8 és el més lent dels models de bosc, de manera que
+fora de Balears un foc sota arbrat correrà menys que amb el 7, i en una
+pineda amb matollar de debò quedarà curt. La pantalla diu «bosc → model 8»
+al costat de cada resultat estimat.
+
+**El sòl nu no crema.** Decidit el 14/11/2026, i tanca la 12.14. La primera
+versió de la taula el posava al model 1, herba fina contínua, i s'ha canviat:
+
+- **La font el defineix sense vegetació.** El manual de WorldCover (v2.0,
+  taula 3) diu de la classe 60: terres amb sòl, sorra o roca a la vista que
+  **no passen mai del 10 % de coberta vegetal** en cap moment de l'any. Amb
+  això no hi ha continuïtat perquè un foc de superfície avanci.
+- **El model 1 era l'error cap al costat dolent.** És dels més ràpids amb
+  vent: el simulador feia córrer el foc per una carena de roca o una platja,
+  que és on de debò s'atura.
+- **És el que fan les cartografies de combustible**: Scott i Burgan (2005)
+  porten una classe de sòl nu no combustible.
+
+**El preu:** un pedregar amb una mica de càrritx, o un terreny acabat de
+cremar que el satèl·lit ha vist nu, passa a ser barrera. Una cel·la sola
+s'envolta; el que atura un front són les taques grans, que són justament roca
+o sorra. Els guarets no hi entren: el manual els posa a herbàcies o a
+conreus, no aquí.
+
+La versió de la taula passa a `v2`, que invalida les respostes desades amb
+l'altra. Les molses i líquens es queden al model 1: a Ibèria gairebé no n'hi
+ha i no val una decisió.
+
+**Al servidor i no al navegador**, al revés que l'elevació (§2.28). Les
+tessel·les Terrarium són PNG petits i oberts; WorldCover són GeoTIFF de 3° de
+costat que es llegeixen per rangs HTTP, i la cartografia oficial són fitxers
+preparats al disc. `/api/fuels?bbox=&size=` torna la graella sobre **la
+mateixa extensió i orientació que el relleu**, comprimida per ratxes, i la
+desa trenta dies. Una resposta amb forats —WorldCover caigut— no es desa: un
+error ha de poder-se reintentar, no durar un mes.
+
+**Es mostreja el centre de cada cel·la, sense interpolar.** Un model és una
+categoria: la mitjana d'un 4 i un 8 no és un 6. Les tessel·les oficials es
+rasteritzen a uns 20–27 m; la precisió temàtica segueix sent la de la font
+—tessel·les d'una hectàrea a l'MFE, 10 m a WorldCover— i no la de la graella.
+
+**El que canvia al model.**
+
+- **Els tretze models**, amb les càrregues, fondàries i humitats d'extinció
+  d'Anderson (1982). N'hi havia quatre.
+- **Cada cel·la, el seu llit**: velocitat base, factor de vent i de pendent
+  surten del model de la cel·la. El vent a mitja flama també, perquè l'ajust
+  depèn de la fondària del combustible.
+- **Un pas llarg paga cada cel·la que travessa.** Els passos de fins a cinc
+  cel·les (§11.19) prenien la velocitat de l'origen; amb combustible variable
+  això saltaria una franja lenta. Ara el temps és la suma dels trossos dins de
+  cada cel·la creuada, amb la velocitat de cadascuna.
+- **Una barrera d'una cel·la atura el foc**, també en diagonal: un pas que
+  passa exactament per un vèrtex toca les dues cel·les del costat, i si una no
+  crema, no passa. És el que farà falta per als tallafocs (§11.1, 12.12).
+- **No es calcula sobre el que no se sap.** Amb terreny sense dada, o una
+  ignició sobre una cel·la sense combustible, el botó no s'encén i la pantalla
+  diu per què. Tractar el desconegut com a barrera faria un foc més petit del
+  que toca sense dir-ho.
+
+**El que no canvia**, i segueix sent supòsit (§11.19): meteorologia uniforme i
+constant, humitat del viu al 100 %, humitat del mort estimada, sense capçades
+ni focus secundaris. Un mapa de combustible real no converteix res d'això en
+una observació.
+
+**El que costa i el que es deixa.**
+
+- Quatre dependències noves al servidor —`geotiff`, `proj4`, `shapefile`,
+  `fflate` (§6)—, que és la feina per lots que la §2.12 deia que cabria en
+  scripts a part i que aquí ha entrat a l'API.
+- **Les dades preparades no són al repositori.** `api/data/fuels` és fora de
+  Git, i l'entrega balear es va importar d'un fitxer del projecte anterior
+  (`Pere/Code`), que simplifica la geometria a 0,0001°. En una altra màquina,
+  sense copiar-les, tot surt estimat. La pantalla ho diria —«ESTIMAT»— però
+  convé saber-ho abans d'una demostració.
+- **MFE25 i Portugal segueixen pendents.** El documentador de l'IFN4 defineix
+  `ModComb` per a la península, de manera que la frase del §5 de la fase 1
+  —que caldria reclassificar a partir de l'espècie— era massa general i s'ha
+  esmenat; però cap entrega peninsular s'ha baixat ni auditat, i la descarrega
+  de MITECO respon amb un CAPTCHA. El servei portuguès de FIRE-MODSAT II
+  donava 503 el dia de la recerca.
+
+Comprovat el 14/11/2026: les sis proves del servidor i les quinze del client
+passen —barreres d'una cel·la i en diagonal, franges lentes travessades,
+ignicions invàlides, forats i coordenades negatives en rasteritzar, i les
+velocitats de referència d'Anderson dins del 10 % per als vuit models només
+de mort— i TypeScript no dona errors. **No s'ha mirat al navegador**, ni
+s'han repetit les consultes reals ni els temps que dona el document de Codex.
+
 ---
 
 ## 12. Decisions pendents
+
+- ~~**12.13. Quin model és l'arbrat de WorldCover.**~~ Resolta el 14/11/2026
+  a la §11.21: es queda el 8. El que es plantejava: la taula hi posa el 8,
+  fullaraca compacta sota arbrat tancat, que és el més lent dels de bosc; la
+  §11.19 havia triat el 7 per a la pineda mediterrània amb sotabosc. Fora de
+  Balears tot el bosc surt d'aquesta fila. Cap dels dos surt d'una dada.
+- ~~**12.14. El sòl nu com a combustible.**~~ Resolta el 14/11/2026 a la
+  §11.21: no combustible. El que es plantejava: la classe 60 de
+  WorldCover —sòl nu o vegetació esparsa— anava al model 1, i el mateix document
+  deia que podia sobreestimar molt. L'alternativa és no combustible, que
+  convertiria en barrera un pedregar amb càrritx.
 
 - **12.7. El canvi de nom d'«ignició» a «centre».** Ve de la §11.11: el text ja
   diu centre i els identificadors encara diuen ignició —`IgnitionStep`,
@@ -844,7 +1416,9 @@ clic n'hi afegeix una altra; i `history.length` no es mou de 2.
   l'eina del simulador col·loqui focus de debò, perquè llavors els dos
   conceptes hauran de conviure i els noms hauran de distingir-los.
 
-- **12.8. Les cel·les de mar dins del domini.** Ve de la §11.12. Un domini
+- **12.8. Les cel·les de mar dins del domini.** Resolta per al model el
+  14/11/2026 a la §11.19: altitud ≤ 0 no crema. Queda només treure el mar de
+  les xifres d'altitud i pendent de la §11.12. El plantejament: Ve de la §11.12. Un domini
   costaner inclou mar, i Terrarium hi dona el fons marí: l'altitud mínima surt
   negativa i la mitjana i la màxima de pendent compten talussos submarins. Cal
   decidir si el mar s'exclou de les xifres —i amb quin criteri: elevació ≤ 0 o
@@ -854,6 +1428,18 @@ clic n'hi afegeix una altra; i `history.length` no es mou de 2.
 - ~~**12.9. Les ignicions a la URL.**~~ Resolta el 13/11/2026 a la §11.16: un
   paràmetre de consulta, `?ignicions=`, i cada canvi substitueix l'entrada de
   l'historial.
+
+- **12.10. La meteorologia en directe.** Ve de la §11.17. Cal decidir quina
+  estació parla per un domini de 30 km —la més propera al centre, o una
+  interpolació—, cada quant es refresca, i què es fa quan l'estació no dona
+  vent. AEMET va pel servidor per la clau; IPMA es pot demanar des del
+  navegador si el CORS ho deixa, cosa que no s'ha comprovat.
+- **12.11. On viuen els escenaris desats.** Ve de la §11.17. Les ignicions ja
+  són a la URL (§11.16) i la meteorologia no. O tot viatja a l'enllaç i
+  «desar» és guardar un enllaç amb nom, o es desa al navegador i no es pot
+  compartir. Sense base de dades, no hi ha tercera via.
+- **12.12. Què fa una contramesura a una cel·la.** Ve de la §11.17, i és del
+  model (§12.5): treure combustible, apujar-ne la humitat, o aturar el front.
 
 La primera que toca és la 12.4, perquè condiciona on viu la resta: si el foc es
 pinta dins de MapLibre o en un segon canvas, el model no escriu al mateix lloc.
@@ -866,7 +1452,10 @@ pinta dins de MapLibre o en un segon canvas, el model no escriu al mateix lloc.
   distribueix com a tessel·les obertes.
 - **12.2. Polígons sense model de combustible.** Ve de la 3.3 de la fase 1.
   `MODCOMB = 0` són 5.471 d'11.654 polígons a l'inventari balear. Confondre'ls
-  amb terreny no combustible convertiria mitja illa en tallafocs.
+  amb terreny no combustible convertiria mitja illa en tallafocs. Resolta el
+  14/11/2026 a la §11.21: es tracten com a desconeguts i hi respon la coberta
+  del sòl. Les dues files discutibles de la taula de conversió, 12.13 i
+  12.14, es tanquen el mateix dia.
 - ~~**12.3. Terreny 3D a la vista de simulació.**~~ Venia de la 3.6 de la fase 1
   i la tanca la §11.2: la premissa —que drapejar és més feina que pintar sobre
   un pla— no es compleix en aquesta versió de MapLibre.
@@ -882,7 +1471,10 @@ pinta dins de MapLibre o en un segon canvas, el model no escriu al mateix lloc.
     coses (§11.2).
 - ~~**12.6. Si el mapa del darrer pas s'ha de poder orbitar.**~~ Resolta el
   5/11/2026 a la §11.3: sí, girar i inclinar; desplaçar i fer zoom, no.
-- **12.5. El model de propagació.** Encara sense investigar. És el centre de la
+- **12.5. El model de propagació.** Oberta amb una primera versió a la §11.19
+  —Rothermel i temps mínim de viatge sobre combustible suposat—; el que en
+  queda és allà, llevat del combustible per cel·la, que ja hi és (§11.21).
+  Abans deia: encara sense investigar. És el centre de la
   fase i condiciona les 12.1 i 12.2: quines dades demana el model —pendent,
   combustible, vent, humitat— és el que diu quines fonts calen i amb quina
   resolució.
@@ -930,5 +1522,8 @@ Les que ja s'usen són al §5 de la fase 1, amb els crèdits al §6, i no es
 repeteixen aquí: l'elevació Terrarium i la cartografia base hi són des del
 primer dia.
 
-Les que la fase 2 necessitarà i encara no estan triades —combustible o coberta
-del sòl, vent— esperen la 12.5, perquè és el model qui diu què li cal.
+Les de la fase 2, que s'han afegit a la taula del §5 i als crèdits del §6:
+
+- **Meteorologia**: AEMET OpenData i IPMA (§11.18).
+- **Combustible**: IDEIB a Balears i ESA WorldCover 2021 a tot l'àmbit
+  (§11.21). MFE25 i la cartografia portuguesa, localitzades i no integrades.

@@ -4,6 +4,7 @@ import {
   MapLibreMap,
   ScaleControl,
   setWorkerUrl,
+  type CanvasSource,
   type GeoJSONSource,
   type ImageSource,
   type LngLatBoundsLike,
@@ -21,18 +22,19 @@ import {
   buildStyle,
   DEM_SOURCE,
   DOMAIN_SOURCE,
+  FIRE_SOURCE,
   hotspotColour,
   type HotspotColourBy,
   hotspotDensity,
   hotspotRadius,
   HOTSPOTS_SOURCE,
-  IGNITION_SOURCE,
   LAYERS,
   MUNICIPALITIES_SOURCE,
   PLACES_SOURCE,
   PROVINCES_SOURCE,
   SLOPES_SOURCE,
 } from './map.style';
+import { FireParticles, type Emitters } from './fire-particles';
 import { addSpawnMarker, type SpawnMarker } from './spawn-marker';
 
 /**
@@ -203,6 +205,9 @@ export class MapService {
 
   /** The marks of where the fire starts. See setFireStarts(). */
   private fireStarts: SpawnMarker[] = [];
+
+  /** The fixed white mark at the centre of the simulation domain. */
+  private centreMarker: SpawnMarker | null = null;
 
   /**
    * Where the last click while picking landed, as [lon, lat].
@@ -603,22 +608,13 @@ export class MapService {
     if (canvas) canvas.style.cursor = on ? 'crosshair' : '';
   }
 
-  /** Draws the ignition point, or takes it off. */
+  /** Marks the simulation centre, or takes it off. Kept under its existing API name. */
   setIgnition(point: readonly [number, number] | null): void {
     this.withStyle((map) => {
-      const source = map.getSource(IGNITION_SOURCE) as GeoJSONSource | undefined;
-      source?.setData({
-        type: 'FeatureCollection',
-        features: point
-          ? [
-              {
-                type: 'Feature',
-                properties: {},
-                geometry: { type: 'Point', coordinates: [...point] },
-              },
-            ]
-          : [],
-      });
+      this.centreMarker?.remove();
+      this.centreMarker = point
+        ? addSpawnMarker(map, point, 'Centre de la simulació', 'centre')
+        : null;
     });
   }
 
@@ -742,6 +738,136 @@ export class MapService {
   }
 
   /**
+   * Lays the simulated fire over the ground, or takes it off.
+   *
+   * The fire is a picture the simulator paints itself, one pixel per cell, in
+   * a canvas this hands to MapLibre as a `canvas` source. A canvas and not an
+   * image because it changes with every move of the timeline: re-encoding a
+   * megapixel PNG sixty times a second is the slow way to change a texture
+   * MapLibre can simply read again.
+   *
+   * It is a `raster` layer, so it drapes over the relief like the slopes do
+   * (§13.1), and it sits above them and under the contours, the mask and the
+   * outline: the fire is on the ground, and the lines are drawn on the fire.
+   */
+  setFire(
+    canvas: HTMLCanvasElement | null,
+    bounds?: readonly [number, number, number, number],
+  ): void {
+    this.withStyle((map) => {
+      if (map.getLayer(LAYERS.fire)) map.removeLayer(LAYERS.fire);
+      if (map.getSource(FIRE_SOURCE)) map.removeSource(FIRE_SOURCE);
+      if (!canvas || !bounds) return;
+
+      const [west, south, east, north] = bounds;
+      map.addSource(FIRE_SOURCE, {
+        type: 'canvas',
+        canvas,
+        // Not animated: the picture changes when the timeline moves, not on
+        // every frame, and refreshFire() says when.
+        animate: false,
+        coordinates: [
+          [west, north],
+          [east, north],
+          [east, south],
+          [west, south],
+        ],
+      });
+      map.addLayer(
+        {
+          id: LAYERS.fire,
+          type: 'raster',
+          source: FIRE_SOURCE,
+          // Linear, unlike the slopes: the picture is a continuous field
+          // (fire-field.ts) and the filter is what puts the front between
+          // two cells instead of on one of them.
+          paint: { 'raster-resampling': 'linear', 'raster-fade-duration': 0 },
+        },
+        LAYERS.contourLines,
+      );
+    });
+  }
+
+  /** The flames and the smoke over the fire. See setFireParticles(). */
+  private particles: FireParticles | null = null;
+
+  /**
+   * Puts flames and smoke over the cells the fire is in, or takes them off.
+   *
+   * The second layer of the fire (see fire-particles.ts): the raster is the
+   * ground and this is the air above it. The layer is added the first time
+   * there is something to draw and stays while there is a fire, because adding
+   * and removing a custom layer recompiles its shaders.
+   *
+   * On top of everything, labels included: it is not draped, and a layer that
+   * is not draped put between two that are splits the stack MapLibre renders
+   * to the terrain in one pass (§13.1).
+   */
+  setFireParticles(emitters: Emitters | null, towardsDeg = 0, windKmh = 0): void {
+    this.withStyle((map) => {
+      if (!emitters) {
+        if (this.particles && map.getLayer(this.particles.id)) map.removeLayer(this.particles.id);
+        this.particles = null;
+        return;
+      }
+      if (!this.particles) {
+        this.particles = new FireParticles(LAYERS.fireParticles);
+        map.addLayer(this.particles);
+      }
+      this.particles.setWind(towardsDeg, windKmh);
+      this.particles.setEmitters(emitters);
+    });
+  }
+
+  /** Stops the particles for whoever has asked for less motion, or lets them go. */
+  setFireMotion(on: boolean): void {
+    this.particles?.setMotion(on);
+  }
+
+  resetFireParticles(): void {
+    this.particles?.reset();
+  }
+
+  focusFire(bounds: readonly [number, number, number, number]): void {
+    this.withStyle((map) =>
+      map.fitBounds(
+        [
+          [bounds[0], bounds[1]],
+          [bounds[2], bounds[3]],
+        ],
+        {
+          padding: { top: 100, right: 80, bottom: 60, left: 80 },
+          maxZoom: 15,
+          pitch: map.getPitch(),
+          bearing: map.getBearing(),
+          duration: 850,
+        },
+      ),
+    );
+  }
+
+  /**
+   * Tells MapLibre the fire's canvas has been painted again.
+   *
+   * `play()` and `pause()` in a row is how a canvas source that is not
+   * animated is made to read its canvas once: pausing uploads the texture a
+   * last time before it stops.
+   */
+  refreshFire(): void {
+    this.withStyle((map) => {
+      const source = map.getSource(FIRE_SOURCE) as CanvasSource | undefined;
+      if (!source) return;
+      source.play();
+      source.pause();
+      // Canvas upload alone does not invalidate the 3D terrain's cached
+      // draped texture in MapLibre 6.15. Publish a content revision through
+      // the public source API so the terrain actually paints this frame.
+      source.setCoordinates(source.coordinates);
+      map.triggerRepaint();
+    });
+  }
+
+  /**
    * Lights the ground the way the simulation screen needs it, or puts it back.
    *
    * The same relief, not a different one: this moves light and colour and
@@ -818,6 +944,7 @@ export class MapService {
     this.terrain3D = on;
     this.withStyle((map) => {
       map.setTerrain(on ? { source: DEM_SOURCE, exaggeration: TERRAIN_EXAGGERATION } : null);
+      this.particles?.reset();
     });
   }
 
@@ -1015,6 +1142,9 @@ export class MapService {
   }
 
   destroy(): void {
+    this.particles = null;
+    this.centreMarker?.remove();
+    this.centreMarker = null;
     for (const mark of this.fireStarts) mark.remove();
     this.fireStarts = [];
     this.instance?.remove();

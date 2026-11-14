@@ -135,7 +135,7 @@ body {
   background-color: rgb(230 234 238 / 0.9);
 }
 
-/* ───────────── The ignition mark (see app/map/spawn-marker.ts) ─────────────
+/* ───────────── Location marks (see app/map/spawn-marker.ts) ─────────────
 
    Global and not a component's: MapLibre puts a marker's element inside its
    own container, outside any component's template, so a scoped rule would
@@ -245,6 +245,47 @@ body {
   border: 1px solid #ff8a4f99;
   border-radius: 4px;
   box-shadow: 0 2px 8px #0008;
+}
+
+/* The centre shares the ignition's needle and halo, but its needle is fixed. */
+.spawn-centre .spawn-float {
+  animation: none;
+}
+
+.spawn-centre.spawn-ring::before {
+  border-color: #fff;
+  background: #ffffff28;
+  box-shadow:
+    0 0 10px 2px #ffffffb3,
+    inset 0 0 8px #ffffff80;
+}
+
+.spawn-centre .spawn-pulse {
+  border-color: #fff;
+  box-shadow: 0 0 12px #ffffffcc;
+}
+
+.spawn-centre .spawn-float svg {
+  filter: drop-shadow(0 0 6px #ffffff80) drop-shadow(0 3px 4px #0009);
+}
+
+.spawn-centre .spawn-stem,
+.spawn-centre .spawn-head {
+  fill: #fff;
+}
+
+.spawn-centre .spawn-head {
+  stroke: #dbe3ea;
+}
+
+.spawn-centre .spawn-eye {
+  fill: #36414d;
+}
+
+.spawn-centre .spawn-label {
+  color: #fff;
+  background: #141a20e6;
+  border-color: #ffffff99;
 }
 
 @media (prefers-reduced-motion: reduce) {

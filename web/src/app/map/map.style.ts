@@ -37,6 +37,8 @@ export const LAYERS = {
   hotspots: 'hotspots',
   hotspotSelected: 'hotspot-selected',
   slopes: 'slopes',
+  fire: 'fire',
+  fireParticles: 'fire-particles',
   contourLines: 'contour-lines',
   contourLabels: 'contour-labels',
   placeLabels: 'place-labels',
@@ -44,21 +46,21 @@ export const LAYERS = {
   domainFill: 'domain-fill',
   domainMask: 'domain-mask',
   domainLine: 'domain-line',
-  ignitionHalo: 'ignition-halo',
-  ignitionDot: 'ignition-dot',
 } as const;
 
 export const DEM_SOURCE = 'terrain-dem';
 export const REGIONS_SOURCE = 'regions';
 export const PROVINCES_SOURCE = 'provinces';
 export const MUNICIPALITIES_SOURCE = 'municipalities';
-export const IGNITION_SOURCE = 'ignition';
 export const PLACES_SOURCE = 'places';
 export const CONTOURS_SOURCE = 'contours';
 export const DOMAIN_SOURCE = 'domain';
 
 /** Not in the style: an image source needs its image, so it is added on demand. */
 export const SLOPES_SOURCE = 'slopes';
+
+/** The simulated fire. Added on demand too: a canvas source needs its canvas. */
+export const FIRE_SOURCE = 'fire';
 
 /**
  * How a detection is drawn, by its radiative power.
@@ -310,7 +312,6 @@ export function buildStyle(): StyleSpecification {
         attribution: 'Focus: NASA FIRMS (VIIRS 375 m)',
       },
       [DOMAIN_SOURCE]: { type: 'geojson', data: NO_POINT },
-      [IGNITION_SOURCE]: { type: 'geojson', data: NO_POINT },
       [PLACES_SOURCE]: {
         type: 'geojson',
         data: NO_POINT,
@@ -580,32 +581,6 @@ export function buildStyle(): StyleSpecification {
           'text-halo-color': 'rgba(8, 12, 16, 0.8)',
           'text-halo-width': 1.1,
           'text-opacity': 0.85,
-        },
-      },
-      {
-        // The ignition point, last of all so nothing can cover it. Two layers
-        // because one dot is hard to find again over a photograph: the ring
-        // says where to look and the dot says exactly where.
-        id: LAYERS.ignitionHalo,
-        type: 'circle',
-        source: IGNITION_SOURCE,
-        paint: {
-          'circle-radius': 13,
-          'circle-color': 'transparent',
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#ff7a3c',
-          'circle-stroke-opacity': 0.85,
-        },
-      },
-      {
-        id: LAYERS.ignitionDot,
-        type: 'circle',
-        source: IGNITION_SOURCE,
-        paint: {
-          'circle-radius': 4,
-          'circle-color': '#ff7a3c',
-          'circle-stroke-width': 1.5,
-          'circle-stroke-color': '#2b1403',
         },
       },
     ],
