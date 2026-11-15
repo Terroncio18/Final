@@ -11,7 +11,7 @@ export type CountermeasureKind =
   | 'amphibious'
   | 'retardant';
 
-/** A plan prepared at T=0, not a real-time dispatch or a calibrated suppression model. */
+/** A timed intervention; absent startMin means T=0 for legacy scenarios. */
 export interface Countermeasure {
   readonly id: string;
   readonly kind: CountermeasureKind;
@@ -19,6 +19,7 @@ export interface Countermeasure {
   readonly widthM: number;
   readonly strength: number;
   readonly durationMin: number;
+  readonly startMin?: number;
 }
 
 interface MeasureDefinition {
@@ -87,7 +88,7 @@ export const COUNTERMEASURE_CATALOG: readonly MeasureDefinition[] = [
   {
     kind: 'backfire',
     label: 'Contrafoc',
-    note: 'Encén la franja a T=0; també crema superfície',
+    note: 'Encén la franja en desplegar-la; també crema superfície',
     icon: 'flame',
     group: 'ground',
     geometry: 'line',
@@ -188,6 +189,11 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
     )
       return 'Durada incorrecta: 1–720 min per als efectes temporals; 0 per als permanents.';
     ids.add(raw.id);
+    if (
+      raw.startMin !== undefined &&
+      (!finite(raw.startMin) || raw.startMin < 0 || raw.startMin > 720)
+    )
+      return 'El desplegament ha de ser entre 0 i 720 minuts.';
     result.push({
       id: raw.id,
       kind: def.kind,
@@ -195,6 +201,7 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
       widthM: raw.widthM,
       strength: raw.strength,
       durationMin: raw.durationMin,
+      ...(raw.startMin !== undefined ? { startMin: raw.startMin } : {}),
     });
   }
   return result;
@@ -277,6 +284,7 @@ export interface CountermeasureField {
   readonly permanent: Float32Array;
   readonly temporary: ReadonlyMap<number, readonly TreatmentWindow[]>;
   readonly ignitions: readonly number[];
+  readonly timedIgnitions: readonly { cell: number; minute: number }[];
 }
 
 export function compileCountermeasures(
@@ -287,37 +295,57 @@ export function compileCountermeasures(
   if (typeof measures === 'string') throw new Error(measures);
   const blocked = new Uint8Array(GRID * GRID);
   const permanent = new Float32Array(GRID * GRID).fill(1);
+  const intervals = new Map<number, { from: number; until: number; factor: number }[]>();
   const wet = new Map<number, TreatmentWindow[]>();
   const ignitions = new Set<number>();
+  const timedIgnitions = new Map<number, number>();
   for (const measure of measures) {
+    const from = measure.startMin ?? 0;
     for (const cell of countermeasureCells(centre, measure)) {
-      if (measure.kind === 'firebreak' || measure.kind === 'defense-line') blocked[cell] = 1;
-      else if (measure.kind === 'clearing')
+      const barrier = measure.kind === 'firebreak' || measure.kind === 'defense-line';
+      if (barrier && from === 0) blocked[cell] = 1;
+      else if (measure.kind === 'clearing' && from === 0)
         permanent[cell] = Math.min(permanent[cell], 1 - measure.strength);
-      else if (measure.kind === 'backfire') ignitions.add(cell);
-      else if (measure.strength > 0) {
-        let windows = wet.get(cell);
-        if (!windows) wet.set(cell, (windows = []));
-        windows.push({ until: measure.durationMin, factor: 1 - measure.strength });
+      else if (measure.kind === 'backfire') {
+        if (from === 0) ignitions.add(cell);
+        else timedIgnitions.set(cell, Math.min(timedIgnitions.get(cell) ?? Infinity, from));
+      } else if (barrier || measure.strength > 0) {
+        let windows = intervals.get(cell);
+        if (!windows) intervals.set(cell, (windows = []));
+        windows.push({
+          from,
+          until: measure.durationMin ? from + measure.durationMin : Infinity,
+          factor: barrier ? 0 : 1 - measure.strength,
+        });
       }
     }
   }
-  for (const [cell, windows] of wet) {
-    const ends = [...new Set(windows.map((w) => w.until))].sort((a, b) => a - b);
-    wet.set(
-      cell,
-      ends.map((until) => ({
-        until,
-        // Permanent is already in the underlying rate; don't multiply overlapping reductions.
-        factor:
-          Math.min(
-            permanent[cell],
-            ...windows.filter((w) => w.until >= until).map((w) => w.factor),
-          ) / permanent[cell],
-      })),
+  for (const [cell, windows] of intervals) {
+    const cuts = [...new Set([0, ...windows.flatMap((w) => [w.from, w.until]), Infinity])].sort(
+      (a, b) => a - b,
     );
+    const schedule: TreatmentWindow[] = [];
+    for (let i = 0; i < cuts.length - 1; i++) {
+      const factor =
+        Math.min(
+          permanent[cell],
+          ...windows.filter((w) => w.from <= cuts[i] && w.until > cuts[i]).map((w) => w.factor),
+        ) / permanent[cell];
+      const last = schedule.at(-1);
+      if (last?.factor === factor) schedule[schedule.length - 1] = { until: cuts[i + 1], factor };
+      else schedule.push({ until: cuts[i + 1], factor });
+    }
+    wet.set(cell, schedule);
   }
-  return { blocked, permanent, temporary: wet, ignitions: [...ignitions] };
+  return {
+    blocked,
+    permanent,
+    temporary: wet,
+    ignitions: [...ignitions],
+    timedIgnitions: [...timedIgnitions]
+      .filter(([cell]) => !ignitions.has(cell))
+      .map(([cell, minute]) => ({ cell, minute })),
+  };
 }
 
 export function treatmentFactor(
@@ -339,6 +367,7 @@ export function treatedTravel(
   for (const window of windows ?? []) {
     if (window.until <= now) continue;
     const speed = rate * window.factor;
+    if (speed === 0 && window.until === Infinity) return Infinity;
     const available = window.until - now;
     if (remaining <= speed * available) return now - start + remaining / speed;
     remaining -= speed * available;

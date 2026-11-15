@@ -36,7 +36,7 @@ const LIMITS = {
 } as const;
 
 const HEADER = '# IgnisLab · escenari de simulació';
-const VERSION = '2';
+const VERSION = '3';
 
 /**
  * The scenario as a text file: one `key = value` per line, in Catalan, with
@@ -77,7 +77,8 @@ export function formatScenario(scenario: Scenario, saved: Date): string {
     ...(scenario.countermeasures
       ? [
           '',
-          '# Pla de contramesures preparat a T=0; coordenades [longitud,latitud].',
+          '# Contramesures: startMin és el minut de desplegament (absent = 0).',
+          '# durationMin compta des del desplegament; coordenades [longitud,latitud].',
           `contramesures = ${JSON.stringify(scenario.countermeasures)}`,
         ]
       : []),
@@ -111,7 +112,7 @@ export function parseScenario(text: string): Scenario | string {
     return /^[A-Za-z0-9_]+$/.test(value) ? value : null;
   };
   const version = values.get('versio');
-  if (version !== undefined && version !== '1' && version !== VERSION)
+  if (version !== undefined && version !== '1' && version !== '2' && version !== VERSION)
     return 'Versió d’escenari no compatible.';
   const region = code('regio');
   const province = code('provincia');

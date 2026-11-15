@@ -28,6 +28,52 @@ function drawn(kind = line.kind, points: readonly Point[] = [a, b]): Countermeas
 }
 
 describe('the countermeasure plan', () => {
+  it('timestamps points and completed lines at the paused simulation cursor', () => {
+    const plan = new CountermeasurePlan();
+    plan.minute.set(135.5);
+    plan.begin(point.kind);
+    plan.click(a, bounds);
+    plan.begin(line.kind);
+    plan.click(a, bounds);
+    plan.click(b, bounds);
+    plan.finish();
+    expect(plan.measures().map((m) => m.startMin)).toEqual([135.5, 135.5]);
+    expect(plan.rows()[0].deployment).toBe('T + 02:15:30');
+  });
+
+  it('protects past deployments and only clears current or future ones', () => {
+    const plan = drawn();
+    const past = plan.measures()[0];
+    plan.minute.set(60);
+    plan.begin(point.kind);
+    plan.click(c, bounds);
+    const current = plan.measures()[1];
+    expect(plan.setWidth(past.id, 300)).toBe(false);
+    plan.remove(past.id);
+    expect(plan.measures()[0]).toEqual(past);
+    expect(plan.setWidth(current.id, 300)).toBe(true);
+    plan.clear();
+    expect(plan.measures()).toEqual([past]);
+    expect(plan.hasEditable()).toBe(false);
+    plan.minute.set(0);
+    expect(plan.setWidth(past.id, 120)).toBe(true);
+    plan.clear();
+    expect(plan.measures()).toEqual([]);
+  });
+
+  it('reports pending, deployed and expired states on timeline seeks', () => {
+    const plan = new CountermeasurePlan();
+    plan.minute.set(100);
+    plan.begin(point.kind);
+    plan.click(a, bounds);
+    plan.minute.set(99);
+    expect(plan.rows()[0]).toMatchObject({ status: 'Programada', locked: false });
+    plan.minute.set(100);
+    expect(plan.rows()[0]).toMatchObject({ status: 'Desplegada', locked: false });
+    plan.minute.set(100 + point.durationMin);
+    expect(plan.rows()[0]).toMatchObject({ status: 'Caducada', locked: true });
+  });
+
   it('draws a line vertex by vertex and only keeps it once finished', () => {
     const plan = new CountermeasurePlan();
     plan.begin(line.kind);

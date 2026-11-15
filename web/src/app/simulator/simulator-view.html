@@ -441,9 +441,7 @@
         }
       </details>
 
-      <!-- What the extinction services do, as tools: pick one, draw it on the
-           ground, and the next run is computed with it. The plan is prepared
-           at T = 0; nothing here is deployed on a fire already computed. -->
+      <!-- Deploy at the playback cursor; earlier fire history is preserved. -->
       <details class="fold control-section" open>
         <summary>
           <h3>
@@ -453,6 +451,10 @@
             }
           </h3>
         </summary>
+        <p class="section-lead">
+          Tria una eina per pausar i desplegar-la a T + {{ elapsed() }} h. Dibuixa-la al mapa: la
+          previsió s'actualitza automàticament.
+        </p>
         @for (group of countermeasures; track group.title) {
           <h4>{{ group.title }}</h4>
           <div class="measure-grid">
@@ -463,6 +465,7 @@
                 [attr.aria-pressed]="plan.kind() === measure.kind"
                 [style.--measure]="measure.color"
                 [title]="measure.note"
+                [disabled]="computing()"
                 (click)="pickMeasure(measure.kind)"
               >
                 <app-icon [name]="measure.icon" />
@@ -488,7 +491,11 @@
             </p>
             <div class="tools-row">
               @if (active.geometry === 'line') {
-                <button type="button" [disabled]="!plan.canFinish()" (click)="finishMeasure()">
+                <button
+                  type="button"
+                  [disabled]="!plan.canFinish() || computing()"
+                  (click)="finishMeasure()"
+                >
                   Finalitzar
                 </button>
                 <button
@@ -523,8 +530,9 @@
           </p>
         }
         @if (planStale()) {
-          <p class="terrain-note measure-note failed" role="status">
-            El pla ha canviat i el resultat anterior s'ha retirat: torna a iniciar la simulació.
+          <p class="terrain-note measure-note" role="status">
+            Previsió actualitzada. Es conserva el foc anterior al desplegament. Prem reproduir per
+            continuar des d'aquest minut.
           </p>
         }
 
@@ -544,6 +552,7 @@
                     <span>
                       <strong>{{ row.name }}</strong>
                       <small>{{ row.shape }} · {{ row.effect }}</small>
+                      <small>{{ row.deployment }} · {{ row.status }}</small>
                     </span>
                   </button>
                   <button
@@ -551,6 +560,7 @@
                     class="measure-remove"
                     [attr.aria-label]="'Suprimir ' + row.name"
                     title="Suprimir"
+                    [disabled]="computing() || row.locked"
                     (click)="removeMeasure(row.id)"
                   >
                     ×
@@ -568,6 +578,7 @@
                           [min]="widthLimits.min"
                           [max]="widthLimits.max"
                           [value]="row.widthM"
+                          [disabled]="computing() || row.locked"
                           (change)="setMeasureNumber(row.id, 'width', $event)"
                         />
                       </label>
@@ -582,6 +593,7 @@
                           [min]="durationLimits.min"
                           [max]="durationLimits.max"
                           [value]="row.durationMin"
+                          [disabled]="computing() || row.locked"
                           (change)="setMeasureNumber(row.id, 'duration', $event)"
                         />
                       </label>
@@ -596,6 +608,7 @@
                           max="95"
                           step="1"
                           [value]="row.strengthPercent"
+                          [disabled]="computing() || row.locked"
                           (change)="setMeasureNumber(row.id, 'strength', $event)"
                         />
                       </label>
@@ -606,8 +619,12 @@
             }
           </ul>
           <div class="tools-row measure-clear">
-            <button type="button" (click)="clearMeasures()">
-              <app-icon name="trash" /> Suprimir-les totes
+            <button
+              type="button"
+              [disabled]="computing() || !plan.hasEditable()"
+              (click)="clearMeasures()"
+            >
+              <app-icon name="trash" /> Suprimir les editables
             </button>
           </div>
         } @else {
@@ -615,11 +632,12 @@
         }
 
         <p class="terrain-note">
-          El pla s'aplica des de T = 0 i cal tornar a calcular quan s'edita. Els percentatges són
-          coeficients del simulacre, no eficàcia operativa validada: no es modelen dotacions, temps
-          de construcció, salts de foc ni foc de capçades. La graella és de 30 m: la petjada real és
-          la de les cel·les tocades i pot ser més ampla que la franja dibuixada. El pla no viatja a
-          l'enllaç: es conserva en desar l'escenari.
+          Cada mesura s'aplica al minut de desplegament; la durada compta des d'aquell instant. Les
+          mesures del passat queden bloquejades: torna a l'inici per editar-les. Els percentatges
+          són coeficients del simulacre, no eficàcia operativa validada: no es modelen dotacions,
+          temps de construcció, salts de foc ni foc de capçades. La graella és de 30 m: la petjada
+          real és la de les cel·les tocades i pot ser més ampla que la franja dibuixada. El pla no
+          viatja a l'enllaç: es conserva en desar l'escenari.
         </p>
       </details>
 
@@ -636,6 +654,9 @@
         </div>
         @if (computing()) {
           <div class="run-progress"><span [style.width.%]="progress() * 100"></span></div>
+        }
+        @if (runError(); as error) {
+          <p class="terrain-note measure-note failed" role="alert">{{ error }}</p>
         }
         <div class="play-controls">
           <button type="button" class="button primary" [disabled]="!canStart()" (click)="start()">
@@ -801,7 +822,7 @@
               <span><i class="fire-flames"></i>Flames</span>
               <span><i class="fire-char"></i>Cremat</span>
             </div>
-            @if (forecasts()) {
+            @if (forecasts() && !computing()) {
               <div class="map-legend forecast-legend">
                 <span>Previsió</span>
                 @for (row of forecastRows(); track row.offset) {
@@ -836,7 +857,7 @@
           <div class="timeline-actions">
             <button
               type="button"
-              [disabled]="!result()"
+              [disabled]="!result() || computing()"
               [attr.aria-label]="playing() ? 'Aturar' : 'Reproduir'"
               (click)="togglePlay()"
             >
@@ -845,7 +866,7 @@
             <select
               aria-label="Velocitat"
               [value]="speed()"
-              [disabled]="!result()"
+              [disabled]="!result() || computing()"
               (change)="setSpeed($event)"
             >
               <option value="1">1×</option>
@@ -867,7 +888,7 @@
             [value]="minutes()"
             [style.--fill]="fill(minutes(), 0, horizon.minutes)"
             (input)="setMinutes($event)"
-            [disabled]="!result()"
+            [disabled]="!result() || computing()"
           />
           <div class="timeline-ticks">
             @for (tick of horizon.ticks; track tick) {
@@ -1016,7 +1037,7 @@
           </div>
         </details>
 
-        @if (shows('areaChart')) {
+        @if (shows('areaChart') && !computing()) {
           <details class="fold chart-section" open>
             <summary>
               <div class="chart-heading">
@@ -1040,7 +1061,7 @@
           </details>
         }
 
-        @if (shows('rateChart')) {
+        @if (shows('rateChart') && !computing()) {
           <details class="fold chart-section">
             <summary>
               <div class="chart-heading">

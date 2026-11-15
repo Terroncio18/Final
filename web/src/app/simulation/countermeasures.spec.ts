@@ -112,6 +112,12 @@ describe('countermeasure geometry and validation', () => {
 });
 
 describe('time-dependent travel', () => {
+  it('rejects malformed deployment times and retains valid legacy or timed plans', () => {
+    for (const startMin of [-1, 721, NaN, Infinity, '30', null])
+      expect(typeof parseCountermeasures([{ ...make(), startMin }])).toBe('string');
+    expect(parseCountermeasures([make({ startMin: 120.5 })])).toEqual([make({ startMin: 120.5 })]);
+    expect(parseCountermeasures([make()])).toEqual([make()]);
+  });
   const windows = [
     { until: 5, factor: 0.5 },
     { until: 10, factor: 0.8 },

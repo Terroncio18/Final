@@ -17,7 +17,11 @@ import { Chrome } from '../chrome';
 import { CountermeasureDisplay } from '../map/countermeasure-display';
 import { MapService } from '../map/map.service';
 import { PlacesService } from '../map/places.service';
-import { COUNTERMEASURE_CATALOG, type CountermeasureKind } from '../simulation/countermeasures';
+import {
+  COUNTERMEASURE_CATALOG,
+  type CountermeasureKind,
+  type Countermeasure,
+} from '../simulation/countermeasures';
 import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from '../simulation/domain';
 import { FireSurface } from '../simulation/fire-surface';
 import { FORECASTS, FORECAST_COLOURS, forecastOffsets } from '../simulation/fire-display';
@@ -244,9 +248,8 @@ export class SimulatorView {
   /**
    * The countermeasure plan and the line being drawn (countermeasure-plan.ts).
    *
-   * Prepared at T = 0 and handed to the model whole: editing it is asking
-   * another question, so the effect that watches the inputs takes the result
-   * off, the same as moving an ignition does.
+   * Each deployment is timestamped; recalculation preserves the history
+   * before that time and the playback cursor.
    */
   protected readonly plan = new CountermeasurePlan();
   protected readonly widthLimits = WIDTH_LIMITS;
@@ -254,7 +257,7 @@ export class SimulatorView {
   private readonly measureDisplay = new CountermeasureDisplay();
   /** The domain the plan was last checked against, as the address writes it. */
   private planDomain: string | null = null;
-  /** Set when an edit of the plan took a computed fire off the screen. */
+  /** Set after the forecast has been updated for an in-simulation deployment. */
   protected readonly planStale = signal(false);
 
   /** The timeline's length, with a tick every two hours. */
@@ -340,10 +343,11 @@ export class SimulatorView {
 
   /** The picture of the fire MapLibre reads: one pixel per cell. */
   protected readonly forecasts = signal(true);
+  private readonly visibleForecasts = computed(() => this.forecasts() && !this.computing());
   private redrawFire: ((minute: number, forecast: boolean) => void) | null = null;
   protected readonly forecastRows = computed(() => {
     const result = this.result();
-    if (!result) return [];
+    if (!result || this.computing()) return [];
     const minute = Math.floor(this.minutes());
     const available = forecastOffsets(this.minutes(), result.horizon);
     const format = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
@@ -666,6 +670,7 @@ export class SimulatorView {
       this.scenarioNote.set({ text: scenario, failed: true });
       return;
     }
+    this.reset();
     this.weatherMode.set('manual');
     this.wind.set(scenario.wind);
     this.direction.set(scenario.windFrom);
@@ -825,7 +830,7 @@ export class SimulatorView {
     if (this.computing()) {
       return {
         tag: 'CALCULANT',
-        short: `Calculant… ${Math.round(this.progress() * 100)} %`,
+        short: `${this.result() ? 'Actualitzant previsió' : 'Calculant'}… ${Math.round(this.progress() * 100)} %`,
         title: 'Calculant la propagació',
         detail: "El foc es calcula en l'ordre en què crema.",
       };
@@ -1109,7 +1114,15 @@ export class SimulatorView {
     // The ignition tool. While it is on, a click on the ground is a place
     // where the fire starts; the map only reports clicks while it is asked to
     // (setPicking), which is also what turns the pointer into a crosshair.
-    effect(() => this.maps.setPicking(this.tool() === 'ignition' || this.plan.kind() !== null));
+    effect(() =>
+      this.maps.setPicking(
+        !this.computing() && (this.tool() === 'ignition' || this.plan.kind() !== null),
+      ),
+    );
+    effect(() => {
+      const minute = this.result() ? this.minutes() : 0;
+      untracked(() => this.plan.minute.set(minute));
+    });
 
     // One tool in the hand at a time: taking a countermeasure puts the
     // ignition tool down (toggleTool does the reverse).
@@ -1121,12 +1134,13 @@ export class SimulatorView {
       const picked = this.maps.picked();
       if (!picked) return;
       untracked(() => {
+        if (this.computing()) return;
         // The click belongs to whichever tool is in the hand, and to one only:
         // a vertex of a firebreak must never also be an ignition.
         if (this.plan.kind()) {
           const centre = this.ignition();
           // Through editPlan: a discharge is placed by this very click, and
-          // it takes a computed fire off the screen like any other edit.
+          // it updates the forecast at the paused deployment time.
           if (centre)
             this.editPlan(() => this.plan.click([picked[0], picked[1]], domainAround(centre)));
           return;
@@ -1159,16 +1173,25 @@ export class SimulatorView {
       if (!map) return;
       this.measureDisplay.attach(map, (id) => this.plan.select(id));
       this.measureDisplay.setMeasures(
-        this.plan.measures().map((measure) => {
-          const entry = catalogEntry(measure.kind);
-          return {
-            id: measure.id,
-            points: measure.points,
-            widthM: measure.widthM,
-            colour: entry.color,
-            disc: entry.geometry === 'point',
-          };
-        }),
+        this.plan
+          .measures()
+          .filter(
+            (measure) =>
+              !this.result() ||
+              ((measure.startMin ?? 0) <= this.minutes() &&
+                (!measure.durationMin ||
+                  this.minutes() < (measure.startMin ?? 0) + measure.durationMin)),
+          )
+          .map((measure) => {
+            const entry = catalogEntry(measure.kind);
+            return {
+              id: measure.id,
+              points: measure.points,
+              widthM: measure.widthM,
+              colour: entry.color,
+              disc: entry.geometry === 'point',
+            };
+          }),
         this.plan.selected(),
       );
     });
@@ -1215,7 +1238,6 @@ export class SimulatorView {
     // question: it is taken off rather than left on screen under new sliders.
     effect(() => {
       this.starts();
-      this.plan.measures();
       this.fuelState();
       this.now().towardsDeg;
       this.terrain.terrain();
@@ -1248,7 +1270,7 @@ export class SimulatorView {
         weather = untracked(this.now);
       const reduced = matchMedia('(prefers-reduced-motion: reduce)');
       const scale = () => this.maps.metresPerPixel() ?? undefined;
-      painter.paint(untracked(this.minutes), 0, untracked(this.forecasts), scale());
+      painter.paint(untracked(this.minutes), 0, untracked(this.visibleForecasts), scale());
       this.maps.setFire(painter.canvas, painter.bounds(bounds));
       let frame = 0,
         last = performance.now(),
@@ -1281,7 +1303,7 @@ export class SimulatorView {
         if (!document.hidden) {
           if (motion) visualSeconds += dt;
           const minute = untracked(this.minutes),
-            forecast = untracked(this.forecasts),
+            forecast = untracked(this.visibleForecasts),
             metres = scale();
           const jumped =
             Number.isFinite(previousMinute) &&
@@ -1331,7 +1353,7 @@ export class SimulatorView {
     // animation clock is suspended (e.g. a background preview).
     effect(() => {
       const minute = this.minutes(),
-        forecast = this.forecasts();
+        forecast = this.visibleForecasts();
       if (document.hidden) untracked(() => this.redrawFire?.(minute, forecast));
     });
 
@@ -1425,6 +1447,7 @@ export class SimulatorView {
   }
 
   protected setMinutes(event: Event): void {
+    if (this.computing()) return;
     // Dragging the clock is taking it over: the playback stops.
     this.playing.set(false);
     this.minutes.set(Number((event.target as HTMLInputElement).value));
@@ -1469,7 +1492,10 @@ export class SimulatorView {
    * the cells the ignitions fall in. Nothing is read again while it runs, so
    * what is computed is one consistent question.
    */
-  protected async start(): Promise<void> {
+  protected async start(
+    continueAt?: number,
+    previousPlan?: readonly Countermeasure[],
+  ): Promise<void> {
     const terrain = this.terrain.terrain();
     const centre = this.ignition();
     const fuels = this.fuels.grid();
@@ -1483,8 +1509,11 @@ export class SimulatorView {
 
     const mine = (this.run += 1);
     this.playing.set(false);
-    this.result.set(null);
-    this.minutes.set(0);
+    if (continueAt === undefined) {
+      this.result.set(null);
+      this.minutes.set(0);
+      this.plan.cancel();
+    }
     this.progress.set(0);
     this.computing.set(true);
     this.runError.set(null);
@@ -1515,12 +1544,16 @@ export class SimulatorView {
 
       this.computing.set(false);
       this.result.set(result);
-      this.playing.set(true);
+      this.minutes.set(continueAt ?? 0);
+      this.planStale.set(continueAt !== undefined);
+      this.playing.set(continueAt === undefined);
     } catch (error) {
-      if (mine === this.run)
+      if (mine === this.run) {
+        if (previousPlan) this.plan.measures.set(previousPlan);
         this.runError.set(
           error instanceof Error ? error.message : 'No s’ha pogut calcular el foc.',
         );
+      }
     } finally {
       if (mine === this.run) this.computing.set(false);
     }
@@ -1534,12 +1567,17 @@ export class SimulatorView {
     this.computing.set(false);
     this.result.set(null);
     this.minutes.set(0);
+    this.plan.minute.set(0);
+    this.planStale.set(false);
   }
 
   protected togglePlay(): void {
-    if (!this.result()) return;
+    if (!this.result() || this.computing()) return;
+    this.plan.cancel();
+    this.tool.set(null);
     // Pressing play at the end starts over, which is what the button means there.
     if (!this.playing() && this.minutes() >= this.horizon.minutes) this.minutes.set(0);
+    this.planStale.set(false);
     this.playing.update((on) => !on);
   }
 
@@ -1557,18 +1595,26 @@ export class SimulatorView {
   // ---- Countermeasures: the plan is edited here and computed by start(). ----
 
   /**
-   * Every edit of the plan goes through here, so that one place knows whether
-   * it took a computed fire off the screen —and can say so, instead of leaving
-   * an empty map to be guessed at.
+   * Update a running forecast atomically, keeping its history and cursor.
+   * A failed calculation rolls the plan back to match the previous result.
    */
   private editPlan(edit: () => void): void {
+    if (this.computing()) return;
     const before = this.plan.measures();
-    const had = this.result() !== null || this.computing();
+    const had = this.result() !== null;
+    this.playing.set(false);
+    this.plan.minute.set(had ? this.minutes() : 0);
     edit();
-    if (had && this.plan.measures() !== before) this.planStale.set(true);
+    if (had && this.plan.measures() !== before) {
+      this.plan.draft.set([]);
+      void this.start(this.minutes(), before);
+    }
   }
 
   protected pickMeasure(kind: CountermeasureKind): void {
+    if (this.computing()) return;
+    this.playing.set(false);
+    this.plan.minute.set(this.result() ? this.minutes() : 0);
     this.plan.begin(kind);
   }
 

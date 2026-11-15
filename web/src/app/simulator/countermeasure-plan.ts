@@ -47,7 +47,7 @@ const HELP: Readonly<Record<CountermeasureKind, string>> = {
   clearing: 'Redueix la propagació dins la franja, de manera permanent. No atura el foc.',
   'water-line': 'Redueix la propagació dins la franja mentre dura l’efecte; després caduca.',
   backfire:
-    'Encén la línia de veritat a T = 0: el que crema compta com a superfície cremada i pot ampliar l’incendi.',
+    'Encén la línia en desplegar-la: el que crema compta com a superfície cremada i pot ampliar l’incendi.',
   helicopter: 'Un clic, una descàrrega: un disc que frena el foc mentre dura l’efecte.',
   amphibious: 'Un clic, una descàrrega: un disc que frena el foc mentre dura l’efecte.',
   retardant: 'Franja que frena el foc mentre dura l’efecte; després caduca.',
@@ -85,9 +85,8 @@ export function lengthM(points: readonly Point[]): number {
  * —what a click means, what Escape undoes, what is refused— be tested without
  * a map or a DOM.
  *
- * **The plan is prepared at T = 0** (shared contract v1). Nothing here deploys
- * anything on a fire already computed: every change is a different question,
- * and the screen takes the old answer off (see SimulatorView).
+ * New measures are timestamped at the paused playback cursor. Measures that
+ * have already affected its past cannot be edited or deleted retroactively.
  *
  * The plan is not in the address, unlike the ignitions: a few polylines are
  * more than a link should carry. It travels in the scenario file.
@@ -101,6 +100,15 @@ export class CountermeasurePlan {
   readonly draft = signal<readonly Point[]>([]);
   readonly selected = signal<string | null>(null);
   readonly note = signal<PlanNote | null>(null);
+  readonly minute = signal(0);
+  readonly hasEditable = computed(() =>
+    this.measures().some((m) => (m.startMin ?? 0) >= this.minute()),
+  );
+
+  isLocked(id: string): boolean {
+    const measure = this.measures().find((m) => m.id === id);
+    return !!measure && (measure.startMin ?? 0) < this.minute();
+  }
 
   private nextId = 1;
 
@@ -125,8 +133,20 @@ export class CountermeasurePlan {
       const percent = Math.round(measure.strength * 100);
       const backfire = measure.kind === 'backfire';
       const barrier = BARRIERS.has(measure.kind);
+      const start = measure.startMin ?? 0;
+      const expired = measure.durationMin > 0 && this.minute() >= start + measure.durationMin;
       return {
         id: measure.id,
+        locked: start < this.minute(),
+        deployed: start,
+        deployment: `T + ${Math.floor(start / 60)
+          .toString()
+          .padStart(2, '0')}:${Math.floor(start % 60)
+          .toString()
+          .padStart(2, '0')}:${Math.floor((start * 60) % 60)
+          .toString()
+          .padStart(2, '0')}`,
+        status: start > this.minute() ? 'Programada' : expired ? 'Caducada' : 'Desplegada',
         name: `${entry.label} ${ordinal}`,
         colour: entry.color,
         icon: entry.icon,
@@ -137,7 +157,7 @@ export class CountermeasurePlan {
               ? `${one.format(metres / 1000)} km`
               : `${whole.format(metres)} m`,
         effect: backfire
-          ? 'Ignició a T = 0'
+          ? 'Ignició en desplegar-la'
           : barrier
             ? 'Barrera permanent'
             : measure.durationMin > 0
@@ -218,6 +238,10 @@ export class CountermeasurePlan {
   }
 
   remove(id: string): void {
+    if (this.isLocked(id)) {
+      this.historyNote();
+      return;
+    }
     this.commit(
       this.measures().filter((measure) => measure.id !== id),
       null,
@@ -227,7 +251,12 @@ export class CountermeasurePlan {
 
   clear(): void {
     this.cancel();
-    this.commit([], null);
+    const retained = this.measures().filter((m) => this.isLocked(m.id));
+    if (retained.length === this.measures().length && retained.length) {
+      this.historyNote();
+      return;
+    }
+    this.commit(retained, retained.length ? 'Es conserven les mesures ja desplegades.' : null);
     this.selected.set(null);
   }
 
@@ -323,6 +352,7 @@ export class CountermeasurePlan {
       widthM: entry.widthM,
       strength: entry.strength,
       durationMin: entry.durationMin,
+      ...(this.minute() > 0 ? { startMin: this.minute() } : {}),
     };
     const ordinal = this.measures().filter((other) => other.kind === kind).length + 1;
     const done = this.commit([...this.measures(), measure], `Afegit: ${entry.label} ${ordinal}.`);
@@ -331,10 +361,21 @@ export class CountermeasurePlan {
   }
 
   private patch(id: string, change: Partial<Countermeasure>): boolean {
+    if (this.isLocked(id)) {
+      this.historyNote();
+      return false;
+    }
     return this.commit(
       this.measures().map((measure) => (measure.id === id ? { ...measure, ...change } : measure)),
       null,
     );
+  }
+
+  private historyNote(): void {
+    this.note.set({
+      text: 'Aquesta mesura ja forma part del passat. Torna a l’inici per editar el pla.',
+      failed: true,
+    });
   }
 
   /**

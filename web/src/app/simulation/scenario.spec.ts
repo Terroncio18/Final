@@ -73,12 +73,21 @@ describe('scenario files', () => {
           widthM: 90,
           strength: 0.7,
           durationMin: 20,
+          startMin: 135.5,
         },
       ],
     };
+    expect(formatScenario(planned, new Date(0))).toContain('versio = 3');
     expect(parseScenario(formatScenario(planned, new Date(0)))).toEqual(planned);
+    const legacy = {
+      ...planned,
+      countermeasures: planned.countermeasures!.map(({ startMin, ...m }) => m),
+    };
     expect(
-      parseScenario(formatScenario(scenario, new Date(0)).replace('versio = 2', 'versio = 1')),
+      parseScenario(formatScenario(legacy, new Date(0)).replace('versio = 3', 'versio = 2')),
+    ).toEqual(legacy);
+    expect(
+      parseScenario(formatScenario(scenario, new Date(0)).replace('versio = 3', 'versio = 1')),
     ).toEqual(scenario);
   });
 
@@ -86,7 +95,7 @@ describe('scenario files', () => {
     const text = formatScenario(scenario, new Date(0));
     expect(parseScenario(text + 'contramesures = nope')).toMatch(/JSON/);
     expect(parseScenario(text + 'contramesures = [{}]')).toMatch(/desconegut/);
-    expect(parseScenario(text.replace('versio = 2', 'versio = 99'))).toMatch(/Versió/);
+    expect(parseScenario(text.replace('versio = 3', 'versio = 99'))).toMatch(/Versió/);
     const outside = [
       { id: 'x', kind: 'helicopter', points: [[0, 0]], widthM: 30, strength: 0.7, durationMin: 20 },
     ];

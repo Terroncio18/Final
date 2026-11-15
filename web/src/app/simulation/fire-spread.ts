@@ -36,7 +36,7 @@ export interface SpreadInput {
   readonly ignitions: readonly number[];
   /** How long to simulate, in minutes. */
   readonly horizon: number;
-  /** Prepared at T=0; temporary effects expire in simulated minutes. */
+  /** Interventions activate at startMin; durations are relative to deployment. */
   readonly countermeasures?: {
     readonly centre: Point;
     readonly measures: readonly Countermeasure[];
@@ -122,26 +122,28 @@ const PATHS = STEPS.map(([dx, dy]) => {
   return times.slice(1).map((end, i) => {
     const start = times[i],
       t = (start + end) / 2;
-    return { offset: Math.round(dx * t) + Math.round(dy * t) * GRID, share: end - start };
+    return { offset: Math.round(dx * t) + Math.round(dy * t) * GRID, share: end - start, end };
   });
 });
 
 // At an exact grid corner the ray touches both adjacent cells. Do not cut
 // diagonally through a one-cell firebreak, even if the touched length is zero.
 const CORNERS = STEPS.map(([dx, dy]) => {
-  const offsets: number[] = [];
+  const offsets: { offset: number; fraction: number }[] = [];
   if (!dx || !dy) return offsets;
   for (let i = 0; i < Math.abs(dx); i++) {
     const t = (i + 0.5) / Math.abs(dx);
     const y = dy * t;
     if (Math.abs(y - Math.floor(y) - 0.5) > 1e-9) continue;
     const x = dx * t;
-    offsets.push(
-      Math.round(x - Math.sign(dx) * 1e-7) + Math.round(y + Math.sign(dy) * 1e-7) * GRID,
-    );
-    offsets.push(
-      Math.round(x + Math.sign(dx) * 1e-7) + Math.round(y - Math.sign(dy) * 1e-7) * GRID,
-    );
+    offsets.push({
+      offset: Math.round(x - Math.sign(dx) * 1e-7) + Math.round(y + Math.sign(dy) * 1e-7) * GRID,
+      fraction: t,
+    });
+    offsets.push({
+      offset: Math.round(x + Math.sign(dx) * 1e-7) + Math.round(y - Math.sign(dy) * 1e-7) * GRID,
+      fraction: t,
+    });
   }
   return offsets;
 });
@@ -331,6 +333,23 @@ export async function spread(
     arrival[cell] = 0;
     heap.push(0, cell);
   }
+  const timedIgnitions = (treatments?.timedIgnitions ?? []).filter(
+    ({ cell, minute }) =>
+      minute <= horizon &&
+      rate[cell] > 0 &&
+      treatmentFactor(treatments?.temporary.get(cell), minute) > 0,
+  );
+  for (const { cell, minute } of timedIgnitions) {
+    // Round upwards to the stored precision: a seed must never ignite before
+    // its deployment, even when playback stops between whole minutes.
+    const stored = new Float32Array([minute]);
+    if (stored[0] < minute) new Uint32Array(stored.buffer)[0] += 1;
+    const time = stored[0];
+    if (time < arrival[cell]) {
+      arrival[cell] = time;
+      heap.push(time, cell);
+    }
+  }
 
   let done = 0;
   let sliceStart = performance.now();
@@ -352,7 +371,7 @@ export async function spread(
       const next = cell + stepOffset[step];
       const rateNext = rate[next];
       if (rateNext === 0) continue;
-      if (CORNERS[step].some((offset) => rate[cell + offset] === 0)) continue;
+      if (CORNERS[step].some(({ offset }) => rate[cell + offset] === 0)) continue;
       let travel = 0;
       for (const segment of PATHS[step]) {
         const at = cell + segment.offset;
@@ -366,6 +385,18 @@ export async function spread(
         travel += treatments
           ? treatedTravel(distance, along, time + travel, treatments.temporary.get(at))
           : distance / along;
+        if (!Number.isFinite(travel)) break;
+        if (
+          treatments &&
+          CORNERS[step].some(
+            ({ offset, fraction }) =>
+              Math.abs(fraction - segment.end) < 1e-9 &&
+              treatmentFactor(treatments.temporary.get(cell + offset), time + travel) === 0,
+          )
+        ) {
+          travel = Infinity;
+          break;
+        }
       }
       // Match the stored float precision so heap entries are not falsely stale.
       const reached = Math.fround(time + travel);
@@ -396,7 +427,7 @@ export async function spread(
     arrival,
     horizon,
     burnable,
-    ...measure(arrival, rate, headE, headN, intensity, ignitions, horizon),
+    ...measure(arrival, rate, headE, headN, intensity, ignitions, horizon, timedIgnitions),
     baseRate: burnable ? baseSum / burnable : 0,
   };
 }
@@ -425,6 +456,7 @@ function measure(
   intensity: Float32Array,
   ignitions: readonly number[],
   horizon: number,
+  timedIgnitions: readonly { cell: number; minute: number }[] = [],
 ) {
   const minutes = Math.floor(horizon) + 1;
   const cells = new Float64Array(minutes);
@@ -432,9 +464,29 @@ function measure(
   const fastest = new Float32Array(minutes);
   const hottest = new Float32Array(minutes);
   const farthest = new Float32Array(minutes);
-  const starts = ignitions.map((cell) => [cell % GRID, Math.floor(cell / GRID)] as const);
-  // A backfire can seed thousands of cells. Avoid O(burned cells × seeds).
-  const distances = ignitions.length > 32 ? ignitionDistances(ignitions) : null;
+  // Each epoch uses only ignitions already deployed. Future backfires must not
+  // change past run statistics. One distance field at a time bounds memory.
+  const epochs = [...new Set([0, ...timedIgnitions.map((i) => i.minute)])].sort((a, b) => a - b);
+  for (let epoch = 0; epoch < epochs.length; epoch++) {
+    const from = epochs[epoch],
+      until = epochs[epoch + 1] ?? Infinity;
+    const active = [
+      ...ignitions,
+      ...timedIgnitions.filter((i) => i.minute <= from).map((i) => i.cell),
+    ];
+    const starts = active.map((cell) => [cell % GRID, Math.floor(cell / GRID)] as const);
+    const distances = active.length > 32 ? ignitionDistances(active) : null;
+    for (let i = 0; i < arrival.length; i++) {
+      const t = arrival[i];
+      if (t < from || t >= until || t > horizon) continue;
+      let nearest = distances ? Math.sqrt(distances[i]) : Infinity;
+      if (!distances)
+        for (const [x, y] of starts)
+          nearest = Math.min(nearest, Math.hypot((i % GRID) - x, Math.floor(i / GRID) - y));
+      const minute = Math.ceil(t);
+      farthest[minute] = Math.max(farthest[minute], nearest);
+    }
+  }
   const sumE = new Float64Array(minutes);
   const sumN = new Float64Array(minutes);
   let reachedEdge = Infinity;
@@ -464,10 +516,6 @@ function measure(
       cells[minute] += 1;
       if (rate[index] > fastest[minute]) fastest[minute] = rate[index];
       if (intensity[index] > hottest[minute]) hottest[minute] = intensity[index];
-      let nearest = distances ? Math.sqrt(distances[index]) : Infinity;
-      if (!distances)
-        for (const [x, y] of starts) nearest = Math.min(nearest, Math.hypot(column - x, row - y));
-      if (nearest > farthest[minute]) farthest[minute] = nearest;
       sumE[minute] += headE[index];
       sumN[minute] += headN[index];
       if (
