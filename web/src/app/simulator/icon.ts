@@ -43,6 +43,11 @@ const ICONS = {
 
 export type IconName = keyof typeof ICONS;
 
+/** A name that came as data —the countermeasure catalogue's— or a fallback. */
+export function iconOr(name: string, fallback: IconName): IconName {
+  return Object.hasOwn(ICONS, name) ? (name as IconName) : fallback;
+}
+
 /**
  * One icon, inline.
  *

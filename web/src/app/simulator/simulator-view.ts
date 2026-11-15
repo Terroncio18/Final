@@ -14,8 +14,10 @@ import {
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { Chrome } from '../chrome';
+import { CountermeasureDisplay } from '../map/countermeasure-display';
 import { MapService } from '../map/map.service';
 import { PlacesService } from '../map/places.service';
+import { COUNTERMEASURE_CATALOG, type CountermeasureKind } from '../simulation/countermeasures';
 import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from '../simulation/domain';
 import { FireSurface } from '../simulation/fire-surface';
 import { FORECASTS, FORECAST_COLOURS, forecastOffsets } from '../simulation/fire-display';
@@ -45,7 +47,13 @@ import { SLOPE_CLASSES, slopeImage } from '../simulation/slope-classes';
 import { cellOf, groundAt } from '../simulation/terrain';
 import { TerrainService } from '../simulation/terrain.service';
 import { FuelService } from '../simulation/fuel.service';
-import { Icon } from './icon';
+import {
+  catalogEntry,
+  CountermeasurePlan,
+  DURATION_LIMITS,
+  WIDTH_LIMITS,
+} from './countermeasure-plan';
+import { Icon, iconOr } from './icon';
 import { WeatherService } from './weather.service';
 
 /**
@@ -89,35 +97,23 @@ const DIRECTIONS = [
 ] as const;
 
 /**
- * What the extinction services do to a fire, as the tools the sandbox will
- * offer. The list is the real one —what Spanish and Portuguese services
- * actually deploy— and none of it acts on anything yet: with no model there is
- * nothing for a firebreak to stop.
+ * The countermeasure tools, in the two groups the panel shows them in.
  *
- * Two groups because they are two kinds of thing for a model: the ground ones
- * change the fuel of a strip of cells and stay changed, and the aerial ones
- * wet or coat an area for a while and wear off.
+ * Two groups because they are two kinds of thing: the ground ones are drawn
+ * where a crew or a machine works, and the aerial ones are dropped. What each
+ * does to the fire is the model's (simulation/countermeasures.ts); this is
+ * only the order of the buttons.
  */
-const COUNTERMEASURES = [
-  {
-    title: 'Mitjans terrestres',
-    items: [
-      { label: 'Línia de defensa', note: 'Brigada amb eines manuals', icon: 'ruler' },
-      { label: 'Tallafoc', note: 'Maquinària pesant', icon: 'minus' },
-      { label: 'Tala i desbrossament', note: 'Treure combustible', icon: 'trees' },
-      { label: "Línia d'aigua", note: 'Autobomba i mànegues', icon: 'droplet' },
-      { label: 'Contrafoc', note: "Crema d'eixamplament", icon: 'flame' },
-    ],
-  },
-  {
-    title: 'Mitjans aeris',
-    items: [
-      { label: 'Helicòpter', note: "Descàrrega d'aigua", icon: 'droplet' },
-      { label: 'Avió amfibi', note: "Descàrrega d'aigua", icon: 'plane' },
-      { label: 'Retardant', note: "Línia des de l'aire", icon: 'plane' },
-    ],
-  },
-] as const;
+const COUNTERMEASURE_GROUPS = [
+  { id: 'ground', title: 'Mitjans terrestres' },
+  { id: 'air', title: 'Mitjans aeris' },
+].map((group) => ({
+  title: group.title,
+  items: COUNTERMEASURE_CATALOG.filter((entry) => entry.group === group.id).map((entry) => ({
+    ...entry,
+    icon: iconOr(entry.icon, 'ruler'),
+  })),
+}));
 
 /**
  * How far the timeline runs.
@@ -216,6 +212,8 @@ function chartPaths(values: readonly number[], width = 300, height = 100) {
   imports: [RouterLink, Icon],
   templateUrl: './simulator-view.html',
   styleUrl: './simulator-view.css',
+  // Escape puts down whatever tool is in the hand, wherever the focus is.
+  host: { '(document:keydown.escape)': 'cancelTool()' },
 })
 export class SimulatorView {
   private readonly maps = inject(MapService);
@@ -241,7 +239,23 @@ export class SimulatorView {
   readonly ignicions = input<string>();
 
   protected readonly ready = this.maps.ready;
-  protected readonly countermeasures = COUNTERMEASURES;
+  protected readonly countermeasures = COUNTERMEASURE_GROUPS;
+
+  /**
+   * The countermeasure plan and the line being drawn (countermeasure-plan.ts).
+   *
+   * Prepared at T = 0 and handed to the model whole: editing it is asking
+   * another question, so the effect that watches the inputs takes the result
+   * off, the same as moving an ignition does.
+   */
+  protected readonly plan = new CountermeasurePlan();
+  protected readonly widthLimits = WIDTH_LIMITS;
+  protected readonly durationLimits = DURATION_LIMITS;
+  private readonly measureDisplay = new CountermeasureDisplay();
+  /** The domain the plan was last checked against, as the address writes it. */
+  private planDomain: string | null = null;
+  /** Set when an edit of the plan took a computed fire off the screen. */
+  protected readonly planStale = signal(false);
 
   /** The timeline's length, with a tick every two hours. */
   protected readonly horizon = {
@@ -264,7 +278,7 @@ export class SimulatorView {
    * one is laid out and not connected, and says so where it is shown.
    */
   protected readonly weatherMode = signal<'live' | 'manual'>('manual');
-  protected readonly tool = signal<string | null>(null);
+  protected readonly tool = signal<'ignition' | null>(null);
   /**
    * Where the fire starts: the places the ignition tool has been clicked on.
    *
@@ -614,6 +628,8 @@ export class SimulatorView {
         windFrom: Math.round(now.fromDeg),
         humidity: Math.round(now.humidity),
         temperature: Math.round(now.temperature),
+        // Left out when empty, so a scenario without a plan is the file it always was.
+        ...(this.plan.measures().length ? { countermeasures: this.plan.measures() } : {}),
       },
       new Date(),
     );
@@ -663,6 +679,11 @@ export class SimulatorView {
         },
       },
     );
+    // After the navigation, so the plan is checked against the domain it was
+    // drawn for. It replaces the one on screen, as the ignitions and the
+    // weather of the file replace theirs.
+    this.planDomain = formatPoint(scenario.centre);
+    this.plan.replace(scenario.countermeasures ?? [], domainAround(scenario.centre));
     this.scenarioNote.set({ text: `Carregat: ${scenario.name || file.name}`, failed: false });
   }
 
@@ -670,8 +691,11 @@ export class SimulatorView {
   protected readonly scenarioSummary = computed(() => {
     const starts = this.starts().length;
     const fires = starts === 1 ? '1 ignició' : `${starts} ignicions`;
+    const planned = this.plan.measures().length;
+    const measures =
+      planned === 1 ? '1 contramesura · ' : planned ? `${planned} contramesures · ` : '';
     return (
-      `${fires} · vent ${this.now().wind} km/h ${this.from().short} · ` +
+      `${fires} · ${measures}vent ${this.now().wind} km/h ${this.from().short} · ` +
       `${this.now().humidity} % · ${this.now().temperatureText} °C`
     );
   });
@@ -1077,15 +1101,85 @@ export class SimulatorView {
     // The ignition tool. While it is on, a click on the ground is a place
     // where the fire starts; the map only reports clicks while it is asked to
     // (setPicking), which is also what turns the pointer into a crosshair.
-    effect(() => this.maps.setPicking(this.tool() === 'ignition'));
+    effect(() => this.maps.setPicking(this.tool() === 'ignition' || this.plan.kind() !== null));
+
+    // One tool in the hand at a time: taking a countermeasure puts the
+    // ignition tool down (toggleTool does the reverse).
+    effect(() => {
+      if (this.plan.kind()) untracked(() => this.tool.set(null));
+    });
 
     effect(() => {
       const picked = this.maps.picked();
       if (!picked) return;
-      // Written to the address and read back from it. A click outside the
-      // square goes the same way and is dropped on the way back, by the one
-      // rule `starts` already applies.
-      this.writeStarts([...untracked(this.starts), [picked[0], picked[1]]]);
+      untracked(() => {
+        // The click belongs to whichever tool is in the hand, and to one only:
+        // a vertex of a firebreak must never also be an ignition.
+        if (this.plan.kind()) {
+          const centre = this.ignition();
+          // Through editPlan: a discharge is placed by this very click, and
+          // it takes a computed fire off the screen like any other edit.
+          if (centre)
+            this.editPlan(() => this.plan.click([picked[0], picked[1]], domainAround(centre)));
+          return;
+        }
+        if (this.tool() !== 'ignition') return;
+        // Written to the address and read back from it. A click outside the
+        // square goes the same way and is dropped on the way back, by the one
+        // rule `starts` already applies.
+        this.writeStarts([...this.starts(), [picked[0], picked[1]]]);
+      });
+    });
+
+    // The plan belongs to a domain. When the address names another one —a
+    // link edited, the back button— what no longer fits is taken off and the
+    // panel says how many: never silently (CountermeasurePlan.confine).
+    effect(() => {
+      const centre = this.ignition();
+      untracked(() => {
+        const key = centre ? formatPoint(centre) : '';
+        if (key === this.planDomain) return;
+        this.planDomain = key;
+        this.plan.confine(centre ? domainAround(centre) : null);
+      });
+    });
+
+    // The plan on the map. The layers go up once the style is in, and are
+    // this screen's to take down (see the destroy hook below).
+    effect(() => {
+      const map = this.maps.ready() ? this.maps.map : null;
+      if (!map) return;
+      this.measureDisplay.attach(map, (id) => this.plan.select(id));
+      this.measureDisplay.setMeasures(
+        this.plan.measures().map((measure) => {
+          const entry = catalogEntry(measure.kind);
+          return {
+            id: measure.id,
+            points: measure.points,
+            widthM: measure.widthM,
+            colour: entry.color,
+            disc: entry.geometry === 'point',
+          };
+        }),
+        this.plan.selected(),
+      );
+    });
+
+    // The line in progress, with the segment that follows the pointer.
+    effect(() => {
+      if (!this.maps.ready()) return;
+      const tool = this.plan.tool();
+      this.measureDisplay.setDraft(
+        tool
+          ? {
+              points: this.plan.draft(),
+              pointer: this.maps.pointer(),
+              widthM: tool.widthM,
+              colour: tool.color,
+              disc: tool.geometry === 'point',
+            }
+          : null,
+      );
     });
 
     effect(() => {
@@ -1113,6 +1207,7 @@ export class SimulatorView {
     // question: it is taken off rather than left on screen under new sliders.
     effect(() => {
       this.starts();
+      this.plan.measures();
       this.fuelState();
       this.now().towardsDeg;
       this.terrain.terrain();
@@ -1255,6 +1350,9 @@ export class SimulatorView {
 
     inject(DestroyRef).onDestroy(() => {
       this.run += 1;
+      // Before the map goes: the layers and the click listener are this screen's.
+      this.measureDisplay.detach();
+      this.plan.cancel();
       this.terrain.clear();
       this.fuels.clear();
       this.weather.clear();
@@ -1382,6 +1480,10 @@ export class SimulatorView {
     this.progress.set(0);
     this.computing.set(true);
     this.runError.set(null);
+    this.planStale.set(false);
+    // The plan as it is now, read once like every other input. A line still
+    // being drawn is not part of it: only what was finished is computed.
+    const measures = this.plan.measures();
 
     try {
       const result = await spread(
@@ -1394,6 +1496,8 @@ export class SimulatorView {
           towardsDeg: this.now().towardsDeg,
           ignitions,
           horizon: this.horizon.minutes + FORECAST_MARGIN_MINUTES,
+          // Left out when empty, so a run without measures is the run it always was.
+          ...(measures.length ? { countermeasures: { centre, measures } } : {}),
         },
         (share) => {
           if (mine === this.run) this.progress.set(share);
@@ -1436,8 +1540,68 @@ export class SimulatorView {
   }
 
   /** The same button turns a tool off, which is what makes it a toggle. */
-  protected toggleTool(name: string): void {
+  protected toggleTool(name: 'ignition'): void {
+    // One tool at a time: a countermeasure half drawn is put down first.
+    this.plan.cancel();
     this.tool.update((current) => (current === name ? null : name));
+  }
+
+  // ---- Countermeasures: the plan is edited here and computed by start(). ----
+
+  /**
+   * Every edit of the plan goes through here, so that one place knows whether
+   * it took a computed fire off the screen —and can say so, instead of leaving
+   * an empty map to be guessed at.
+   */
+  private editPlan(edit: () => void): void {
+    const before = this.plan.measures();
+    const had = this.result() !== null || this.computing();
+    edit();
+    if (had && this.plan.measures() !== before) this.planStale.set(true);
+  }
+
+  protected pickMeasure(kind: CountermeasureKind): void {
+    this.plan.begin(kind);
+  }
+
+  protected finishMeasure(): void {
+    this.editPlan(() => this.plan.finish());
+  }
+
+  protected undoMeasurePoint(): void {
+    this.plan.undo();
+  }
+
+  /** Escape, or the button: the tool in the hand is put down, whichever it is. */
+  protected cancelTool(): void {
+    this.plan.cancel();
+    this.tool.set(null);
+  }
+
+  protected removeMeasure(id: string): void {
+    this.editPlan(() => this.plan.remove(id));
+  }
+
+  protected clearMeasures(): void {
+    this.editPlan(() => this.plan.clear());
+  }
+
+  /**
+   * A width or a duration typed into the list.
+   *
+   * On `change` and not on every keystroke: «120» goes through «1» and «12»,
+   * and each of those would be a refused value and a result thrown away. A
+   * value the plan refuses is put back as it was, with the reason beside it.
+   */
+  protected setMeasureNumber(id: string, which: 'width' | 'duration', event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value.trim() === '' ? NaN : Number(input.value.replace(',', '.'));
+    this.editPlan(() => {
+      if (which === 'width') this.plan.setWidth(id, value);
+      else this.plan.setDuration(id, value);
+    });
+    const row = this.plan.rows().find((item) => item.id === id);
+    if (row) input.value = String(which === 'width' ? row.widthM : row.durationMin);
   }
 
   /** Frames the domain again, from wherever the camera has been dragged to. */

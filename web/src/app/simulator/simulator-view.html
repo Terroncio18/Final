@@ -385,8 +385,8 @@
           </p>
         }
         <p class="terrain-note">
-          Es desa com un fitxer de text (.txt) amb el domini, les ignicions i la meteorologia en
-          vigor.
+          Es desa com un fitxer de text (.txt) amb el domini, les ignicions, la meteorologia en
+          vigor i el pla de contramesures.
         </p>
       </details>
 
@@ -398,6 +398,7 @@
           <button
             type="button"
             [class.active]="tool() === 'ignition'"
+            [attr.aria-pressed]="tool() === 'ignition'"
             (click)="toggleTool('ignition')"
           >
             <app-icon name="flame" /> Punt d'ignició
@@ -440,17 +441,30 @@
         }
       </details>
 
-      <!-- What the extinction services actually do, as the tools they will
-           be. None of them works yet, and none pretends to. -->
-      <details class="fold control-section">
+      <!-- What the extinction services do, as tools: pick one, draw it on the
+           ground, and the next run is computed with it. The plan is prepared
+           at T = 0; nothing here is deployed on a fire already computed. -->
+      <details class="fold control-section" open>
         <summary>
-          <h3>CONTRAMESURES <span class="tiny-tag warn">AVIAT</span></h3>
+          <h3>
+            CONTRAMESURES
+            @if (plan.measures().length) {
+              <span class="tiny-tag">{{ plan.measures().length }} AL PLA</span>
+            }
+          </h3>
         </summary>
         @for (group of countermeasures; track group.title) {
           <h4>{{ group.title }}</h4>
           <div class="measure-grid">
-            @for (measure of group.items; track measure.label) {
-              <button type="button" disabled [title]="measure.note">
+            @for (measure of group.items; track measure.kind) {
+              <button
+                type="button"
+                [class.active]="plan.kind() === measure.kind"
+                [attr.aria-pressed]="plan.kind() === measure.kind"
+                [style.--measure]="measure.color"
+                [title]="measure.note"
+                (click)="pickMeasure(measure.kind)"
+              >
                 <app-icon [name]="measure.icon" />
                 <span>
                   {{ measure.label }}
@@ -460,8 +474,138 @@
             }
           </div>
         }
+
+        @if (plan.tool(); as active) {
+          <div class="measure-drawing" [style.--measure]="active.color">
+            <p class="tool-hint">
+              <strong>{{ active.label }}.</strong>
+              @if (active.geometry === 'point') {
+                Fes clic al terreny, dins del domini, per deixar-hi la descàrrega.
+              } @else {
+                Fes clic per posar cada vèrtex i prem «Finalitzar» per tancar la línia.
+              }
+              {{ active.help }}
+            </p>
+            <div class="tools-row">
+              @if (active.geometry === 'line') {
+                <button type="button" [disabled]="!plan.canFinish()" (click)="finishMeasure()">
+                  Finalitzar
+                </button>
+                <button
+                  type="button"
+                  [disabled]="!plan.draft().length"
+                  (click)="undoMeasurePoint()"
+                >
+                  <app-icon name="reset" /> Desfer punt
+                </button>
+              }
+              <button type="button" (click)="cancelTool()">Cancel·lar (Esc)</button>
+            </div>
+            @if (active.geometry === 'line') {
+              <p class="terrain-note" role="status">
+                @if (plan.draft().length === 1) {
+                  1 vèrtex posat: en cal un altre.
+                } @else {
+                  {{ plan.draft().length }} vèrtexs posats.
+                }
+              </p>
+            }
+          </div>
+        }
+
+        @if (plan.note(); as note) {
+          <p
+            class="terrain-note measure-note"
+            [class.failed]="note.failed"
+            [attr.role]="note.failed ? 'alert' : 'status'"
+          >
+            {{ note.text }}
+          </p>
+        }
+        @if (planStale()) {
+          <p class="terrain-note measure-note failed" role="status">
+            El pla ha canviat i el resultat anterior s'ha retirat: torna a iniciar la simulació.
+          </p>
+        }
+
+        @if (plan.rows().length) {
+          <ul class="measure-list">
+            @for (row of plan.rows(); track row.id) {
+              <li [class.selected]="plan.selected() === row.id" [style.--measure]="row.colour">
+                <div class="measure-head">
+                  <button
+                    type="button"
+                    class="measure-name"
+                    [attr.aria-pressed]="plan.selected() === row.id"
+                    [title]="'Ressaltar ' + row.name + ' al mapa'"
+                    (click)="plan.select(plan.selected() === row.id ? null : row.id)"
+                  >
+                    <span class="measure-dot"></span>
+                    <span>
+                      <strong>{{ row.name }}</strong>
+                      <small>{{ row.shape }} · {{ row.effect }}</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    class="measure-remove"
+                    [attr.aria-label]="'Suprimir ' + row.name"
+                    title="Suprimir"
+                    (click)="removeMeasure(row.id)"
+                  >
+                    ×
+                  </button>
+                </div>
+                @if (row.widthEditable || row.durationEditable) {
+                  <div class="measure-fields">
+                    @if (row.widthEditable) {
+                      <label>
+                        <span>{{ row.widthLabel }} (m)</span>
+                        <input
+                          type="number"
+                          inputmode="numeric"
+                          step="30"
+                          [min]="widthLimits.min"
+                          [max]="widthLimits.max"
+                          [value]="row.widthM"
+                          (change)="setMeasureNumber(row.id, 'width', $event)"
+                        />
+                      </label>
+                    }
+                    @if (row.durationEditable) {
+                      <label>
+                        <span>Durada (min)</span>
+                        <input
+                          type="number"
+                          inputmode="numeric"
+                          step="5"
+                          [min]="durationLimits.min"
+                          [max]="durationLimits.max"
+                          [value]="row.durationMin"
+                          (change)="setMeasureNumber(row.id, 'duration', $event)"
+                        />
+                      </label>
+                    }
+                  </div>
+                }
+              </li>
+            }
+          </ul>
+          <div class="tools-row measure-clear">
+            <button type="button" (click)="clearMeasures()">
+              <app-icon name="trash" /> Suprimir-les totes
+            </button>
+          </div>
+        } @else {
+          <p class="empty-list">Cap contramesura al pla.</p>
+        }
+
         <p class="terrain-note">
-          Les contramesures encara no actuen sobre res: són el lloc on aniran.
+          El pla s'aplica des de T = 0 i cal tornar a calcular quan s'edita. Els percentatges són
+          coeficients del simulacre, no eficàcia operativa validada: no es modelen dotacions, temps
+          de construcció, salts de foc ni foc de capçades. La graella és de 30 m: la petjada real és
+          la de les cel·les tocades i pot ser més ampla que la franja dibuixada. El pla no viatja a
+          l'enllaç: es conserva en desar l'escenari.
         </p>
       </details>
 
