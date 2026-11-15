@@ -261,13 +261,73 @@
 .control-section h3 {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   margin: 0 0 9px;
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 1.2px;
   color: #aab5bf;
   --icon-size: 14px;
+}
+
+/* A section that folds, in either column: a <details> with its title. */
+.fold > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.fold > summary h3::before {
+  content: '▸';
+  margin-right: 6px;
+}
+
+.fold[open] > summary h3::before {
+  content: '▾';
+}
+
+.fold:not([open]) h3,
+.fold:not([open]) .chart-heading {
+  margin: 0;
+}
+
+/* Inside a folding section the grid of figures has no frame of its own. */
+.fold .metric-grid {
+  margin: 0;
+  border: 0;
+}
+
+button.tiny-tag {
+  font-family: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+.analysis-options {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 8px;
+  margin: 0;
+  padding: 10px 13px;
+  font-size: 10px;
+  color: #aab5bf;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.analysis-options legend {
+  padding: 0 0 6px;
+  color: #8e9ba8;
+}
+
+.analysis-options label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* The arrow and the title to the left, the icon or the tag to the right. */
+.control-section h3 > :last-child {
+  margin-left: auto;
 }
 
 .control-section h3 app-icon {
@@ -331,15 +391,6 @@
   color: #8e9ba8;
 }
 
-.manual-tag {
-  padding: 3px 4px;
-  font-size: 8px;
-  letter-spacing: 0.5px;
-  color: #9a9f9c;
-  border: 1px solid #3c4246;
-  border-radius: 3px;
-}
-
 .wind-summary {
   display: flex;
   align-items: center;
@@ -350,30 +401,41 @@
 .wind-rose {
   position: relative;
   flex-shrink: 0;
-  width: 70px;
-  height: 70px;
+  width: 92px;
+  height: 92px;
   font-size: 9px;
   color: #71808d;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.wind-rose:focus-visible {
+  outline: 2px solid #f95;
 }
 
 .wind-rose > span:not(.wind-needle) {
   position: absolute;
 }
 
+.north,
+.south {
+  left: 43px;
+}
 .north {
   top: 0;
-  left: 32px;
 }
 .south {
   bottom: 0;
-  left: 32px;
+}
+.east,
+.west {
+  top: 40px;
 }
 .east {
-  top: 29px;
   right: 0;
 }
 .west {
-  top: 29px;
   left: 0;
 }
 
@@ -398,12 +460,6 @@
 .wind-needle {
   position: absolute;
   inset: 5px;
-  display: grid;
-  place-items: center;
-  font-size: 36px;
-  font-weight: 400;
-  color: #fb995b;
-  text-shadow: 0 0 16px #fc87442e;
 }
 
 .secondary {
@@ -424,16 +480,6 @@
     11px 'DM Sans',
     sans-serif;
   color: #8f9ba7;
-}
-
-.direction-select select {
-  width: 100px;
-  padding: 0;
-  font: inherit;
-  font-size: 10px;
-  color: #b9c4ce;
-  background: none;
-  border: 0;
 }
 
 .slider-label {
@@ -629,16 +675,6 @@ input[type='range']::-webkit-slider-thumb {
   color: #c9d1d8;
   background: #1e2731;
   border: 1px solid #3b4650;
-  border-radius: 4px;
-}
-
-.empty-list {
-  margin: 9px 0 0;
-  padding: 9px;
-  font-size: 10px;
-  text-align: center;
-  color: #7d8b99;
-  border: 1px dashed #35414e;
   border-radius: 4px;
 }
 
@@ -1142,13 +1178,6 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .map-legend i,
-.chart-key i {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-
 /* Squares and not dots: these are areas of ground, not marks on it. */
 .slope-legend {
   margin-top: 6px;
@@ -1250,47 +1279,6 @@ input[type='range']::-webkit-slider-thumb {
 
 /* ───────────────────── right: the invented numbers ───────────────────── */
 
-.risk-banner {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 12px 13px 2px;
-  padding: 10px;
-  color: #f6ab72;
-  background: #3b2820;
-  border: 1px solid #694631;
-  border-radius: 5px;
-  --icon-size: 21px;
-}
-
-.risk-banner strong {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.risk-banner small {
-  display: block;
-  margin-top: 5px;
-  font-size: 9px;
-  color: #c69d80;
-}
-
-.risk-level {
-  margin-left: auto;
-  font:
-    600 25px Manrope,
-    sans-serif;
-}
-
-.risk-level > span {
-  margin-left: 3px;
-  font:
-    9px 'DM Sans',
-    sans-serif;
-  color: #a38a78;
-}
-
 .metric-grid {
   flex-shrink: 0;
   display: grid;
@@ -1355,19 +1343,6 @@ input[type='range']::-webkit-slider-thumb {
   letter-spacing: 0;
 }
 
-.containment-track {
-  width: 85%;
-  height: 3px;
-  margin-top: 10px;
-  background: #34413f;
-}
-
-.containment-track span {
-  display: block;
-  height: 3px;
-  background: #8fbb94;
-}
-
 .warning-metric strong {
   color: #efaa74;
 }
@@ -1401,26 +1376,6 @@ input[type='range']::-webkit-slider-thumb {
   font-size: 9px;
   color: #768a99;
   white-space: nowrap;
-}
-
-.chart-key {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 9px 0 4px;
-}
-
-.chart-key > span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 9px;
-  color: #8f9eaa;
-}
-
-.chart-key small {
-  font-size: 8px;
-  color: #8c9aa5;
 }
 
 .chart {
@@ -1457,45 +1412,6 @@ input[type='range']::-webkit-slider-thumb {
 
 .muted-line {
   stroke: #8fbb94;
-}
-
-.comparison-section {
-  flex-shrink: 0;
-  padding: 13px;
-}
-
-.comparison-section .chart-heading {
-  margin-bottom: 11px;
-}
-
-.comparison-row {
-  display: grid;
-  grid-template-columns: 76px 1fr 46px;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  font-size: 9px;
-  color: #99a8b5;
-}
-
-.comparison-bar {
-  height: 5px;
-  overflow: hidden;
-  background: #2c3740;
-  border-radius: 2px;
-}
-
-.comparison-bar > span {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-}
-
-.comparison-row b {
-  font-size: 9px;
-  font-weight: 500;
-  text-align: right;
-  color: #c0cbd1;
 }
 
 .model-note {
@@ -1635,12 +1551,6 @@ select:focus-visible {
 }
 
 /* The banner of the column, without the alarm: it says the time, not a risk. */
-.risk-banner.calm {
-  color: #c9d3db;
-  background: #1f2933;
-  border-color: #34404a;
-}
-
 .chart-cursor {
   stroke: #f1f6f8;
   stroke-width: 1;

@@ -1,5 +1,12 @@
 import { CELL_M, GRID } from './domain';
-import { effectiveWind, lengthToBreadth, M_PER_FT, windFactor, type FuelBed } from './rothermel';
+import {
+  effectiveWind,
+  firelineIntensity,
+  lengthToBreadth,
+  M_PER_FT,
+  windFactor,
+  type FuelBed,
+} from './rothermel';
 
 /**
  * What a simulation needs to run. All of it is data, none of it is a service:
@@ -42,6 +49,10 @@ export interface SpreadResult {
     readonly rate: Float32Array;
     /** Mean heading of the cells reached that minute, degrees; NaN with none. */
     readonly heading: Float32Array;
+    /** Highest head-fire intensity among the cells reached that minute, kW/m. */
+    readonly intensity: Float32Array;
+    /** Farthest the fire has got from the ignition nearest to it, kilometres. */
+    readonly run: Float32Array;
   };
   /** When the fire first touches the edge of the domain, or Infinity. */
   readonly reachedEdge: number;
@@ -228,6 +239,7 @@ export async function spread(
   const headE = new Float32Array(count); // unit vector of the heading, east
   const headN = new Float32Array(count); // ... and north
   const ecc = new Float32Array(count);
+  const intensity = new Float32Array(count); // kW/m at the head rate
 
   const towards = (input.towardsDeg * Math.PI) / 180;
   const windE = Math.sin(towards);
@@ -268,6 +280,7 @@ export async function spread(
       const phi = Math.hypot(sumE, sumN);
 
       rate[index] = r0 * (1 + phi);
+      intensity[index] = firelineIntensity(bed, rate[index]);
       if (phi > 0) {
         headE[index] = sumE / phi;
         headN[index] = sumN / phi;
@@ -350,7 +363,7 @@ export async function spread(
     arrival,
     horizon,
     burnable,
-    ...measure(arrival, rate, headE, headN, horizon),
+    ...measure(arrival, rate, headE, headN, intensity, input.ignitions, horizon),
     baseRate: burnable ? baseSum / burnable : 0,
   };
 }
@@ -366,18 +379,27 @@ export async function spread(
  *   perimeter of the square around it.
  * - **Rate and heading** are those of the cells the fire reaches in that
  *   minute: what the front is doing then, not an average of the whole fire.
+ * - **Intensity** is Byram's, at the head rate of each cell reached that
+ *   minute, and the highest of them: the hardest stretch of the front.
+ * - **Run** is how far the fire has got from the ignition nearest to each
+ *   cell, in a straight line, and the farthest so far.
  */
 function measure(
   arrival: Float32Array,
   rate: Float32Array,
   headE: Float32Array,
   headN: Float32Array,
+  intensity: Float32Array,
+  ignitions: readonly number[],
   horizon: number,
 ) {
   const minutes = Math.floor(horizon) + 1;
   const cells = new Float64Array(minutes);
   const edges = new Float64Array(minutes + 1);
   const fastest = new Float32Array(minutes);
+  const hottest = new Float32Array(minutes);
+  const farthest = new Float32Array(minutes);
+  const starts = ignitions.map((cell) => [cell % GRID, Math.floor(cell / GRID)] as const);
   const sumE = new Float64Array(minutes);
   const sumN = new Float64Array(minutes);
   let reachedEdge = Infinity;
@@ -406,6 +428,10 @@ function measure(
       const minute = Math.ceil(time);
       cells[minute] += 1;
       if (rate[index] > fastest[minute]) fastest[minute] = rate[index];
+      if (intensity[index] > hottest[minute]) hottest[minute] = intensity[index];
+      let nearest = Infinity;
+      for (const [x, y] of starts) nearest = Math.min(nearest, Math.hypot(column - x, row - y));
+      if (nearest > farthest[minute]) farthest[minute] = nearest;
       sumE[minute] += headE[index];
       sumN[minute] += headN[index];
       if (
@@ -421,11 +447,15 @@ function measure(
   const perimeter = new Float32Array(minutes);
   const heading = new Float32Array(minutes);
   const hectaresPerCell = (CELL_M * CELL_M) / 10_000;
+  const run = new Float32Array(minutes);
   let burned = 0;
   let open = 0;
+  let reach = 0;
   for (let minute = 0; minute < minutes; minute += 1) {
     burned += cells[minute];
     open += edges[minute];
+    reach = Math.max(reach, farthest[minute]);
+    run[minute] = (reach * CELL_M) / 1000;
     area[minute] = burned * hectaresPerCell;
     perimeter[minute] = (open * CELL_M * (Math.PI / 4)) / 1000;
     heading[minute] =
@@ -434,5 +464,8 @@ function measure(
         : ((Math.atan2(sumE[minute], sumN[minute]) * 180) / Math.PI + 360) % 360;
   }
 
-  return { series: { area, perimeter, rate: fastest, heading }, reachedEdge };
+  return {
+    series: { area, perimeter, rate: fastest, heading, intensity: hottest, run },
+    reachedEdge,
+  };
 }

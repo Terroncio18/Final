@@ -1077,6 +1077,22 @@ export class MapService {
     this.withStyle((map) => map.easeTo({ zoom: map.getZoom() + levels, duration: 250 }));
   }
 
+  /**
+   * Metres of ground under one pixel at the centre of the view, or null
+   * before there is a map.
+   *
+   * For whatever is painted into a draped texture and has to keep a width on
+   * screen —the forecast lines of the fire—: the texture is stretched with the
+   * ground, so a width in cells is a hairline from afar and a band up close.
+   * MapLibre's tiles are 512 px, hence half the usual constant.
+   */
+  metresPerPixel(): number | null {
+    const map = this.instance;
+    if (!map || !this.styled) return null;
+    const latitude = (map.getCenter().lat * Math.PI) / 180;
+    return (78_271.517 * Math.cos(latitude)) / 2 ** map.getZoom();
+  }
+
   clearSelection(): void {
     this.select(null);
   }

@@ -1225,7 +1225,8 @@ El que es respecta:
 
 El que el prototip té i aquí encara no: les isòcrones de predicció a +30, +60
 i +90 minuts. Aquí sortirien del model i no d'una el·lipse, i són el pas
-següent natural.
+següent natural. **Fet el mateix dia, a la §11.22**, que també substitueix
+`fire-field.ts` per un pintor a la GPU.
 
 Comprovat, pel pintor continu: renderitzat fora del mapa sobre un terreny
 ondulat, el front surt com una línia incandescent contínua amb resplendor i
@@ -1396,7 +1397,334 @@ s'han repetit les consultes reals ni els temps que dona el document de Codex.
 
 ---
 
+### 11.22. El terra del foc es pinta a la GPU, i porta la previsió a +1, +3 i +6 hores
+
+Escrit el 14/11/2026, **després de fer-ho**, com la §11.21: és feina de Codex a
+petició de Pere, documentada a
+[propagacion-firecast.md](propagacion-firecast.md), i aquí se'n recull el que
+és decisió. Tanca el que la §11.20 deixava com a «pas següent natural» —les
+isòcrones de previsió— i canvia amb què es pinta el terra.
+
+**El terra passa de `fire-field.ts` a `fire-surface.ts`.** La idea és la de la
+§11.20 —un camp continu i no cel·les que s'encenen— i el que canvia és on es
+calcula: un *shader* en un llenç WebGL2 propi, que MapLibre segueix llegint com
+a font i drapejant com a capa `raster` (§13.1).
+
+- **S'interpola el temps d'arribada, i després es pinta.** La graella puja a
+  la GPU com una textura de dos canals —el minut d'arribada i el que el front
+  triga a travessar la cel·la— i cada píxel interpola el temps entre les
+  quatre cel·les veïnes abans de triar color. Interpolar colors donaria una
+  taca difuminada; interpolar temps dona una línia que llisca.
+- **No s'interpola a través del que no crema.** Una cel·la que el foc no
+  assoleix no entra a la mitjana i no es pinta: el dibuix no omple una barrera
+  per fer una figura més rodona.
+- **La resolució es gasta on hi ha foc.** La textura és de 2048 × 2048 i
+  cobreix només el rectangle que el foc assoleix en dotze hores, amb marge, i
+  no els 30 km sencers. Un foc de 40 ha es dibuixa amb molt més detall que un
+  píxel per cel·la sense tocar la malla de càlcul, que segueix sent de 30 m.
+
+**La previsió són tres llindars sobre la mateixa graella.** Carbó és el que té
+un minut d'arribada per sota del cursor; previsió a +1 h és el que el té per
+sota del cursor més seixanta. No hi ha cap segon càlcul ni cap el·lipse: és el
+que la §11.19 ja deia de la línia temporal —un llindar i no una nova
+execució— aplicat tres vegades cap endavant.
+
+- **Tres bandes**, vermella, taronja i groga, cadascuna amb el seu contorn
+  de ratlles.
+  Per sobre del que ja ha cremat no es pinten.
+- **Les xifres surten de la sèrie d'àrea**, la mateixa de la columna
+  d'anàlisi: la superfície a +1, +3 i +6 hores i quant creix cadascuna.
+- **Una previsió que cau fora del càlcul no es dibuixa** ni s'etiqueta. Amb
+  el marge de l'esmena de sota ja no passa mai, però la regla es queda.
+- **Encesa per defecte**, i s'apaga al menú de capes. Un botó nou, «Veure el
+  foc i la previsió», enquadra el conjunt sense moure la inclinació ni el gir.
+
+**Què és i què no és aquesta previsió.** És el mateix simulacre vist uns
+minuts més enllà, amb la meteorologia quieta. **No és una probabilitat ni un
+interval d'incertesa**, i la paraula no ha de fer-ho semblar: si el vent
+canvia, la banda no ho sap.
+
+**Les flames neixen sobre el contorn interpolat.** La §11.20 les feia néixer
+al centre de les cel·les assolides en els darrers sis minuts. Ara el front es
+traça —triangles sobre la graella, tallats al minut del cursor— i les
+partícules es reparteixen al llarg d'aquella línia, de manera que no s'apleguen
+en uns quants centres de cel·la. Retrocedir o saltar a la línia temporal les
+reinicia: altrament quedava fum de l'instant anterior.
+
+**El que es paga, i és el mateix que a la §11.20:** el dibuix interpolat pot
+diferir una mica de la petjada discreta amb què es compten les hectàrees. Les
+xifres no surten del dibuix.
+
+**Esmena del mateix dia, vista a la pantalla per Pere: tres defectes del
+primer dibuix.**
+
+- **En acabar, el foc quedava a quadrats.** A les dotze hores la vora del foc
+  era la vora del que s'havia calculat: les cel·les de fora no tenien minut
+  d'arribada i el *shader* les descartava senceres. Ara **es calcula sis hores
+  i mitja més enllà de la línia temporal**, que segueix arribant a dotze: el
+  contorn final és una isòcrona interpolada com qualsevol altra. El que el
+  foc faci en aquell marge no es diu enlloc llevat de la previsió —l'arribada
+  a la vora del domini només compta fins a les dotze.
+- **Les vores del que no crema també eren graons.** Si una cel·la es pot
+  assolir s'interpola igual que el temps, i el dibuix s'acaba on aquella
+  cobertura creua la meitat: una barrera o un forat surten amb els cantons
+  tallats i no amb escales. El temps segueix sense interpolar-se a través.
+- **Les línies de previsió no es veien, i +30, +60 i +90 minuts quedaven
+  enganxades.** Passen a **+1, +3 i +6 hores**, que és el que demana un foc
+  que sota arbrat avança un metre per minut (§11.21): a noranta minuts les
+  tres bandes cabien en dues cel·les. I les línies **mantenen el gruix a la
+  pantalla**, menys de dos píxels i de ratlles: la imatge va drapejada i
+  s'estira amb el terra, de manera que un gruix en cel·les era un fil amb el
+  domini sencer a la vista i una franja de prop. El mapa diu quants metres fa
+  un píxel i el pintor en treu el gruix. Una primera versió les feia de tres
+  píxels, contínues i amb una vora fosca; es veien, i tapaven massa. Fines i
+  discontínues diuen el que són —una previsió i no un perímetre— i la vora
+  fosca sobra. Les ratlles es compten al llarg de la línia, per l'eix al qual
+  s'acosta més, i la seva llargada és un múltiple del gruix.
+- De passada: el ritme local —minuts per cel·la— tenia un sostre de 25, i un
+  front lent en passa. Allà totes les línies sortien de diverses cel·les
+  d'ample. El sostre és ara 240.
+
+El marge són sis hores i mitja i no sis: amb sis justes, la línia de +6 h al
+final de la línia temporal cau sobre la vora del càlcul i en surt mig tallada.
+
+Comprovat al navegador amb Sóller, en relleu i en pla, a T + 01:00 i a
+T + 12:00: contorn final corb, les tres línies tancades i del mateix gruix en
+acostar i allunyar, i cap error a la consola. Les línies fines i de ratlles,
+mirades a T + 06:00.
+
+**El que queda al repositori sense fer-se servir**, i ara són dos: el pintor
+exacte per cel·les, `fire-appearance.ts`, i el camp continu de la §11.20,
+`fire-field.ts`. Cap dels dos el crida ningú. És la 12.15.
+
+Dues coses que han sortit pel camí:
+
+- **El relleu no repintava el foc**, i és la troballa §13.3. Explica el que la
+  §11.19 i la §11.20 van deixar escrit com a no comprovat.
+- **La memòria cau del navegador servia combustibles vells.** Amb la taula a
+  `v2` (§11.21), una resposta `v1` desada pel navegador feia que el domini no
+  carregués. La petició ara revalida sempre, i «Torna a carregar» la força.
+
+Comprovat el 14/11/2026: les 21 proves de `src/app/simulation` passen —contorn
+continu, fronts desconnectats, cel·les inassolibles, retrocés, retall de
+l'extensió i els límits de la previsió— i la compilació de producció surt
+dins de pressupost. **Al navegador ho ha mirat Codex i no s'ha repetit**: el
+seu document dona, per a Sóller amb una ignició a 39,755° N, 2,704° E i la
+meteorologia manual, 35,5 ha a T + 10:00 i 39,1, 43,1 i 54,8 a +30, +60 i +90,
+que eren els horitzons d'abans de l'esmena.
+
+**Una xifra que convé mirar abans de creure-se-la.** La §11.19 donava 789 ha a
+T + 09:05 amb el model 7 a tot el domini; aquí en surten 35,5 a T + 10:00. La
+ignició no és la mateixa i no són comparables cel·la per cel·la, però un factor
+vint és el que s'espera de passar del 7 al combustible cartografiat i al
+model 8 sota arbrat (§11.21). És la conseqüència d'aquella decisió vista en un
+número, i el motiu pel qual la 12.5 segueix demanant un incendi real contra el
+qual comparar.
+
+---
+
+### 11.23. La direcció del vent és una brúixola que es gira
+
+Decidit el 14/11/2026, a petició de Pere. La rosa dels vents de la columna
+esquerra era un dibuix amb una agulla, i la direcció es triava en un
+desplegable de vuit rumbs. Ara **la rosa és el control**: s'agafa l'agulla i
+es gira.
+
+- **L'agulla assenyala cap on va el vent**, com des de la §11.14, i això és el
+  que es mou amb la mà: es posa l'agulla cap on ha de córrer el foc. El que es
+  desa és l'oposat, d'on ve, que és com es diu un vent i com el dona una
+  estació. El text del costat diu les dues coses —«Des de NO (315°) → cap a
+  SE»— perquè les dues lectures estan a 180° i no s'han de poder confondre.
+- **De cinc en cinc graus**, i no els vuit rumbs. Més fi que això és més del
+  que una mà pot voler dir sobre un dial de 92 px, i més del que una sola
+  estació sap (§11.18). El desplegable de vuit rumbs es treu: eren dos
+  controls per a una sola dada, i el nord exacte és la tecla Inici.
+- **Amb el teclat es fa el mateix.** La rosa és un `slider` per a la
+  tecnologia d'assistència, sobre el rumb d'origen: les fletxes mouen cinc
+  graus, Re Pàg i Av Pàg un rumb sencer, i Inici torna al nord. És el criteri
+  de la §2.22 —el teclat fa exactament el que fa el ratolí— i aquí a més es
+  podia, perquè no depèn del gestor de teclat del mapa (§11.3).
+- **Amb el dit també**: el gest és de la rosa i no fa desplaçar la columna.
+- **Bloquejada en mode «En directe»**, com la resta d'entrades (§11.17): allà
+  l'agulla ensenya el que diu l'estació.
+- Girar-la, com moure qualsevol entrada, treu el resultat de la pantalla
+  (§11.19).
+
+De passada: «Vent del est» i «Vent del oest» passen a «de l'est» i «de
+l'oest».
+
+El que no s'ha fet: la direcció no viatja a l'adreça, com la resta de la
+meteorologia. És la 12.11.
+
+Comprovat al navegador: arrossegant l'agulla cap a l'est queda «Vent de
+l'oest, 270°» i cap a l'oest «Vent de l'est, 90°»; fletxa dreta suma cinc
+graus i Re Pàg quaranta-cinc; el full d'estils de la pantalla segueix dins del
+pressupost de 20 kB (§11.7), que ha calgut vigilar. Les lletres de la rosa no
+es poden seleccionar: arrossegant l'agulla s'emportaven la selecció.
+
+### 11.24. Les seccions de la configuració es pleguen
+
+Decidit el 14/11/2026, a petició de Pere. La columna esquerra porta sis
+seccions (§11.17) i no caben en una pantalla: per arribar a les eines
+d'ignició calia desplaçar-se per sobre del combustible.
+
+Cada secció és ara un `<details>` del navegador, amb el títol com a `summary`
+—el mateix element que els països del primer pas del formulari (§2.18), i pel
+mateix motiu: plegar i desplegar, el teclat i el que en diu un lector de
+pantalla ja venen fets. El títol segueix sent un `h3` a dins.
+
+- **Obertes d'entrada: àrea d'estudi, meteorologia i eines d'ignició**, que
+  són el que cal per posar un foc i engegar-lo. **Plegades: combustible,
+  escenaris i contramesures**: la primera és una lectura llarga i les altres
+  dues encara no fan res (§11.17).
+- **Una fletxa a l'esquerra del títol** diu si és oberta; la icona o
+  l'etiqueta de la secció queden a la dreta.
+- **No es recorda entre visites.** Recarregar torna a l'estat d'entrada.
+
+De passada s'han tret del full d'estils set blocs que ja no pintaven res
+—risc, contenció, comparació d'escenaris—, restes de quan la columna dreta
+sortia de `SAMPLE` (§11.19). Són 1,4 kB i deixen el pressupost amb marge.
+
+Comprovat al navegador: les sis seccions es pleguen i es despleguen, amb tres
+obertes d'entrada, i ja no hi ha cap desplegable a la columna.
+
+### 11.25. La columna d'anàlisi es plega, es tria, i diu com es comporta el front
+
+Decidit el 14/11/2026, a petició de Pere, que també va deixar afegir les dades
+que fossin pròpies de l'estudi d'incendis.
+
+**Es plega com l'altra columna** (§11.24): indicadors, les dues gràfiques, la
+propagació prevista, el combustible cremat i les condicions del càlcul són
+cadascun un `<details>`. D'entrada són oberts els indicadors, la gràfica de
+superfície i la previsió; les condicions del càlcul s'obren soles mentre no hi
+ha resultat, que és quan són l'única cosa a llegir.
+
+**I es tria què s'hi veu.** El botó «Dades» de la capçalera obre una llista
+amb una casella per indicador i per bloc. El que es desmarca desapareix, i la
+tria **es desa al navegador** (`localStorage`), perquè és una preferència de
+qui mira i no part de la simulació: no viatja a l'adreça, i un enllaç
+compartit s'obre amb la columna de qui el rep. Si el navegador no deixa
+desar, val per a la visita i prou.
+
+**Quatre dades noves, i d'on surten.** La columna deia quant crema i cap on;
+no deia **com** crema, que és el que es mira per saber si un front es pot
+atacar.
+
+- **Intensitat del front**, en kW/m: la de Byram (1959), la calor que allibera
+  cada metre de front per segon. És la calor per unitat de superfície —la
+  intensitat de reacció de Rothermel sostinguda durant el temps de residència,
+  384/σ minuts (Anderson 1969)— per la velocitat de propagació. Es calcula a
+  la velocitat **de cap** de cada cel·la i es dona la més alta de les cel·les
+  assolides en els darrers deu minuts, com la velocitat (§11.19): el tram més
+  dur del front, no una mitjana.
+- **Longitud de flama**, en metres: també de Byram, 0,0775 · I^0,46.
+- **Dificultat de control**: la banda del *fire characteristics chart*
+  (Andrews i Rothermel 1982) en què cau aquella flama, amb els talls a 1,2,
+  2,4 i 3,4 m (4, 8 i 11 peus): atac directe amb eines manuals, cal maquinària
+  o mitjans aeris, l'atac al cap deixa de ser efectiu, i fora de capacitat
+  d'extinció. A diferència dels trams de potència de la §2.17 i de pendent de
+  la §11.13, **aquests talls no són d'aquest treball**: són la referència del
+  sector.
+- **Avanç màxim**, en km: fins on ha arribat el foc des de la ignició més
+  propera a cada cel·la, en línia recta.
+
+I un bloc: **combustible cremat**, la superfície per model d'Anderson fins al
+minut del cursor. Diu de què viu el foc, i és el que fa llegible un resultat
+que surt de combustible cartografiat i estimat (§11.21). És una passada per la
+graella, de manera que només es fa mentre el bloc és a la pantalla.
+
+**El que cal dir d'aquestes xifres:**
+
+- **Són de foc de superfície.** Sense capçades (§11.19), una flama de quatre
+  metres sota arbrat ja seria un altre foc, i el model no ho sap. La banda
+  «Extrema» vol dir que la superfície sola ja no es pot aturar, no que s'hagi
+  calculat què passa després.
+- **La intensitat és la de cap**, encara que la cel·la hagi cremat de flanc:
+  és un sostre, com la velocitat que l'acompanya.
+- **La dificultat de control és una lectura de la flama, no una tàctica.** La
+  nota de sota de la columna ho diu, al costat del «no serveix per prendre
+  decisions d'emergència» de sempre.
+
+Comprovat: les longituds de flama dels vuit models només de mort surten **a
+menys d'un peu** de les que imprimeix Anderson (1982), en les mateixes
+condicions de referència que les velocitats —és la comprovació que la §11.19
+esmentava i que no tenia prova escrita—, i hi ha prova de l'avanç i de la
+intensitat sobre una graella petita. Passen les 23 proves de simulació i la
+compilació. **Al navegador no s'ha mirat**: ho prova Pere.
+
+De passada surten cinc icones i el bàner de risc que ja no feia servir ningú:
+el paquet inicial tocava el pressupost d'1,6 MB.
+
+### 11.26. Els escenaris són fitxers de text, i la reproducció va més a poc a poc
+
+Decidit el 14/11/2026, a petició de Pere, i tanca la 12.11.
+
+**Un escenari és un fitxer `.txt` que es desa i es carrega.** La 12.11
+plantejava dues vies —tot a l'enllaç, o desat al navegador— i deia que sense
+base de dades no n'hi havia cap altra. N'hi ha una, i és la més vella: un
+fitxer. «Desar» en baixa un i «Carregar» en llegeix un.
+
+- **Es pot compartir i es pot guardar**, que és el que l'enllaç dona i el
+  navegador no, i a més té nom, es pot adjuntar a un informe i no depèn que
+  aquesta aplicació segueixi a la mateixa adreça.
+- **Text pla i no JSON**: una línia `clau = valor` per dada, en català i amb
+  les unitats escrites als comentaris. És un fitxer que algú obrirà d'aquí a
+  un any amb un bloc de notes, i ha de dir què és a qui l'obre i aguantar que
+  l'editin a mà: finals de línia de Windows, espais, una coma decimal.
+- **Què porta**: el domini —els quatre segments de l'adreça (§11.4)—, les
+  ignicions amb el format de sempre (§11.16) i la meteorologia. Res calculat:
+  el terreny i el combustible es tornen a llegir, i el foc és el mateix
+  perquè el càlcul no té atzar (§11.19).
+- **La meteorologia que es desa és la que mana**, vingui dels lliscadors o
+  d'una estació (§11.18), i **es carrega sempre com a manual**. «El que deia
+  l'estació aquell dia» no és cosa que un fitxer pugui tornar a demanar, i un
+  escenari ha de donar el mateix foc.
+- **Carregar passa per l'adreça.** La meteorologia va als valors manuals i la
+  resta es navega: un escenari carregat i un enllaç enganxat acaben en el
+  mateix estat, sense un segon camí (§2.26).
+- **Estricte amb el que cal i tolerant amb la resta.** Sense domini o sense
+  meteorologia el fitxer es rebutja dient què hi falta. Una clau desconeguda
+  se salta, una ignició que no s'entén es descarta, i un valor fora del que
+  admeten els lliscadors es retalla. Els codis del domini només poden ser
+  lletres, xifres i guió baix: van a parar a una adreça.
+
+El que no fa: no hi ha llista d'escenaris desats, perquè són a la carpeta de
+baixades de qui els desa i no aquí. I un escenari d'una altra versió del
+model donarà un altre foc; el fitxer porta `versio` per poder-ho dir algun
+dia.
+
+**La reproducció passa a trenta segons de foc per segon**, dotze hores en
+vint-i-quatre minuts a 1×. Eren dos minuts, i el foc s'acabava abans de poder-lo llegir:
+sota arbrat un front fa unes quantes cel·les per hora (§11.21). El selector
+guanya 30× i 60× per a qui vol el resum: a 60× les dotze hores són 24 segons,
+i a 10×, poc menys de dos minuts i mig. Una primera versió del mateix dia ho
+deixava en una hora de foc cada trenta segons, per haver llegit malament la
+xifra que es demanava.
+
+**La pantalla del simulador es carrega quan s'obre.** Amb els escenaris el
+paquet inicial passava d'1,6 MB, i el que calia no era apujar el límit sinó
+mirar què hi feia: el model, els *shaders* i una consola de tres columnes
+viatjaven amb la portada, que no en dibuixa res. Ara la ruta `simulador` és un
+tros a part de 104 kB i **el paquet inicial baixa d'1,60 a 1,50 MB**. La
+pantalla s'obre en una pestanya pròpia (§11.4), de manera que no hi ha cap
+espera nova al mig d'una navegació. La §3.8 de la fase 1 deixava dit que
+partir el paquet quedava per si algun dia es mesurava; s'ha mesurat.
+
+Comprovat: sis proves del format —anada i tornada, edició a mà, límits,
+ignició il·legible, fitxers que no ho són, nom del fitxer—, les 29 proves de
+simulació i la compilació sense avisos. **Al navegador no s'ha mirat**: ho
+prova Pere.
+
+---
+
 ## 12. Decisions pendents
+
+- **12.15. Dos pintors que no pinten.** Ve de la §11.22. `fire-appearance.ts`
+  (amb set proves) i `fire-field.ts` són al repositori i no els fa servir
+  ningú: el primer és la petjada exacta cel·la a cel·la, el segon el camp
+  continu que `fire-surface.ts` ha substituït. O es treuen, o un d'ells es
+  queda com a alternativa per a qui no tingui WebGL2, que avui es queda sense
+  dibuix del terra.
 
 - ~~**12.13. Quin model és l'arbrat de WorldCover.**~~ Resolta el 14/11/2026
   a la §11.21: es queda el 8. El que es plantejava: la taula hi posa el 8,
@@ -1434,7 +1762,8 @@ s'han repetit les consultes reals ni els temps que dona el document de Codex.
   interpolació—, cada quant es refresca, i què es fa quan l'estació no dona
   vent. AEMET va pel servidor per la clau; IPMA es pot demanar des del
   navegador si el CORS ho deixa, cosa que no s'ha comprovat.
-- **12.11. On viuen els escenaris desats.** Ve de la §11.17. Les ignicions ja
+- ~~**12.11. On viuen els escenaris desats.**~~ Resolta el 14/11/2026 a la
+  §11.26: en fitxers de text. El que es plantejava: ve de la §11.17. Les ignicions ja
   són a la URL (§11.16) i la meteorologia no. O tot viatja a l'enllaç i
   «desar» és guardar un enllaç amb nom, o es desa al navegador i no es pot
   compartir. Sense base de dades, no hi ha tercera via.
@@ -1513,6 +1842,24 @@ perquè `FitBoundsOptions` estén `CameraOptions`, i així una sola animació fa
 dues coses. Com a efecte secundari, cada pas pla torna a posar la càmera a zero
 sense que ningú ho hagi de recordar: la inclinació surt de l'estat del servei i
 no d'una crida a part.
+
+### 13.3. Amb el relleu encès, pujar un llenç no repinta el que hi ha drapejat
+
+Una font `canvas` que no és animada es fa llegir amb `play()` i `pause()`
+seguits: en aturar-se puja la textura una darrera vegada. En mapa pla n'hi ha
+prou. **Amb el terreny 3D no**: a `maplibre-gl` 6.15.0 el relleu desa en una
+textura pròpia el que hi té drapejat (§13.1) i la reaprofita, de manera que el
+llenç nou arribava a la GPU i a la pantalla seguia l'anterior. El símptoma és
+un foc que no avança, o una capa que s'apaga al menú i segueix dibuixada, fins
+que es mou la càmera.
+
+El que ho invalida és dir-li a la font que el seu contingut ha canviat, i la
+via pública és `setCoordinates()` amb les mateixes coordenades. Va a
+`refreshFire()`, després del `play()` i el `pause()`.
+
+És, molt probablement, el que hi havia darrere de les dues comprovacions que
+la §11.19 i la §11.20 van deixar sense fer —«no s'ha pogut comprovar el dibuix
+del foc sobre el mapa»—, atribuïdes llavors al navegador de proves.
 
 ---
 

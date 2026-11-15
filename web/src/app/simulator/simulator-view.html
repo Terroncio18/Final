@@ -56,8 +56,10 @@
         <span class="tiny-tag">{{ municipality() }}</span>
       </div>
 
-      <section class="control-section">
-        <h3>ÀREA D'ESTUDI <app-icon name="pin" /></h3>
+      <details class="fold control-section" open>
+        <summary>
+          <h3>ÀREA D'ESTUDI <app-icon name="pin" /></h3>
+        </summary>
         <div class="location-card">
           <span class="location-icon"><app-icon name="map" /></span>
           <span>
@@ -88,10 +90,12 @@
         } @else {
           <p class="terrain-note">Llegint l'elevació…</p>
         }
-      </section>
+      </details>
 
-      <section class="control-section weather">
-        <h3>METEOROLOGIA <app-icon name="wind" /></h3>
+      <details class="fold control-section weather" open>
+        <summary>
+          <h3>METEOROLOGIA <app-icon name="wind" /></h3>
+        </summary>
 
         <!-- Two ways of saying what the weather is, and only one of them is
              wired: the live one shows where the data will come from and
@@ -147,7 +151,27 @@
 
         <div class="weather-values" [class.locked]="weatherMode() === 'live'">
           <div class="wind-summary">
-            <div class="wind-rose">
+            <!-- A compass to turn: drag the needle, or use the arrow keys. It is
+                 a slider to assistive technology, over the bearing the wind
+                 comes from. Locked while an observation is in force. The dial
+                 takes the pointer and not the needle (`pointer-events: none`),
+                 and `touch-action: none` keeps a finger from scrolling the
+                 column instead of turning it. -->
+            <div
+              class="wind-rose"
+              role="slider"
+              aria-label="Direcció d'origen del vent"
+              aria-valuemin="0"
+              aria-valuemax="355"
+              [attr.aria-valuenow]="now().fromDeg"
+              [attr.aria-valuetext]="'Vent ' + fromPhrase() + ', ' + now().fromDeg + '°'"
+              [attr.aria-disabled]="weatherMode() === 'live'"
+              [attr.tabindex]="weatherMode() === 'live' ? -1 : 0"
+              title="Arrossega l'agulla cap on bufa el vent"
+              (pointerdown)="turnWind($event)"
+              (pointermove)="turnWind($event)"
+              (keydown)="nudgeWind($event)"
+            >
               <span class="north">N</span>
               <span class="east">E</span>
               <span class="south">S</span>
@@ -155,30 +179,30 @@
               <div class="rose-rings"></div>
               <!-- The needle points where the wind goes, which is where it
                    takes the fire: the origin plus 180°, and not the origin. -->
-              <span class="wind-needle" [style.transform]="'rotate(' + now().towardsDeg + 'deg)'"
-                >↑</span
+              <svg
+                class="wind-needle"
+                viewBox="-50 -50 100 100"
+                width="82"
+                height="82"
+                fill="#fb995b"
+                stroke="#fb995b"
+                stroke-width="4"
+                pointer-events="none"
+                aria-hidden="true"
+                [style.transform]="'rotate(' + now().towardsDeg + 'deg)'"
               >
+                <!-- The blunt end: where the wind comes from. -->
+                <circle cx="0" cy="27" r="2" />
+                <line x1="0" y1="27" x2="0" y2="-18" />
+                <path d="M0 -34 L8 -17 L0 -21 L-8 -17 Z" />
+              </svg>
             </div>
             <div>
-              <span class="secondary">Vent del {{ from().name }}</span>
+              <span class="secondary">Vent {{ fromPhrase() }}</span>
               <div class="wind-number">{{ now().wind }}<small>km/h</small></div>
               <small class="secondary">
-                Des de {{ from().short }} → cap a {{ towards().short }}
+                Des de {{ from().short }} ({{ now().fromDeg }}°) → cap a {{ towards().short }}
               </small>
-              <label class="direction-select">
-                <select
-                  aria-label="Direcció d'origen del vent"
-                  [value]="from().degrees"
-                  [disabled]="weatherMode() === 'live'"
-                  (change)="setDirection($event)"
-                >
-                  @for (option of directions; track option.degrees) {
-                    <option [value]="option.degrees">
-                      {{ option.short }} · {{ option.degrees }}°
-                    </option>
-                  }
-                </select>
-              </label>
             </div>
           </div>
 
@@ -229,25 +253,30 @@
             (input)="setNumber('temperature', $event)"
           />
         </div>
-      </section>
+      </details>
 
-      <section class="control-section">
-        <h3>
-          COMBUSTIBLE
-          @if (fuels.grid(); as grid) {
-            <span class="tiny-tag" [class.warn]="grid.estimatedCells > 0 || grid.unknownCells > 0">
-              {{
-                grid.unknownCells
-                  ? 'INCOMPLET'
-                  : grid.officialCells
-                    ? grid.estimatedCells
-                      ? 'MIXT'
-                      : 'CARTOGRAFIAT'
-                    : 'ESTIMAT'
-              }}
-            </span>
-          }
-        </h3>
+      <details class="fold control-section">
+        <summary>
+          <h3>
+            COMBUSTIBLE
+            @if (fuels.grid(); as grid) {
+              <span
+                class="tiny-tag"
+                [class.warn]="grid.estimatedCells > 0 || grid.unknownCells > 0"
+              >
+                {{
+                  grid.unknownCells
+                    ? 'INCOMPLET'
+                    : grid.officialCells
+                      ? grid.estimatedCells
+                        ? 'MIXT'
+                        : 'CARTOGRAFIAT'
+                      : 'ESTIMAT'
+                }}
+              </span>
+            }
+          </h3>
+        </summary>
         <p class="section-lead">
           Model Anderson per cel·la de 30 m. La cartografia oficial té prioritat; les zones restants
           s'estimen a partir de la coberta del sòl.
@@ -310,10 +339,12 @@
             <p role="status">{{ warning }}</p>
           }
         }
-      </section>
+      </details>
 
-      <section class="control-section">
-        <h3>ESCENARIS <app-icon name="folder" /></h3>
+      <details class="fold control-section">
+        <summary>
+          <h3>ESCENARIS <app-icon name="folder" /></h3>
+        </summary>
         <p class="section-lead">
           Un escenari desa on són les ignicions i la meteorologia establerta, per tornar-hi després.
         </p>
@@ -325,25 +356,44 @@
 
         <label class="scenario-name">
           <span class="secondary">Nom de l'escenari</span>
-          <input type="text" placeholder="Per exemple: tramuntana forta" disabled />
+          <input
+            type="text"
+            placeholder="Per exemple: tramuntana forta"
+            [value]="scenarioName()"
+            (input)="setScenarioName($event)"
+          />
         </label>
+        <!-- A scenario is a text file: saving downloads one, loading reads
+             one. The file input is hidden and its button stands for it. -->
         <div class="tools-row">
-          <button type="button" disabled title="Encara no disponible">
-            <app-icon name="save" /> Desar
-          </button>
-          <button type="button" disabled title="Encara no disponible">
+          <button type="button" (click)="saveScenario()"><app-icon name="save" /> Desar</button>
+          <button type="button" (click)="scenarioFile.click()">
             <app-icon name="folder" /> Carregar
           </button>
+          <input
+            #scenarioFile
+            type="file"
+            accept=".txt,text/plain"
+            hidden
+            (change)="loadScenario($event)"
+          />
         </div>
 
-        <p class="empty-list">Cap escenari desat.</p>
+        @if (scenarioNote(); as note) {
+          <p class="terrain-note" [attr.role]="note.failed ? 'alert' : 'status'">
+            {{ note.text }}
+          </p>
+        }
         <p class="terrain-note">
-          <span class="tiny-tag warn">AVIAT</span> Desar i carregar encara no funcionen.
+          Es desa com un fitxer de text (.txt) amb el domini, les ignicions i la meteorologia en
+          vigor.
         </p>
-      </section>
+      </details>
 
-      <section class="control-section">
-        <h3>EINES D'IGNICIÓ <app-icon name="flame" /></h3>
+      <details class="fold control-section" open>
+        <summary>
+          <h3>EINES D'IGNICIÓ <app-icon name="flame" /></h3>
+        </summary>
         <div class="tools-row">
           <button
             type="button"
@@ -388,12 +438,14 @@
         } @else {
           <p class="empty-list">Cap ignició posada.</p>
         }
-      </section>
+      </details>
 
       <!-- What the extinction services actually do, as the tools they will
            be. None of them works yet, and none pretends to. -->
-      <section class="control-section">
-        <h3>CONTRAMESURES <span class="tiny-tag warn">AVIAT</span></h3>
+      <details class="fold control-section">
+        <summary>
+          <h3>CONTRAMESURES <span class="tiny-tag warn">AVIAT</span></h3>
+        </summary>
         @for (group of countermeasures; track group.title) {
           <h4>{{ group.title }}</h4>
           <div class="measure-grid">
@@ -411,7 +463,7 @@
         <p class="terrain-note">
           Les contramesures encara no actuen sobre res: són el lloc on aniran.
         </p>
-      </section>
+      </details>
 
       <div class="simulation-controls">
         <div class="simulation-state">
@@ -569,7 +621,7 @@
                 [checked]="forecasts()"
                 (change)="forecasts.set(!forecasts())"
               />
-              Previsió +30 / +60 / +90 min
+              Previsió +1 / +3 / +6 h
             </label>
           </div>
         }
@@ -592,9 +644,9 @@
                 @for (row of forecastRows(); track row.offset) {
                   <span
                     [style.opacity]="row.available ? 1 : 0.35"
-                    [title]="row.available ? 'Mateixes condicions' : 'Fora de les 12 h calculades'"
+                    [title]="row.available ? 'Mateixes condicions' : 'Fora del que s’ha calculat'"
                   >
-                    <i [style.background]="row.colour"></i>+{{ row.offset }} min
+                    <i [style.background]="row.colour"></i>{{ row.label }}
                   </span>
                 }
               </div>
@@ -637,6 +689,8 @@
               <option value="2">2×</option>
               <option value="5">5×</option>
               <option value="10">10×</option>
+              <option value="30">30×</option>
+              <option value="60">60×</option>
             </select>
           </div>
         </div>
@@ -666,105 +720,235 @@
       <div class="panel-heading">
         <h2><app-icon name="activity" /> Anàlisi</h2>
         <span class="tiny-tag" [class.warn]="!figures()">{{ state().tag }}</span>
+        <button
+          type="button"
+          class="tiny-tag"
+          [attr.aria-pressed]="editing()"
+          (click)="editing.set(!editing())"
+        >
+          {{ editing() ? 'Fet' : 'Dades' }}
+        </button>
       </div>
 
+      <!-- The column is the reader's to arrange: what is ticked is what is
+           shown, and the choice is kept in the browser. -->
+      @if (editing()) {
+        <fieldset class="analysis-options">
+          <legend>Dades visibles</legend>
+          @for (item of analysisItems; track item.id) {
+            <label>
+              <input type="checkbox" [checked]="shows(item.id)" (change)="toggleItem(item.id)" />
+              {{ item.label }}
+            </label>
+          }
+        </fieldset>
+      }
+
       @if (figures(); as now) {
-        <div class="risk-banner calm">
-          <app-icon name="clock" />
-          <div>
-            <strong>T + {{ elapsed() }} h</strong>
-            <small>{{ now.share }} % del terreny combustible del domini</small>
+        <details class="fold chart-section" open>
+          <summary>
+            <div class="chart-heading">
+              <h3>Indicadors</h3>
+              <span>T + {{ elapsed() }} h · {{ now.share }} % del combustible</span>
+            </div>
+          </summary>
+          <div class="metric-grid">
+            @if (shows('area')) {
+              <div class="metric">
+                <span>Superfície cremada</span>
+                <div>
+                  <strong>{{ now.area }}</strong
+                  ><small>ha</small>
+                </div>
+                <em>{{ now.growth }}</em>
+              </div>
+            }
+            @if (shows('perimeter')) {
+              <div class="metric">
+                <span>Perímetre</span>
+                <div>
+                  <strong>{{ now.perimeter }}</strong
+                  ><small>km</small>
+                </div>
+                <em class="muted">Vora del foc</em>
+              </div>
+            }
+            @if (shows('rate')) {
+              <div class="metric">
+                <span>Velocitat del front</span>
+                <div>
+                  <strong>{{ now.rate }}</strong
+                  ><small>m/min</small>
+                </div>
+                <em class="muted">{{ now.rateNote }}</em>
+              </div>
+            }
+            @if (shows('heading')) {
+              <div class="metric">
+                <span>Direcció del front</span>
+                <div>
+                  <strong class="direction-metric">{{ now.heading }}</strong>
+                </div>
+                <em class="muted">{{ now.headingNote }}</em>
+              </div>
+            }
+            @if (shows('intensity')) {
+              <div class="metric">
+                <span>Intensitat del front</span>
+                <div>
+                  <strong>{{ now.intensity }}</strong
+                  ><small>kW/m</small>
+                </div>
+                <em class="muted">Byram · cap del foc, 10 min</em>
+              </div>
+            }
+            @if (shows('flame')) {
+              <div class="metric">
+                <span>Longitud de flama</span>
+                <div>
+                  <strong>{{ now.flame }}</strong
+                  ><small>m</small>
+                </div>
+                <em class="muted">Foc de superfície</em>
+              </div>
+            }
+            @if (shows('control')) {
+              <div class="metric" [class.warning-metric]="now.controlHard">
+                <span>Dificultat de control</span>
+                <div>
+                  <strong class="text-metric">{{ now.control }}</strong>
+                </div>
+                <em class="muted">{{ now.controlNote }}</em>
+              </div>
+            }
+            @if (shows('run')) {
+              <div class="metric">
+                <span>Avanç màxim</span>
+                <div>
+                  <strong>{{ now.run }}</strong
+                  ><small>km</small>
+                </div>
+                <em class="muted">Des de la ignició</em>
+              </div>
+            }
+            @if (shows('edge')) {
+              <div class="metric" [class.warning-metric]="now.edgeReached">
+                <span>Arribada a la vora del domini</span>
+                <div>
+                  <strong class="text-metric">{{ now.edge }}</strong>
+                </div>
+                <em class="muted">{{ now.edgeNote }}</em>
+              </div>
+            }
+            @if (shows('base')) {
+              <div class="metric">
+                <span>Sense vent ni pendent</span>
+                <div>
+                  <strong>{{ conditions().base }}</strong
+                  ><small>m/min</small>
+                </div>
+                <em class="muted">Segons els models presents</em>
+              </div>
+            }
           </div>
-        </div>
+        </details>
 
-        <div class="metric-grid">
-          <div class="metric">
-            <span>Superfície cremada</span>
-            <div>
-              <strong>{{ now.area }}</strong
-              ><small>ha</small>
+        @if (shows('areaChart')) {
+          <details class="fold chart-section" open>
+            <summary>
+              <div class="chart-heading">
+                <h3>Superfície cremada</h3>
+                <span>{{ horizon.hours }} h · ha</span>
+              </div>
+            </summary>
+            <div class="chart">
+              <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
+                <path class="chart-area" [attr.d]="charts().area.area" />
+                <path class="chart-line" [attr.d]="charts().area.line" />
+                <line
+                  class="chart-cursor"
+                  [attr.x1]="now.cursor"
+                  [attr.x2]="now.cursor"
+                  y1="0"
+                  y2="100"
+                />
+              </svg>
             </div>
-            <em>{{ now.growth }}</em>
-          </div>
-          <div class="metric">
-            <span>Perímetre</span>
-            <div>
-              <strong>{{ now.perimeter }}</strong
-              ><small>km</small>
-            </div>
-            <em class="muted">Vora del foc</em>
-          </div>
-          <div class="metric">
-            <span>Velocitat del front</span>
-            <div>
-              <strong>{{ now.rate }}</strong
-              ><small>m/min</small>
-            </div>
-            <em class="muted">{{ now.rateNote }}</em>
-          </div>
-          <div class="metric">
-            <span>Direcció del front</span>
-            <div>
-              <strong class="direction-metric">{{ now.heading }}</strong>
-            </div>
-            <em class="muted">{{ now.headingNote }}</em>
-          </div>
-          <div class="metric" [class.warning-metric]="now.edgeReached">
-            <span>Arribada a la vora del domini</span>
-            <div>
-              <strong class="text-metric">{{ now.edge }}</strong>
-            </div>
-            <em class="muted">{{ now.edgeNote }}</em>
-          </div>
-          <div class="metric">
-            <span>Sense vent ni pendent</span>
-            <div>
-              <strong>{{ conditions().base }}</strong
-              ><small>m/min</small>
-            </div>
-            <em class="muted">Rang segons els models presents</em>
-          </div>
-        </div>
+          </details>
+        }
 
-        <section class="chart-section">
-          <div class="chart-heading">
-            <h3>Superfície cremada</h3>
-            <span>{{ horizon.hours }} h · ha</span>
-          </div>
-          <div class="chart">
-            <svg viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
-              <path class="chart-area" [attr.d]="charts().area.area" />
-              <path class="chart-line" [attr.d]="charts().area.line" />
-              <line
-                class="chart-cursor"
-                [attr.x1]="now.cursor"
-                [attr.x2]="now.cursor"
-                y1="0"
-                y2="100"
-              />
-            </svg>
-          </div>
-        </section>
+        @if (shows('rateChart')) {
+          <details class="fold chart-section">
+            <summary>
+              <div class="chart-heading">
+                <h3>Velocitat del front</h3>
+                <span>{{ horizon.hours }} h · m/min</span>
+              </div>
+            </summary>
+            <div class="chart small-chart">
+              <svg viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true">
+                <path class="chart-area muted-area" [attr.d]="charts().rate.area" />
+                <path class="chart-line muted-line" [attr.d]="charts().rate.line" />
+                <line
+                  class="chart-cursor"
+                  [attr.x1]="now.cursor"
+                  [attr.x2]="now.cursor"
+                  y1="0"
+                  y2="64"
+                />
+              </svg>
+            </div>
+          </details>
+        }
 
-        <section class="chart-section">
-          <div class="chart-heading">
-            <h3>Velocitat del front</h3>
-            <span>{{ horizon.hours }} h · m/min</span>
-          </div>
-          <div class="chart small-chart">
-            <svg viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true">
-              <path class="chart-area muted-area" [attr.d]="charts().rate.area" />
-              <path class="chart-line muted-line" [attr.d]="charts().rate.line" />
-              <line
-                class="chart-cursor"
-                [attr.x1]="now.cursor"
-                [attr.x2]="now.cursor"
-                y1="0"
-                y2="64"
-              />
-            </svg>
-          </div>
-        </section>
+        @if (shows('forecast')) {
+          <details class="fold chart-section" open>
+            <summary>
+              <div class="chart-heading">
+                <h3>Propagació prevista</h3>
+                <span>Des del temps actual</span>
+              </div>
+            </summary>
+            <dl class="terrain-facts forecast-facts">
+              @for (row of forecastRows(); track row.offset) {
+                <div>
+                  <dt><span [style.color]="row.colour">●</span> {{ row.label }}</dt>
+                  <dd>
+                    {{ row.area }} ha
+                    @if (row.available) {
+                      <small>(+{{ row.growth }})</small>
+                    }
+                  </dd>
+                </div>
+              }
+            </dl>
+            <p class="terrain-note">
+              Superfície acumulada amb les mateixes condicions. Les bandes són temps d'arribada, no
+              probabilitats. Es calculen fins a sis hores més enllà de la línia temporal.
+            </p>
+          </details>
+        }
+
+        @if (shows('burnedFuels')) {
+          <details class="fold chart-section">
+            <summary>
+              <div class="chart-heading">
+                <h3>Combustible cremat</h3>
+                <span>Per model · ha</span>
+              </div>
+            </summary>
+            <dl class="terrain-facts">
+              @for (row of burnedFuels(); track row.id) {
+                <div>
+                  <dt>{{ row.id }} · {{ row.name }}</dt>
+                  <dd>
+                    {{ row.area }} <small>· {{ row.share }} %</small>
+                  </dd>
+                </div>
+              }
+            </dl>
+          </details>
+        }
       } @else {
         <div class="no-run">
           <app-icon name="flame" />
@@ -775,57 +959,38 @@
 
       <!-- What went into the computation, whether or not it has run: these
            are worked out from the weather in force, not from the fire. -->
-      <section class="chart-section">
-        @if (result()) {
-          <div class="chart-heading">
-            <h3>Propagació prevista</h3>
-            <span>Des del temps actual</span>
-          </div>
-          <dl class="terrain-facts forecast-facts">
-            @for (row of forecastRows(); track row.offset) {
-              <div>
-                <dt><span [style.color]="row.colour">●</span> +{{ row.offset }} min</dt>
-                <dd>
-                  {{ row.area }} ha
-                  @if (row.available) {
-                    <small>(+{{ row.growth }})</small>
-                  }
-                </dd>
-              </div>
-            }
+      @if (shows('conditions')) {
+        <details class="fold chart-section" [open]="!result()">
+          <summary>
+            <div class="chart-heading">
+              <h3>Condicions del càlcul</h3>
+              <span>Rothermel</span>
+            </div>
+          </summary>
+          <dl class="terrain-facts">
+            <div>
+              <dt>Combustible</dt>
+              <dd>{{ fuelModels().length }} models · per cel·la</dd>
+            </div>
+            <div>
+              <dt>Humitat del combustible mort fi</dt>
+              <dd>{{ conditions().dead }} %</dd>
+            </div>
+            <div>
+              <dt>Humitat del combustible viu</dt>
+              <dd>{{ conditions().live }} %</dd>
+            </div>
+            <div>
+              <dt>Vent a mitja flama</dt>
+              <dd>{{ conditions().midflame }} km/h</dd>
+            </div>
+            <div>
+              <dt>Front en pla, amb aquest vent</dt>
+              <dd>{{ conditions().head }} m/min</dd>
+            </div>
           </dl>
-          <p class="terrain-note">
-            Superfície acumulada amb les mateixes condicions. Les bandes són temps d'arribada, no
-            probabilitats. «—» indica que supera les {{ horizon.hours }} h calculades.
-          </p>
-        }
-        <div class="chart-heading">
-          <h3>Condicions del càlcul</h3>
-          <span>Rothermel</span>
-        </div>
-        <dl class="terrain-facts">
-          <div>
-            <dt>Combustible</dt>
-            <dd>{{ fuelModels().length }} models · per cel·la</dd>
-          </div>
-          <div>
-            <dt>Humitat del combustible mort fi</dt>
-            <dd>{{ conditions().dead }} %</dd>
-          </div>
-          <div>
-            <dt>Humitat del combustible viu</dt>
-            <dd>{{ conditions().live }} %</dd>
-          </div>
-          <div>
-            <dt>Vent a mitja flama</dt>
-            <dd>{{ conditions().midflame }} km/h</dd>
-          </div>
-          <div>
-            <dt>Front en pla, amb aquest vent</dt>
-            <dd>{{ conditions().head }} m/min</dd>
-          </div>
-        </dl>
-      </section>
+        </details>
+      }
 
       <div class="model-note">
         <app-icon name="info" />
@@ -834,7 +999,8 @@
           <small>
             El combustible combina cartografia oficial i estimacions de coberta; la meteorologia no
             canvia en {{ horizon.hours }} hores; només hi ha foc de superfície, sense capçades ni
-            focus secundaris. No serveix per prendre decisions d'emergència.
+            focus secundaris. La dificultat de control només llegeix la longitud de flama. No
+            serveix per prendre decisions d'emergència.
           </small>
         </span>
       </div>

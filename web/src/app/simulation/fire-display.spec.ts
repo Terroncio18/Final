@@ -56,11 +56,13 @@ describe('FireCast presentation over computed arrivals', () => {
     expect(packed[0]).toBe(0);
     expect(packed[1]).toBe(10);
   });
-  it('never labels a truncated forecast as a full 30/60/90-minute band', () => {
-    expect(forecastOffsets(0, 720)).toEqual([30, 60, 90]);
-    expect(forecastOffsets(630, 720)).toEqual([30, 60, 90]);
-    expect(forecastOffsets(630.1, 720)).toEqual([30, 60]);
-    expect(forecastOffsets(680, 720)).toEqual([30]);
+  it('never labels a truncated forecast as a full +1/+3/+6 h band', () => {
+    expect(forecastOffsets(0, 720)).toEqual([60, 180, 360]);
+    expect(forecastOffsets(360, 720)).toEqual([60, 180, 360]);
+    expect(forecastOffsets(360.1, 720)).toEqual([60, 180]);
+    expect(forecastOffsets(600, 720)).toEqual([60]);
     expect(forecastOffsets(720, 720)).toEqual([]);
+    // Computed six hours past a twelve-hour timeline, every band exists at its end.
+    expect(forecastOffsets(720, 1080)).toEqual([60, 180, 360]);
   });
 });

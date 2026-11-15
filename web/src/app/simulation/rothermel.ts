@@ -251,6 +251,12 @@ export interface FuelBed {
   readonly r0: number;
   /** Reaction intensity, BTU/ft²/min. */
   readonly reactionIntensity: number;
+  /**
+   * Heat released per unit of ground while the front passes, BTU/ft²: the
+   * reaction intensity held for the residence time, 384/σ minutes (Anderson
+   * 1969). Times the rate of spread, it is Byram's fireline intensity.
+   */
+  readonly heatPerArea: number;
   /** φw = windC · U^windB, with U the midflame wind in ft/min. */
   readonly windC: number;
   readonly windB: number;
@@ -360,6 +366,7 @@ export function fuelBed(model: FuelModel, moistures: Moistures): FuelBed {
   return {
     r0: (reactionIntensity * propagatingFlux) / heatSink,
     reactionIntensity,
+    heatPerArea: (reactionIntensity * 384) / sigma,
     windC,
     windB,
     slopeK: 5.275 * packing ** -0.3,
@@ -373,6 +380,35 @@ function loadOf(model: FuelModel): number {
   // Short tons per acre to metric tons per hectare.
   return tonsPerAcre * 2.2417;
 }
+
+/**
+ * Byram's fireline intensity, in kW per metre of front, for a rate of spread
+ * in m/min: the heat the front releases per unit of its length and of time.
+ *
+ * It is the figure fire behaviour is read by —how hard a front is to stand in
+ * front of— and it is the head's when the rate is the head's.
+ */
+export function firelineIntensity(bed: FuelBed, rateMPerMin: number): number {
+  // BTU/ft² × ft/min ÷ 60 = BTU/ft/s; one of those is 3,459 kW/m.
+  return ((bed.heatPerArea * rateMPerMin * FT_PER_M) / 60) * 3.459;
+}
+
+/** Byram's flame length (1959), in metres, for an intensity in kW/m. */
+export function flameLength(intensityKwM: number): number {
+  return intensityKwM > 0 ? 0.0775 * intensityKwM ** 0.46 : 0;
+}
+
+/**
+ * How hard a surface fire is to control, read from its flame length: the
+ * four bands of the fire characteristics chart (Andrews & Rothermel 1982),
+ * at 4, 8 and 11 ft. A reading aid for the figure beside it, not a tactic.
+ */
+export const CONTROL_CLASSES = [
+  { upTo: 1.2, name: 'Baixa', note: 'Atac directe amb eines manuals' },
+  { upTo: 2.4, name: 'Moderada', note: 'Cal maquinària o mitjans aeris' },
+  { upTo: 3.4, name: 'Alta', note: 'Atac al cap del foc inefectiu' },
+  { upTo: Infinity, name: 'Extrema', note: 'Fora de capacitat d’extinció' },
+] as const;
 
 /** The wind factor φw for a midflame wind in ft/min. */
 export function windFactor(bed: FuelBed, midflame: number): number {

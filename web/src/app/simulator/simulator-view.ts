@@ -22,9 +22,18 @@ import { FORECASTS, FORECAST_COLOURS, forecastOffsets } from '../simulation/fire
 import { frontEmitters } from '../simulation/fire-emitters';
 import { spread, type SpreadResult } from '../simulation/fire-spread';
 import { MunicipalitiesService } from '../simulation/municipalities.service';
-import { formatPoints, parsePoint, parsePoints, type Point } from '../simulation/point';
-import { ProvincesService } from '../simulation/provinces.service';
 import {
+  formatPoint,
+  formatPoints,
+  parsePoint,
+  parsePoints,
+  type Point,
+} from '../simulation/point';
+import { ProvincesService } from '../simulation/provinces.service';
+import { formatScenario, parseScenario, scenarioFileName } from '../simulation/scenario';
+import {
+  CONTROL_CLASSES,
+  flameLength,
   FUEL_MODELS,
   fuelBed,
   M_PER_FT,
@@ -39,7 +48,35 @@ import { FuelService } from '../simulation/fuel.service';
 import { Icon } from './icon';
 import { WeatherService } from './weather.service';
 
-/** The eight points of the compass, as the wind selector offers them. */
+/**
+ * What the analysis column can show, and whether it does on a first visit.
+ *
+ * The column is the reader's to arrange: someone looking at how a front
+ * behaves wants intensity and flame length, someone looking at how much
+ * burns wants the areas, and both at once is a column to scroll. What is
+ * switched off is kept in the browser, under ANALYSIS_KEY.
+ */
+const ANALYSIS_ITEMS = [
+  { id: 'area', label: 'Superfície', on: true },
+  { id: 'perimeter', label: 'Perímetre', on: true },
+  { id: 'rate', label: 'Velocitat', on: true },
+  { id: 'heading', label: 'Direcció', on: true },
+  { id: 'intensity', label: 'Intensitat', on: true },
+  { id: 'flame', label: 'Flama', on: true },
+  { id: 'control', label: 'Control', on: true },
+  { id: 'run', label: 'Avanç màxim', on: true },
+  { id: 'edge', label: 'Vora del domini', on: true },
+  { id: 'base', label: 'Sense vent', on: false },
+  { id: 'areaChart', label: 'Gràfica: superfície', on: true },
+  { id: 'rateChart', label: 'Gràfica: velocitat', on: true },
+  { id: 'forecast', label: 'Previsió', on: true },
+  { id: 'burnedFuels', label: 'Combustible', on: true },
+  { id: 'conditions', label: 'Condicions', on: true },
+] as const;
+
+const ANALYSIS_KEY = 'ignislab.analysis.hidden';
+
+/** The eight points of the compass, for naming a bearing. */
 const DIRECTIONS = [
   { degrees: 0, short: 'N', name: 'nord' },
   { degrees: 45, short: 'NE', name: 'nord-est' },
@@ -95,14 +132,36 @@ const COUNTERMEASURES = [
 const HORIZON_HOURS = 12;
 
 /**
+ * How far past the timeline the fire is computed, and never shown as "now".
+ *
+ * Two reasons, and both are about the last minute of the timeline. The fire's
+ * final outline is then an isochrone inside the computed field, interpolated
+ * like every other, instead of the ragged edge of the cells the computation
+ * happened to stop at. And the longest forecast (+6 h) exists there too.
+ *
+ * Half an hour more than that forecast, so its line falls inside the field
+ * and not on the very edge of it, where half of it would be cut away.
+ */
+const FORECAST_MARGIN_MINUTES = 6 * 60 + 30;
+
+/**
  * Live fuel moisture, as a fraction: 100 %, Anderson's own reference value.
  * Not measured and not derived from the weather; a constant until something
  * better than a constant is available.
  */
 const LIVE_MOISTURE = 1.0;
 
-/** Simulated minutes per second of playback at 1×: twelve hours in two minutes. */
-const PLAYBACK = 6;
+/**
+ * Simulated minutes per second of playback at 1×: thirty seconds of fire
+ * every second, twelve hours in twenty-four minutes.
+ *
+ * It was twelve times that, and the fire was over before it could be read:
+ * under a canopy a front makes a few cells an hour (§11.21), and at two
+ * minutes for the whole run each of them went by in a blink. At 1× a front
+ * is now something to watch arrive; the selector beside the button goes up
+ * to 60×, which is the two-minute summary it used to be, and a little more.
+ */
+const PLAYBACK = 0.5;
 
 /** Latitude first for reading, longitude first for the URL: see point.ts. */
 function readable(point: Point): string {
@@ -182,7 +241,6 @@ export class SimulatorView {
   readonly ignicions = input<string>();
 
   protected readonly ready = this.maps.ready;
-  protected readonly directions = DIRECTIONS;
   protected readonly countermeasures = COUNTERMEASURES;
 
   /** The timeline's length, with a tick every two hours. */
@@ -277,6 +335,7 @@ export class SimulatorView {
     const format = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
     return FORECASTS.map((offset, index) => ({
       offset,
+      label: `+${offset / 60} h`,
       colour: FORECAST_COLOURS[index],
       available: available.includes(offset),
       area: available.includes(offset) ? format.format(result.series.area[minute + offset]) : '—',
@@ -419,6 +478,12 @@ export class SimulatorView {
   /** Where the wind comes from, by name: a station reports 183° and that is «sud». */
   protected readonly from = computed(() => this.compass(this.now().fromDeg));
 
+  /** «del nord», but «de l'est» and «de l'oest»: the article gives way to a vowel. */
+  protected readonly fromPhrase = computed(() => {
+    const { name } = this.from();
+    return /^[eo]/.test(name) ? `de l'${name}` : `del ${name}`;
+  });
+
   /**
    * Where the wind takes the fire. Spelled out because the two readings of
    * «vent del nord-oest» are 180° apart and only one of them is the fire's.
@@ -513,6 +578,92 @@ export class SimulatorView {
   protected retryFuels(): void {
     const centre = this.ignition();
     if (centre) void this.fuels.read(centre, true);
+  }
+
+  // ---- Scenarios: a text file out, a text file in (§11.26). ----
+  protected readonly scenarioName = signal('');
+  /** What the last save or load came to, for the line under the buttons. */
+  protected readonly scenarioNote = signal<{ text: string; failed: boolean } | null>(null);
+
+  protected setScenarioName(event: Event): void {
+    this.scenarioName.set((event.target as HTMLInputElement).value);
+  }
+
+  /**
+   * Writes the scenario to a file the browser downloads.
+   *
+   * The weather kept is the one in force, whatever its source: a scenario has
+   * to give the same fire again, and «the station's reading at the time» is
+   * not something a file can ask for later. It comes back as manual values.
+   */
+  protected saveScenario(): void {
+    const centre = this.ignition();
+    if (!centre) return;
+    const now = this.now();
+    const place = this.chosen()?.name ?? this.municipality();
+    const name = this.scenarioName().trim() || `${place} · ${this.scenarioSummary()}`;
+    const text = formatScenario(
+      {
+        name,
+        region: this.region(),
+        province: this.province(),
+        municipality: this.municipality(),
+        centre,
+        ignitions: this.starts(),
+        wind: Math.round(now.wind),
+        windFrom: Math.round(now.fromDeg),
+        humidity: Math.round(now.humidity),
+        temperature: Math.round(now.temperature),
+      },
+      new Date(),
+    );
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    link.download = scenarioFileName(name);
+    link.click();
+    URL.revokeObjectURL(link.href);
+    this.scenarioNote.set({ text: `Desat com a ${link.download}`, failed: false });
+  }
+
+  /**
+   * Reads a scenario file and puts the screen where it says.
+   *
+   * The weather goes into the manual values and the rest into the address,
+   * which is what draws the domain and the ignitions (§2.26, §11.16): a
+   * loaded scenario and a pasted link end in the same state.
+   */
+  protected async loadScenario(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    // So that choosing the same file again is still a change.
+    input.value = '';
+    if (!file) return;
+    const scenario = parseScenario(await file.text());
+    if (typeof scenario === 'string') {
+      this.scenarioNote.set({ text: scenario, failed: true });
+      return;
+    }
+    this.weatherMode.set('manual');
+    this.wind.set(scenario.wind);
+    this.direction.set(scenario.windFrom);
+    this.humidity.set(scenario.humidity);
+    this.temperature.set(scenario.temperature);
+    this.scenarioName.set(scenario.name);
+    await this.router.navigate(
+      [
+        '/simulador',
+        scenario.region,
+        scenario.province,
+        scenario.municipality,
+        formatPoint(scenario.centre),
+      ],
+      {
+        queryParams: {
+          ignicions: scenario.ignitions.length ? formatPoints(scenario.ignitions) : null,
+        },
+      },
+    );
+    this.scenarioNote.set({ text: `Carregat: ${scenario.name || file.name}`, failed: false });
   }
 
   /** What saving a scenario would keep, read from what is set right now. */
@@ -688,16 +839,18 @@ export class SimulatorView {
   protected readonly figures = computed(() => {
     const result = this.result();
     if (!result) return null;
-    const { area, perimeter, rate, heading } = result.series;
+    const { area, perimeter, rate, heading, intensity, run } = result.series;
     const minute = Math.min(Math.floor(this.minutes()), area.length - 1);
     const one = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
     const whole = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 0 });
     const size = (value: number) => (value < 100 ? one : whole).format(value);
 
     let fastest = 0;
+    let hottest = 0;
     let bearing = NaN;
     for (let m = minute; m >= Math.max(minute - 10, 0); m -= 1) {
       if (rate[m] > fastest) fastest = rate[m];
+      if (intensity[m] > hottest) hottest = intensity[m];
       if (Number.isNaN(bearing) && !Number.isNaN(heading[m])) bearing = heading[m];
     }
 
@@ -705,7 +858,14 @@ export class SimulatorView {
     const perHour = minute > back ? ((area[minute] - area[back]) / (minute - back)) * 60 : 0;
     const total = result.burnable * ((CELL_M * CELL_M) / 10_000);
     const towards = Number.isNaN(bearing) ? null : this.compass(bearing);
-    const edgeReached = result.reachedEdge <= minute;
+    // Past the timeline the fire is still computed (FORECAST_MARGIN_MINUTES), but
+    // an arrival at the edge out there is not something this screen reports.
+    const reachedEdge = result.reachedEdge <= this.horizon.minutes ? result.reachedEdge : Infinity;
+    const edgeReached = reachedEdge <= minute;
+    // Byram's flame length for that intensity, and the band of the fire
+    // characteristics chart it falls in. A stopped front has neither.
+    const flame = flameLength(hottest);
+    const control = hottest ? CONTROL_CLASSES.find((band) => flame < band.upTo)! : null;
 
     return {
       area: size(area[minute]),
@@ -716,22 +876,85 @@ export class SimulatorView {
       rateNote: fastest
         ? `${one.format((fastest * 60) / 1000)} km/h · darrers 10 min`
         : 'Front aturat',
+      intensity: hottest ? whole.format(hottest) : '—',
+      flame: hottest ? one.format(flame) : '—',
+      control: control ? control.name : '—',
+      controlNote: control ? control.note : 'Front aturat',
+      controlHard: flame >= 2.4,
+      run: one.format(run[minute]),
       heading: towards ? towards.short : '—',
       headingNote: towards
         ? `${Math.round(bearing)}° · cap al ${towards.name}`
         : 'Sense front actiu',
-      edge: Number.isFinite(result.reachedEdge)
-        ? `T + ${this.clock(result.reachedEdge)}`
-        : 'No hi arriba',
-      edgeNote: !Number.isFinite(result.reachedEdge)
+      edge: Number.isFinite(reachedEdge) ? `T + ${this.clock(reachedEdge)}` : 'No hi arriba',
+      edgeNote: !Number.isFinite(reachedEdge)
         ? `En ${this.horizon.hours} h el foc no surt del domini`
         : edgeReached
           ? "A partir d'aquí el foc surt del que es calcula"
           : 'Més enllà el foc surt del que es calcula',
       edgeReached,
-      cursor: (minute / (area.length - 1)) * 300,
+      cursor: (minute / this.horizon.minutes) * 300,
     };
   });
+
+  /**
+   * What has burned so far, by fuel model: which fuels the fire is living on.
+   *
+   * A pass over the grid, so it is only made while the block is on screen,
+   * and once per minute of the timeline rather than per frame of it.
+   */
+  protected readonly burnedFuels = computed(() => {
+    const result = this.result();
+    const fuels = this.fuels.grid();
+    if (!result || !fuels || !this.shows('burnedFuels')) return [];
+    const minute = Math.floor(this.minutes());
+    const cells = new Map<number, number>();
+    let all = 0;
+    for (let i = 0; i < result.arrival.length; i += 1) {
+      if (result.arrival[i] > minute) continue;
+      cells.set(fuels.models[i], (cells.get(fuels.models[i]) ?? 0) + 1);
+      all += 1;
+    }
+    const one = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
+    return [...cells]
+      .sort((a, b) => b[1] - a[1])
+      .map(([id, count]) => ({
+        id,
+        name: FUEL_MODELS[id]?.name ?? 'Sense model',
+        area: one.format((count * CELL_M * CELL_M) / 10_000),
+        share: Math.round((count / all) * 100),
+      }));
+  });
+
+  // ---- What the analysis column shows. ----
+  protected readonly analysisItems = ANALYSIS_ITEMS;
+  protected readonly editing = signal(false);
+  private readonly hidden = signal<ReadonlySet<string>>(this.storedHidden());
+
+  private storedHidden(): ReadonlySet<string> {
+    try {
+      const stored = localStorage.getItem(ANALYSIS_KEY);
+      if (stored !== null) return new Set(JSON.parse(stored) as string[]);
+    } catch {
+      // No storage, or something else's value under the key: the defaults.
+    }
+    return new Set(ANALYSIS_ITEMS.filter((item) => !item.on).map((item) => item.id));
+  }
+
+  protected shows(id: (typeof ANALYSIS_ITEMS)[number]['id']): boolean {
+    return !this.hidden().has(id);
+  }
+
+  protected toggleItem(id: string): void {
+    const hidden = new Set(this.hidden());
+    if (!hidden.delete(id)) hidden.add(id);
+    this.hidden.set(hidden);
+    try {
+      localStorage.setItem(ANALYSIS_KEY, JSON.stringify([...hidden]));
+    } catch {
+      // Not kept for the next visit; it still holds for this one.
+    }
+  }
 
   /** The two curves of the column, sampled every five minutes. */
   protected readonly charts = computed(() => {
@@ -740,7 +963,7 @@ export class SimulatorView {
     const { area, rate } = result.series;
     const areas: number[] = [];
     const rates: number[] = [];
-    for (let minute = 0; minute < area.length; minute += 5) {
+    for (let minute = 0; minute <= this.horizon.minutes; minute += 5) {
       areas.push(area[minute]);
       let fastest = 0;
       for (let m = Math.max(minute - 4, 0); m <= minute; m += 1)
@@ -921,7 +1144,8 @@ export class SimulatorView {
       const bounds = domainAround(centre),
         weather = untracked(this.now);
       const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-      painter.paint(untracked(this.minutes), 0, untracked(this.forecasts));
+      const scale = () => this.maps.metresPerPixel() ?? undefined;
+      painter.paint(untracked(this.minutes), 0, untracked(this.forecasts), scale());
       this.maps.setFire(painter.canvas, painter.bounds(bounds));
       let frame = 0,
         last = performance.now(),
@@ -931,10 +1155,11 @@ export class SimulatorView {
         emittersMinute = NaN,
         previousMinute = NaN;
       let paintedMinute = NaN,
+        paintedScale: number | undefined,
         paintedForecast: boolean | undefined,
         motionWas: boolean | undefined;
       this.redrawFire = (minute, forecast) => {
-        painter.paint(minute, reduced.matches ? 0 : visualSeconds, forecast);
+        painter.paint(minute, reduced.matches ? 0 : visualSeconds, forecast, scale());
         this.maps.refreshFire();
         this.maps.resetFireParticles();
         this.maps.setFireParticles(
@@ -953,7 +1178,8 @@ export class SimulatorView {
         if (!document.hidden) {
           if (motion) visualSeconds += dt;
           const minute = untracked(this.minutes),
-            forecast = untracked(this.forecasts);
+            forecast = untracked(this.forecasts),
+            metres = scale();
           const jumped =
             Number.isFinite(previousMinute) &&
             (minute < previousMinute || minute - previousMinute > 3);
@@ -961,13 +1187,15 @@ export class SimulatorView {
             now - lastPaint >= 33 &&
             (motion ||
               minute !== paintedMinute ||
+              metres !== paintedScale ||
               forecast !== paintedForecast ||
               motion !== motionWas)
           ) {
-            painter.paint(minute, motion ? visualSeconds : 0, forecast);
+            painter.paint(minute, motion ? visualSeconds : 0, forecast, metres);
             this.maps.refreshFire();
             lastPaint = now;
             paintedMinute = minute;
+            paintedScale = metres;
             paintedForecast = forecast;
           }
           if (minute !== emittersMinute && (now - lastEmitters >= 100 || jumped)) {
@@ -1040,8 +1268,54 @@ export class SimulatorView {
     ({ wind: this.wind, humidity: this.humidity, temperature: this.temperature })[which].set(value);
   }
 
-  protected setDirection(event: Event): void {
-    this.direction.set(Number((event.target as HTMLSelectElement).value));
+  /**
+   * Turns the compass with the pointer: the needle follows it.
+   *
+   * The needle points where the wind **goes**, so the angle under the pointer
+   * is that, and the bearing kept is the opposite one, where it comes from.
+   * In steps of five degrees: finer than that is more than a hand on a 92 px
+   * dial can mean, and more than one station can tell.
+   */
+  protected turnWind(event: PointerEvent): void {
+    if (this.weatherMode() === 'live') return;
+    const dial = event.currentTarget as HTMLElement;
+    if (event.type === 'pointerdown') {
+      // Captured, so the drag carries on outside the dial. A pointer that is
+      // not a live one —a scripted event— cannot be captured, and then the
+      // press still sets the direction; only the drag is lost.
+      try {
+        dial.setPointerCapture(event.pointerId);
+      } catch {
+        /* nothing to follow */
+      }
+      dial.focus();
+    } else if (!dial.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+    const box = dial.getBoundingClientRect();
+    const east = event.clientX - (box.left + box.width / 2);
+    const south = event.clientY - (box.top + box.height / 2);
+    // Too close to the pivot the angle is noise.
+    if (Math.hypot(east, south) < 6) return;
+    const towards = (Math.atan2(east, -south) * 180) / Math.PI;
+    this.direction.set((((Math.round(towards / 5) * 5 + 180) % 360) + 360) % 360);
+  }
+
+  /** The same with the keyboard: arrows by five degrees, page keys by a point. */
+  protected nudgeWind(event: KeyboardEvent): void {
+    if (this.weatherMode() === 'live') return;
+    const steps: Record<string, number> = {
+      ArrowRight: 5,
+      ArrowUp: 5,
+      ArrowLeft: -5,
+      ArrowDown: -5,
+      PageUp: 45,
+      PageDown: -45,
+    };
+    const step = steps[event.key];
+    if (step === undefined && event.key !== 'Home') return;
+    event.preventDefault();
+    this.direction.set(event.key === 'Home' ? 0 : (this.direction() + step + 360) % 360);
   }
 
   protected setMinutes(event: Event): void {
@@ -1054,7 +1328,10 @@ export class SimulatorView {
     const result = this.result(),
       centre = this.ignition();
     if (!result || !centre) return;
-    const until = Math.min(this.minutes() + (this.forecasts() ? 90 : 0), result.horizon);
+    const until = Math.min(
+      this.minutes() + (this.forecasts() ? FORECASTS[FORECASTS.length - 1] : 0),
+      result.horizon,
+    );
     let left = GRID,
       right = 0,
       top = GRID,
@@ -1116,7 +1393,7 @@ export class SimulatorView {
           fuelBeds: beds,
           towardsDeg: this.now().towardsDeg,
           ignitions,
-          horizon: this.horizon.minutes,
+          horizon: this.horizon.minutes + FORECAST_MARGIN_MINUTES,
         },
         (share) => {
           if (mine === this.run) this.progress.set(share);

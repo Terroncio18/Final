@@ -1,7 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('./domain', () => ({ GRID: 16, CELL_M: 30 }));
 import { spread } from './fire-spread';
-import { FUEL_MODELS, fuelBed, windFactor, type FuelBed } from './rothermel';
+import {
+  FUEL_MODELS,
+  firelineIntensity,
+  flameLength,
+  fuelBed,
+  windFactor,
+  type FuelBed,
+} from './rothermel';
 
 const fast = fuelBed(FUEL_MODELS[1], { dead1: 0.08, dead10: 0.08, dead100: 0.08, live: 1 });
 const slow: FuelBed = { ...fast, r0: fast.r0 / 20 };
@@ -70,5 +77,37 @@ describe('heterogeneous fire spread', () => {
         `model ${id}: ${chainsPerHour}`,
       ).toBeLessThan(0.1);
     }
+  });
+  it('gives the flame lengths Anderson prints for the dead-only models, within a foot', () => {
+    // Anderson (1982), same reference conditions as the rates above; feet.
+    const printed: Record<number, number> = {
+      1: 4,
+      3: 12,
+      6: 6,
+      8: 1,
+      9: 2.6,
+      11: 3.5,
+      12: 8,
+      13: 10.5,
+    };
+    for (const [id, feet] of Object.entries(printed)) {
+      const bed = fuelBed(FUEL_MODELS[Number(id)], {
+        dead1: 0.08,
+        dead10: 0.08,
+        dead100: 0.08,
+        live: 1,
+      });
+      const rate = (bed.r0 * (1 + windFactor(bed, 5 * 88))) / 3.28084;
+      const length = flameLength(firelineIntensity(bed, rate)) * 3.28084;
+      expect(Math.abs(length - feet), `model ${id}: ${length} ft`).toBeLessThan(1);
+    }
+  });
+  it('reports the run from the ignition and a head intensity for the cells reached', async () => {
+    const result = await run(new Uint8Array(256).fill(1));
+    const { run: reach, intensity } = result.series;
+    // From column 2 the far side of a 16-cell row is 13 cells away, at 30 m.
+    expect(reach[reach.length - 1]).toBeGreaterThan(0.39);
+    expect(Math.max(...intensity)).toBeGreaterThan(0);
+    expect([...reach].every((value, i, all) => i === 0 || value >= all[i - 1])).toBe(true);
   });
 });

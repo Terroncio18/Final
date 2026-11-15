@@ -1,5 +1,6 @@
 /** Presentation of computed arrival times. This module never changes propagation. */
-export const FORECASTS = [30, 60, 90] as const;
+/** Minutes ahead of the timeline's cursor: +1 h, +3 h and +6 h. */
+export const FORECASTS = [60, 180, 360] as const;
 export const FORECAST_COLOURS = ['#ff5733', '#ff9e32', '#f5cf50'] as const;
 export const UNREACHED = 1_000_000;
 
@@ -53,7 +54,10 @@ export function arrivalTexture(arrival: Float32Array, size: number): Float32Arra
       y > 0 ? arrival[i - size] : Infinity,
       y + 1 < size ? arrival[i + size] : Infinity,
     );
-    data[2 * i + 1] = Math.max(0.04, Math.min(25, Math.hypot(dx, dy)));
+    // Minutes per cell. The ceiling is high on purpose: under a closed canopy
+    // the front creeps at a metre a minute, half an hour per cell, and a low
+    // ceiling there makes every line drawn from this field several cells wide.
+    data[2 * i + 1] = Math.max(0.04, Math.min(240, Math.hypot(dx, dy)));
   }
   return data;
 }

@@ -7,7 +7,6 @@ import { MunicipalityStep } from './simulation/municipality-step';
 import { ProvinceStep } from './simulation/province-step';
 import { RegionStep } from './simulation/region-step';
 import { SimulationFlow } from './simulation/simulation-flow';
-import { SimulatorView } from './simulator/simulator-view';
 
 /**
  * One segment per level of the hierarchy, and the map above all of them.
@@ -38,11 +37,15 @@ import { SimulatorView } from './simulator/simulator-view';
  * detections, and it opens in a tab of its own, where there is no warm map to
  * inherit anyway. It is declared first for the same reason `simulacio` is: left
  * below, `:scope` would swallow the word.
+ *
+ * And it is loaded when it is opened, not with the portada: the model, the
+ * shaders and a console of three columns are the largest thing this project
+ * writes, and the first screen draws none of it (§11.26).
  */
 export const routes: Routes = [
   {
     path: 'simulador/:region/:province/:municipality/:point',
-    component: SimulatorView,
+    loadComponent: () => import('./simulator/simulator-view').then((m) => m.SimulatorView),
   },
   {
     path: '',

@@ -1,5 +1,5 @@
 import { GRID, CELL_M } from './domain';
-import { arrivalTexture, fireExtent, UNREACHED } from './fire-display';
+import { arrivalTexture, fireExtent, FORECASTS, UNREACHED } from './fire-display';
 
 const VERTEX = `#version 300 es
 out vec2 uv;
@@ -9,12 +9,26 @@ void main() {
   gl_Position = vec4(p*2.0-1.0, 0.0, 1.0);
 }`;
 
-/** FireCast's char, noise, hot line and three future bands over an arrival field. */
+/**
+ * FireCast's char, noise, hot line and three future bands over an arrival field.
+ *
+ * Two things keep the picture from showing the grid it comes from:
+ *
+ * - **The edge of what burns is a contour, not a row of cells.** Whether a
+ *   cell can be reached is interpolated like the arrival time is, and the
+ *   picture ends where that coverage crosses one half. A barrier or a hole
+ *   comes out with cut corners instead of steps.
+ * - **The forecast lines keep their width on screen**, thin and dashed.
+ *   The picture is draped and stretched with the ground, so a width in cells
+ *   is under a pixel with the 30 km domain in view and a band up close.
+ */
 const FRAGMENT = `#version 300 es
 precision highp float;
 uniform sampler2D field;
 uniform float minute, seconds, horizon, size, cellMetres;
 uniform bool forecast;
+uniform vec3 offsets;
+uniform float lineCells;
 uniform vec4 crop;
 in vec2 uv;
 out vec4 colour;
@@ -25,27 +39,44 @@ void over(vec3 rgb,float a){colour.rgb=rgb*a+colour.rgb*(1.0-a);colour.a=a+colou
 void main(){
   colour=vec4(0);
   vec2 grid=mix(crop.xy,crop.zw,uv)*size;
-  // Never interpolate fire across a cell the propagation cannot reach.
-  if(read(ivec2(floor(grid))).r>${UNREACHED / 2}.0) return;
   vec2 p=grid-.5, f=fract(p); ivec2 cell=ivec2(floor(p));
   vec2 a=read(cell),b=read(cell+ivec2(1,0)),c=read(cell+ivec2(0,1)),d=read(cell+ivec2(1,1));
   vec4 w=vec4((1.0-f.x)*(1.0-f.y),f.x*(1.0-f.y),(1.0-f.x)*f.y,f.x*f.y);
+  // Time is never interpolated across a cell the propagation cannot reach:
+  // those corners drop out of the average. How much of the weight is left is
+  // the coverage, and its one-half contour is where the picture ends.
   w*=vec4(lessThan(vec4(a.r,b.r,c.r,d.r),vec4(${UNREACHED / 2}.0)));
-  w/=max(dot(w,vec4(1)),.00001);
+  float cover=dot(w,vec4(1));
+  float pixel=(crop.z-crop.x)*size/2048.0;
+  float mask=smoothstep(.5-pixel,.5+pixel,cover);
+  if(mask<=0.0) return;
+  w/=max(cover,.00001);
   float t=dot(w,vec4(a.r,b.r,c.r,d.r));
   float pace=max(.04,dot(w,vec4(a.g,b.g,c.g,d.g)));
   float distance=(minute-t)/pace;
   vec2 world=grid*cellMetres;
   float n=noise(world*.012), fine=noise(world*.09);
   if(forecast && t>minute){
-    float dash=step(.25,fract((world.x+world.y)/95.0));
-    if(minute+90.0<=horizon && t<=minute+90.0) over(vec3(.83,.63,.08),.13);
-    if(minute+60.0<=horizon && t<=minute+60.0) over(vec3(1,.28,.02),.16);
-    if(minute+30.0<=horizon && t<=minute+30.0) over(vec3(.75,.045,.018),.2);
-    float width=.16;
-    if(minute+90.0<=horizon) over(vec3(1,.78,.12),.9*(1.0-smoothstep(width,width+.18,abs(t-minute-90.0)/pace)));
-    if(minute+60.0<=horizon) over(vec3(1,.47,.04),dash*(1.0-smoothstep(width,width+.12,abs(t-minute-60.0)/pace)));
-    if(minute+30.0<=horizon) over(vec3(1,.25,.1),dash*(1.0-smoothstep(width,width+.12,abs(t-minute-30.0)/pace)));
+    // Farthest first, so the nearest band and its line end up on top.
+    if(minute+offsets.z<=horizon && t<=minute+offsets.z) over(vec3(.83,.63,.08),.2);
+    if(minute+offsets.y<=horizon && t<=minute+offsets.y) over(vec3(1,.28,.02),.22);
+    if(minute+offsets.x<=horizon && t<=minute+offsets.x) over(vec3(.75,.045,.018),.26);
+    // Half-width in cells, handed in for the zoom of the moment so the line
+    // keeps its width on screen; never under a pixel and a half of texture.
+    float width=max(1.5*pixel,lineCells);
+    // Dashed along the line: the contour runs across the gradient of the
+    // arrival time, and the dashes are counted along whichever axis it runs
+    // closer to. Their length is a multiple of the width, so it holds on
+    // screen too. Next to a cell with no time there is no gradient to read.
+    vec2 slope=vec2((b.r-a.r)*(1.0-f.y)+(d.r-c.r)*f.y,(c.r-a.r)*(1.0-f.x)+(d.r-b.r)*f.x);
+    float along=cover>.999 ? (abs(slope.y)>abs(slope.x) ? grid.x : grid.y) : grid.x+grid.y;
+    float dash=step(.42,fract(along/(width*13.0)));
+    vec3 line[3]=vec3[3](vec3(1,.3,.14),vec3(1,.55,.06),vec3(1,.84,.2));
+    for(int i=2;i>=0;i--){
+      if(minute+offsets[i]>horizon) continue;
+      float away=abs(t-minute-offsets[i])/pace;
+      over(line[i],dash*(1.0-smoothstep(width*.7,width,away)));
+    }
   }
   if(t<=minute){
     vec3 char=vec3(.15,.095,.065)+n*.04;
@@ -59,6 +90,7 @@ void main(){
   over(vec3(1,.14,.002),glow*.28);
   over(vec3(1,.25+.43*fine,.015),fire*flicker);
   over(vec3(1,.55,.09),fire*.65);
+  colour*=mask;
 }`;
 
 /** GPU interpolation before colour, at twice the grid resolution. */
@@ -134,12 +166,18 @@ export class FireSurface {
       'size',
       'cellMetres',
       'forecast',
+      'offsets',
+      'lineCells',
       'crop',
     ])
       this.uniforms[name] = gl.getUniformLocation(program, name);
   }
 
-  paint(minute: number, seconds: number, forecast: boolean): void {
+  /**
+   * `metresPerPixel` is the ground under one screen pixel, and sets how wide
+   * the forecast lines are drawn: under two pixels across, whatever the zoom.
+   */
+  paint(minute: number, seconds: number, forecast: boolean, metresPerPixel = CELL_M): void {
     const gl = this.gl;
     if (gl.isContextLost()) return;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -153,6 +191,8 @@ export class FireSurface {
     gl.uniform1f(this.uniforms['size'], GRID);
     gl.uniform1f(this.uniforms['cellMetres'], CELL_M);
     gl.uniform1i(this.uniforms['forecast'], +forecast);
+    gl.uniform3f(this.uniforms['offsets'], FORECASTS[0], FORECASTS[1], FORECASTS[2]);
+    gl.uniform1f(this.uniforms['lineCells'], (0.9 * metresPerPixel) / CELL_M);
     gl.uniform4fv(this.uniforms['crop'], this.extent);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
