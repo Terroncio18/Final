@@ -1918,7 +1918,9 @@ coordinació no en diu res.
   d'operacions, els models de *spotting* d'Albini— o dir explícitament que no
   n'hi ha. Queden també sense mesurar el rendiment amb plans màxims (100
   mesures, 512 vèrtexs) i una revisió en més d'un navegador.
-- **12.17. El document de contramesures va endarrerit.**
+- ~~**12.17. El document de contramesures va endarrerit.**~~ Resolta el
+  16/11/2026: el document ja descriu les §11.29 a §11.31 i diu què s'ha mirat
+  al navegador i què no. El que es plantejava:
   [contramesures.md](contramesures.md) descriu la versió de la §11.28:
   multiplicadors, escenaris de la versió 3 i «no hi ha spotting». Cal
   posar-lo al dia amb les §11.29 a §11.31.
