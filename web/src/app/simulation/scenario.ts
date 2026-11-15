@@ -59,7 +59,8 @@ export const SCENARIO_DEFAULTS: {
   windFrom: 315,
   humidity: 28,
   temperature: 32,
-  spotting: { enabled: false, seed: 2026 },
+  // Seed 1: a number that reads as a choice, not as a year.
+  spotting: { enabled: false, seed: 1 },
 };
 
 /**

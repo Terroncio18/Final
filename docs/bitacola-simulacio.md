@@ -1843,7 +1843,9 @@ perquè el model no tenia salt de brases, i la §11.25 recordava que el foc és
 només de superfície. Les brases són la primera escletxa en aquella frontera.
 
 - **Desactivades per defecte.** Es configuren abans d'iniciar, amb una
-  casella i una llavor. Sense activar-les, el resultat és el de sempre.
+  casella i una llavor. Sense activar-les, el resultat és el de sempre. La
+  llavor per defecte és **1** des del 16/11/2026: era 2026, i a la pantalla
+  es llegia com un any. Un escenari que ja la porta escrita no canvia.
 - **Com funciona**: cada cel·la que crema pot emetre una brasa amb una
   probabilitat que creix amb la intensitat de Byram (§11.25) i és més alta
   sota combustible llenyós. La brasa vola amb el vent —integrant-ne els

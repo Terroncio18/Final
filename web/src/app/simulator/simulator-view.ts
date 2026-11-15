@@ -770,7 +770,7 @@ export class SimulatorView {
     this.weatherMode.set('manual');
     this.windChanges.set(scenario.windChanges ?? []);
     this.spottingEnabled.set(scenario.spotting?.enabled ?? false);
-    this.spottingSeed.set(scenario.spotting?.seed ?? 2026);
+    this.spottingSeed.set(scenario.spotting?.seed ?? SCENARIO_DEFAULTS.spotting.seed);
     this.wind.set(scenario.wind);
     this.direction.set(scenario.windFrom);
     this.humidity.set(scenario.humidity);
