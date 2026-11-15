@@ -127,7 +127,10 @@ Els escenaris nous són **versió 4**. Al fitxer de text, amb JSON dins de la l�
 - `canvis_vent = [...]`, amb `startMin`, `speedKmh` i `fromDeg`;
 - `brases = {"enabled": …, "seed": …}`.
 
-Els fitxers de les versions 1 a 3 continuen obrint-se; l'absència de `startMin`
+Els fitxers de les versions 1 a 3 continuen obrint-se: cada clau que hi falta
+pren el valor per defecte de la pantalla, l'avís diu quines, i el botó «Desar
+actualitzat» els torna a escriure en la versió 4 amb totes les claus. Desar
+escriu sempre totes les claus, també les buides. L'absència de `startMin`
 significa T=0. Un pla, un vent o unes brases mal formats es rebutgen sencers
 amb un missatge: perdre una barrera silenciosament canviaria la pregunta
 simulada. També es rebutgen versions futures desconegudes, les contramesures
@@ -156,7 +159,7 @@ Des de `web`: `npm test -- --watch=false` i `npm run build`.
 
 La suite pura s'executa amb Vitest i les proves Angular amb el seu builder: aquest
 últim no admet els mocks de mòduls relatius de les proves de propagació.
-Verificació actual (16/11/2026): **101 proves passen** (73 de simulació i 28
+Verificació actual (16/11/2026): **103 proves passen** (75 de simulació i 28
 Angular); build de producció sense avisos. El càlcul de distància a les ignicions
 usa una transformada euclidiana exacta quan hi ha més de 32 llavors; les
 estadístiques d'avanç només compten les ignicions ja desplegades a cada instant.

@@ -420,6 +420,13 @@
           <p class="terrain-note" [attr.role]="note.failed ? 'alert' : 'status'">
             {{ note.text }}
           </p>
+          @if (note.outdated) {
+            <div class="tools-row">
+              <button type="button" (click)="saveScenario()">
+                <app-icon name="save" /> Desar actualitzat
+              </button>
+            </div>
+          }
         }
         <p class="terrain-note">
           Es desa com un fitxer de text (.txt) amb el domini, les ignicions, la meteorologia en
@@ -776,12 +783,11 @@
         <p class="terrain-note">
           Cada mesura s'aplica al minut de desplegament. Les descàrregues augmenten la humitat del
           combustible fi; la tala retira càrrega i conserva restes. Les mesures del passat queden
-          bloquejades: torna a l'inici per editar-les. Retenció del 30 % i assecat amb constant d'una
-          hora: hipòtesis experimentals. El retardant només representa humectació equivalent,
-          sense residu químic. No es modelen dotacions ni temps de construcció.
-          La graella és de 30 m: la petjada real és la de les
-          cel·les tocades i pot ser més ampla que la franja dibuixada. El pla no viatja a l'enllaç:
-          es conserva en desar l'escenari.
+          bloquejades: torna a l'inici per editar-les. Retenció del 30 % i assecat amb constant
+          d'una hora: hipòtesis experimentals. El retardant només representa humectació equivalent,
+          sense residu químic. No es modelen dotacions ni temps de construcció. La graella és de 30
+          m: la petjada real és la de les cel·les tocades i pot ser més ampla que la franja
+          dibuixada. El pla no viatja a l'enllaç: es conserva en desar l'escenari.
         </p>
       </details>
 

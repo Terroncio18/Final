@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { formatScenario, parseScenario, scenarioFileName, type Scenario } from './scenario';
+import {
+  formatScenario,
+  isOutdated,
+  parseScenario,
+  readScenario,
+  SCENARIO_DEFAULTS,
+  scenarioFileName,
+  type Scenario,
+} from './scenario';
 
 const scenario: Scenario = {
   name: 'Tramuntana forta',
@@ -19,14 +27,42 @@ const scenario: Scenario = {
 
 describe('scenario files', () => {
   it('round-trips wind history, liquid passes, residual fuel and the ember seed together', () => {
-    const complete:Scenario={...scenario,windChanges:[{startMin:90,speedKmh:40,fromDeg:180}],spotting:{enabled:true,seed:31415},
-      countermeasures:[{id:'h',kind:'helicopter',points:[[2.71,39.76]],widthM:90,strength:0,durationMin:0,startMin:100,litresPerPass:1200,passes:3,passIntervalMin:12},
-        {id:'c',kind:'clearing',points:[[2.7,39.76],[2.71,39.76]],widthM:60,strength:0,durationMin:0,fuelRemaining:0.2}]};
-    expect(parseScenario(formatScenario(complete,new Date(0)))).toEqual(complete);
-    const text=formatScenario(scenario,new Date(0));
-    expect(typeof parseScenario(text+'canvis_vent = [{"startMin":-1}]')).toBe('string');
-    expect(typeof parseScenario(text+'brases = {"enabled":true,"seed":-1}')).toBe('string');
-    expect(parseScenario(text.replace('versio = 4','versio = 3'))).toEqual(scenario);
+    const complete: Scenario = {
+      ...scenario,
+      windChanges: [{ startMin: 90, speedKmh: 40, fromDeg: 180 }],
+      spotting: { enabled: true, seed: 31415 },
+      countermeasures: [
+        {
+          id: 'h',
+          kind: 'helicopter',
+          points: [[2.71, 39.76]],
+          widthM: 90,
+          strength: 0,
+          durationMin: 0,
+          startMin: 100,
+          litresPerPass: 1200,
+          passes: 3,
+          passIntervalMin: 12,
+        },
+        {
+          id: 'c',
+          kind: 'clearing',
+          points: [
+            [2.7, 39.76],
+            [2.71, 39.76],
+          ],
+          widthM: 60,
+          strength: 0,
+          durationMin: 0,
+          fuelRemaining: 0.2,
+        },
+      ],
+    };
+    expect(parseScenario(formatScenario(complete, new Date(0)))).toEqual(complete);
+    const text = formatScenario(scenario, new Date(0));
+    expect(typeof parseScenario(text + 'canvis_vent = [{"startMin":-1}]')).toBe('string');
+    expect(typeof parseScenario(text + 'brases = {"enabled":true,"seed":-1}')).toBe('string');
+    expect(parseScenario(text.replace('versio = 4', 'versio = 3'))).toEqual(scenario);
   });
   it('reads back exactly what it wrote', () => {
     const text = formatScenario(scenario, new Date('2026-11-14T19:00:00Z'));
@@ -110,5 +146,42 @@ describe('scenario files', () => {
       { id: 'x', kind: 'helicopter', points: [[0, 0]], widthM: 30, strength: 0.7, durationMin: 20 },
     ];
     expect(parseScenario(text + 'contramesures = ' + JSON.stringify(outside))).toMatch(/domini/);
+  });
+
+  it('brings an older file up to date, naming every key it had to fill', () => {
+    const old = formatScenario(scenario, new Date(0))
+      .replace('versio = 4\n', '')
+      .replace(/^humitat = .*\n/m, '')
+      .replace(/^temperatura = .*\n/m, '');
+    const read = readScenario(old);
+    if (typeof read === 'string') throw new Error(read);
+    expect(read.version).toBe('1');
+    expect(read.filled).toEqual([
+      'humitat',
+      'temperatura',
+      'brases',
+      'canvis de vent',
+      'contramesures',
+    ]);
+    expect(read.scenario).toMatchObject({
+      humidity: SCENARIO_DEFAULTS.humidity,
+      temperature: SCENARIO_DEFAULTS.temperature,
+      wind: 35,
+    });
+    expect(isOutdated(read)).toBe(true);
+  });
+
+  it('fills nothing in a complete current file', () => {
+    const complete: Scenario = {
+      ...scenario,
+      countermeasures: [],
+      windChanges: [],
+      spotting: SCENARIO_DEFAULTS.spotting,
+    };
+    const read = readScenario(formatScenario(complete, new Date(0)));
+    if (typeof read === 'string') throw new Error(read);
+    expect(read.filled).toEqual([]);
+    expect(isOutdated(read)).toBe(false);
+    expect(read.scenario).toEqual(complete);
   });
 });

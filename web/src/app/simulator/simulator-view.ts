@@ -40,8 +40,10 @@ import {
 import { ProvincesService } from '../simulation/provinces.service';
 import {
   formatScenario,
+  isOutdated,
   MAX_SCENARIO_SIZE,
-  parseScenario,
+  readScenario,
+  SCENARIO_DEFAULTS,
   SCENARIO_TOO_LARGE,
   scenarioFileName,
 } from '../simulation/scenario';
@@ -264,8 +266,8 @@ export class SimulatorView {
   protected readonly durationLimits = DURATION_LIMITS;
   private readonly measureDisplay = new CountermeasureDisplay();
   private readonly spottingDisplay = new SpottingDisplay();
-  protected readonly spottingEnabled = signal(false);
-  protected readonly spottingSeed = signal(2026);
+  protected readonly spottingEnabled = signal(SCENARIO_DEFAULTS.spotting.enabled);
+  protected readonly spottingSeed = signal(SCENARIO_DEFAULTS.spotting.seed);
   private readonly spottingConfig = computed(() => ({
     enabled: this.spottingEnabled(),
     seed: this.spottingSeed(),
@@ -314,8 +316,8 @@ export class SimulatorView {
 
   // ---- What the user can set. ----
 
-  protected readonly wind = signal(22);
-  protected readonly direction = signal(315);
+  protected readonly wind = signal(SCENARIO_DEFAULTS.wind);
+  protected readonly direction = signal(SCENARIO_DEFAULTS.windFrom);
   protected readonly windChanges = signal<readonly WindChange[]>([]);
   protected readonly windDraft = signal<{ speedKmh: number; fromDeg: number } | null>(null);
   protected readonly windRows = computed(() =>
@@ -326,8 +328,8 @@ export class SimulatorView {
       pending: change.startMin > this.minutes(),
     })),
   );
-  protected readonly humidity = signal(28);
-  protected readonly temperature = signal(32);
+  protected readonly humidity = signal(SCENARIO_DEFAULTS.humidity);
+  protected readonly temperature = signal(SCENARIO_DEFAULTS.temperature);
 
   /**
    * Where the weather comes from: an observation, or the sliders.
@@ -681,7 +683,12 @@ export class SimulatorView {
   // ---- Scenarios: a text file out, a text file in (§11.26). ----
   protected readonly scenarioName = signal('');
   /** What the last save or load came to, for the line under the buttons. */
-  protected readonly scenarioNote = signal<{ text: string; failed: boolean } | null>(null);
+  protected readonly scenarioNote = signal<{
+    text: string;
+    failed: boolean;
+    /** Loaded from an older file: offers to save it again as a current one. */
+    outdated?: boolean;
+  } | null>(null);
 
   protected setScenarioName(event: Event): void {
     this.scenarioName.set((event.target as HTMLInputElement).value);
@@ -719,9 +726,10 @@ export class SimulatorView {
         windFrom: Math.round(now.fromDeg),
         humidity: Math.round(now.humidity),
         temperature: Math.round(now.temperature),
-        // Left out when empty, so a scenario without a plan is the file it always was.
-        ...(this.plan.measures().length ? { countermeasures: this.plan.measures() } : {}),
-        ...(this.windChanges().length ? { windChanges: this.windChanges() } : {}),
+        // Written even when empty: a saved file carries every key of its
+        // version, so it never needs defaults filled in when read (§11.33).
+        countermeasures: this.plan.measures(),
+        windChanges: this.windChanges(),
         spotting: this.spottingConfig(),
       },
       new Date(),
@@ -752,11 +760,12 @@ export class SimulatorView {
       this.scenarioNote.set({ text: SCENARIO_TOO_LARGE, failed: true });
       return;
     }
-    const scenario = parseScenario(await file.text());
-    if (typeof scenario === 'string') {
-      this.scenarioNote.set({ text: scenario, failed: true });
+    const read = readScenario(await file.text());
+    if (typeof read === 'string') {
+      this.scenarioNote.set({ text: read, failed: true });
       return;
     }
+    const scenario = read.scenario;
     this.reset();
     this.weatherMode.set('manual');
     this.windChanges.set(scenario.windChanges ?? []);
@@ -786,7 +795,19 @@ export class SimulatorView {
     // weather of the file replace theirs.
     this.planDomain = formatPoint(scenario.centre);
     this.plan.replace(scenario.countermeasures ?? [], domainAround(scenario.centre));
-    this.scenarioNote.set({ text: `Carregat: ${scenario.name || file.name}`, failed: false });
+    const loaded = `Carregat: ${scenario.name || file.name}`;
+    if (!isOutdated(read)) {
+      this.scenarioNote.set({ text: loaded, failed: false });
+      return;
+    }
+    const filled = read.filled.length
+      ? ` S'hi han afegit amb els valors per defecte: ${read.filled.join(', ')}.`
+      : '';
+    this.scenarioNote.set({
+      text: `${loaded}. És un escenari de la versió ${read.version}.${filled}`,
+      failed: false,
+      outdated: true,
+    });
   }
 
   /** What saving a scenario would keep, read from what is set right now. */

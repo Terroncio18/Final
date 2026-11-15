@@ -43,6 +43,40 @@ const HEADER = '# IgnisLab · escenari de simulació';
 const VERSION = '4';
 
 /**
+ * What a key the file does not carry stands for: the screen's own starting
+ * values. They are the values a scenario older than the key ran with —no
+ * plan, a steady wind, no embers— and, for the weather, the sliders as the
+ * screen opens.
+ */
+export const SCENARIO_DEFAULTS: {
+  readonly wind: number;
+  readonly windFrom: number;
+  readonly humidity: number;
+  readonly temperature: number;
+  readonly spotting: SpottingOptions;
+} = {
+  wind: 22,
+  windFrom: 315,
+  humidity: 28,
+  temperature: 32,
+  spotting: { enabled: false, seed: 2026 },
+};
+
+/**
+ * A scenario as read, and how far the file was from the current format: the
+ * version it says it is, and the keys that had to be filled with defaults.
+ * With either, the screen offers to save it again as a current file.
+ */
+export interface ScenarioRead {
+  readonly scenario: Scenario;
+  readonly version: string;
+  readonly filled: readonly string[];
+}
+
+export const isOutdated = (read: ScenarioRead) =>
+  read.version !== VERSION || read.filled.length > 0;
+
+/**
  * The scenario as a text file: one `key = value` per line, in Catalan, with
  * the units in the comments.
  *
@@ -121,8 +155,18 @@ export const SCENARIO_TOO_LARGE = 'El fitxer d’escenari és massa gran.';
  *   which is what lets a file edited by hand carry notes; a slider value out
  *   of range is clamped; and an ignition that does not parse is dropped
  *   rather than guessed, as in the address (§11.16).
+ * - **An older file is brought up to date** (§11.33): a key it does not
+ *   carry takes its default, and is named in `filled`. Without the domain
+ *   it is still refused, because nothing can stand for where the fire is;
+ *   a key that is there but unreadable is refused too, as it is not missing
+ *   but wrong.
  */
 export function parseScenario(text: string): Scenario | string {
+  const read = readScenario(text);
+  return typeof read === 'string' ? read : read.scenario;
+}
+
+export function readScenario(text: string): ScenarioRead | string {
   if (text.length > MAX_SCENARIO_SIZE) return SCENARIO_TOO_LARGE;
   if (!text.includes('IgnisLab')) return 'El fitxer no és un escenari d’IgnisLab.';
 
@@ -156,20 +200,35 @@ export function parseScenario(text: string): Scenario | string {
     return 'A l’escenari li falta el domini: regió, província, municipi o centre.';
   }
 
+  const filled: string[] = [];
   // By the key the file uses. A decimal comma is what a hand writes here.
-  const number = (key: string, limits?: readonly [number, number]) => {
+  // Absent, it takes the default and says so; there and unreadable, null.
+  const number = (
+    key: string,
+    label: string,
+    fallback: number,
+    limits?: readonly [number, number],
+  ) => {
     const text = values.get(key);
-    const value = Number((text ?? '').replace(',', '.'));
-    if (text === undefined || text === '' || !Number.isFinite(value)) return null;
+    if (text === undefined) {
+      filled.push(label);
+      return fallback;
+    }
+    const value = Number(text.replace(',', '.'));
+    if (text === '' || !Number.isFinite(value)) return null;
     return limits ? Math.min(Math.max(value, limits[0]), limits[1]) : value;
   };
-  const wind = number('vent', LIMITS.wind);
-  const humidity = number('humitat', LIMITS.humidity);
-  const temperature = number('temperatura', LIMITS.temperature);
-  const from = number('vent_des_de');
+  const d = SCENARIO_DEFAULTS;
+  const wind = number('vent', 'vent', d.wind, LIMITS.wind);
+  const from = number('vent_des_de', 'direcció del vent', d.windFrom);
+  const humidity = number('humitat', 'humitat', d.humidity, LIMITS.humidity);
+  const temperature = number('temperatura', 'temperatura', d.temperature, LIMITS.temperature);
   if (wind === null || humidity === null || temperature === null || from === null) {
-    return 'A l’escenari li falta la meteorologia: vent, direcció, humitat o temperatura.';
+    return 'La meteorologia de l’escenari no es pot llegir: vent, direcció, humitat o temperatura.';
   }
+  if (!values.has('brases')) filled.push('brases');
+  if (!values.has('canvis_vent')) filled.push('canvis de vent');
+  if (!values.has('contramesures')) filled.push('contramesures');
   let spotting: SpottingOptions | undefined;
   if (values.has('brases')) {
     let raw: unknown;
@@ -210,7 +269,7 @@ export function parseScenario(text: string): Scenario | string {
     countermeasures = parsed;
   }
 
-  return {
+  const scenario: Scenario = {
     name: values.get('nom') ?? '',
     region,
     province,
@@ -225,6 +284,7 @@ export function parseScenario(text: string): Scenario | string {
     ...(windChanges !== undefined ? { windChanges } : {}),
     ...(spotting !== undefined ? { spotting } : {}),
   };
+  return { scenario, version: version ?? '1', filled };
 }
 
 /** A file name out of a scenario's name: `ignislab-tramuntana-forta.txt`. */

@@ -1939,6 +1939,43 @@ Comprovat: una prova nova del camp desconegut, les 73 proves de simulació i
 les 28 d'Angular, i la compilació sense avisos. **Al navegador no s'ha
 mirat**: ho prova Pere.
 
+### 11.33. Un escenari antic s'actualitza, no es perd
+
+Decidit el 16/11/2026, a petició de Pere: un escenari antic no s'ha de perdre
+per culpa d'una clau que encara no existia quan es va desar, i les claus noves
+importants s'hi han d'afegir.
+
+- **Una clau que falta pren el valor per defecte, i es diu.** El lector
+  (`readScenario`) torna l'escenari, la versió que diu ser —o la 1 si no ho
+  diu— i la llista de claus que ha hagut d'omplir. Els valors per defecte són
+  els de la pantalla quan s'obre (`SCENARIO_DEFAULTS`, que ara comparteixen
+  el lector i els lliscadors): sense pla, vent constant, sense brases, i la
+  meteorologia dels lliscadors.
+- **La meteorologia que falta ja no fa rebutjar el fitxer.** S'omple, i
+  l'avís ho diu. **El domini, sí**: res no pot fer de valor per defecte d'on
+  és el foc. I una clau que hi és però no es pot llegir —«humitat = molta»—
+  segueix rebutjant el fitxer: no falta, és errònia.
+- **En carregar un escenari antic, la pantalla ho diu i ofereix «Desar
+  actualitzat»**: quina versió era i què s'hi ha afegit. Desar-lo escriu la
+  versió 4 amb totes les claus.
+- **Desar escriu ara totes les claus, també les buides** —`contramesures =
+  []`, `canvis_vent = []`—. Abans s'ometien perquè un escenari sense pla fos
+  el fitxer de sempre (§11.26); però llavors un fitxer actual semblaria
+  antic en llegir-lo, i el fitxer ja diu sol tot el que val.
+- **No es converteix res que ja hi sigui.** Les contramesures antigues amb
+  percentatges es queden com són (§11.31): passar-les a litres inventaria una
+  dada que ningú no va decidir i canviaria el foc.
+
+El mateix mecanisme serveix per a les versions que vinguin: si una clau canvia
+de forma, el lector la convertirà i ho afegirà a la llista, en comptes de
+rebutjar el fitxer. Una versió més nova que l'aplicació es continua
+rebutjant (§11.32).
+
+Comprovat: dues proves noves —un fitxer sense versió, humitat ni temperatura,
+i un de complet que no ha d'omplir res—, les 75 proves de simulació i les 28
+d'Angular, i la compilació sense avisos. **Al navegador no s'ha mirat**: ho
+prova Pere.
+
 ---
 
 ## 12. Decisions pendents
