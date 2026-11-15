@@ -2116,6 +2116,12 @@ D'on venia el cost, i què s'hi ha fet:
 - **L'estat d'una cel·la tractada es desa per a cada tram**, i no només el
   darrer: Dijkstra hi passa en ordres de temps diferents i el desat únic es
   refeia a cada consulta.
+- **Al mapa, les mesures es tornaven a generar a cada minut de la
+  reproducció.** La llista de mesures visibles depenia del cursor, i cada
+  minut en sortia una de nova encara que fos igual: totes les franges i els
+  discos es refeien i MapLibre tornava a trossejar el GeoJSON. Ara la llista
+  només canvia quan hi entra o en surt una mesura, i el mateix per als focus
+  per brases.
 
 El que no es fa, i per què: **calcular només a partir del minut del
 desplegament**. El foc d'abans no canvia, però els passos que travessen aquell

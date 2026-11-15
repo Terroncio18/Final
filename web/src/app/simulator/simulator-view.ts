@@ -221,6 +221,11 @@ function chartPaths(values: readonly number[], width = 300, height = 100) {
  * are real; the fuel is not yet, and the screen says so. The layout is the
  * FireCast prototype's, as §11.7 settled.
  */
+/** Two lists holding the same items, in the same order. */
+function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
+  return a.length === b.length && a.every((item, i) => item === b[i]);
+}
+
 @Component({
   selector: 'app-simulator-view',
   imports: [RouterLink, Icon],
@@ -272,8 +277,29 @@ export class SimulatorView {
     enabled: this.spottingEnabled(),
     seed: this.spottingSeed(),
   }));
-  protected readonly visibleSpots = computed(() =>
-    (this.result()?.spotIgnitions ?? []).filter((s) => s.minute <= this.minutes()),
+  protected readonly visibleSpots = computed(
+    () => (this.result()?.spotIgnitions ?? []).filter((s) => s.minute <= this.minutes()),
+    // A new list only when a spot appears, not at every minute of playback:
+    // the map rebuilds its layer each time it gets one.
+    { equal: sameItems },
+  );
+  /**
+   * The plan's measures on the map at the cursor. Like the spots, a new list
+   * only when one appears or goes (§11.36): with it the map regenerates every
+   * strip and disc, and during playback the cursor moves every frame.
+   */
+  private readonly shownMeasures = computed(
+    () =>
+      this.plan
+        .measures()
+        .filter(
+          (measure) =>
+            !this.result() ||
+            ((measure.startMin ?? 0) <= this.minutes() &&
+              (!measure.durationMin ||
+                this.minutes() < (measure.startMin ?? 0) + measure.durationMin)),
+        ),
+    { equal: sameItems },
   );
   protected readonly spotRows = computed(() =>
     this.visibleSpots()
@@ -1284,25 +1310,16 @@ export class SimulatorView {
       if (!map) return;
       this.measureDisplay.attach(map, (id) => this.plan.select(id));
       this.measureDisplay.setMeasures(
-        this.plan
-          .measures()
-          .filter(
-            (measure) =>
-              !this.result() ||
-              ((measure.startMin ?? 0) <= this.minutes() &&
-                (!measure.durationMin ||
-                  this.minutes() < (measure.startMin ?? 0) + measure.durationMin)),
-          )
-          .map((measure) => {
-            const entry = catalogEntry(measure.kind);
-            return {
-              id: measure.id,
-              points: measure.points,
-              widthM: measure.widthM,
-              colour: entry.color,
-              disc: entry.geometry === 'point',
-            };
-          }),
+        this.shownMeasures().map((measure) => {
+          const entry = catalogEntry(measure.kind);
+          return {
+            id: measure.id,
+            points: measure.points,
+            widthM: measure.widthM,
+            colour: entry.color,
+            disc: entry.geometry === 'point',
+          };
+        }),
         this.plan.selected(),
       );
     });
