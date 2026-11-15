@@ -6,7 +6,7 @@ de base per a la memòria del TFG.
 Continuació de [bitacola.md](bitacola.md), la fase 1 —el mapa i el formulari—,
 tancada el 5 de novembre de 2026.
 
-Darrera actualització: 15 de novembre de 2026.
+Darrera actualització: 16 de novembre de 2026.
 
 Les seccions van numerades **des del §10**. El codi cita les decisions pel seu
 número als comentaris —§2.29, §3.4— i dos documents que comencessin tots dos a
@@ -1743,6 +1743,13 @@ recorre (§11.19):
 - **Contrafoc**: no frena res, encén. Són ignicions noves al minut del
   desplegament, i per això **pot augmentar** l'àrea cremada.
 
+> **Revisat el 16/11/2026** (§11.31): la tala, l'aigua, els mitjans aeris i
+> el retardant ja no es creen com a multiplicadors sinó com a mesures
+> físiques —combustible retirat i litres descarregats— que sí que recalculen
+> Rothermel a la cel·la. Els multiplicadors segueixen sent vàlids als
+> escenaris que els porten. I les barreres ja no són absolutes: amb les brases
+> activades (§11.30) un focus pot saltar-les.
+
 No es reescriu el llit de Rothermel: el combustible original no es modifica
 mai, i la intensitat de Byram (§11.25) baixa perquè surt de la velocitat ja
 reduïda. Desbrossar no reconstrueix el model d'Anderson de la cel·la; n'és una
@@ -1811,16 +1818,110 @@ Sóller i dades reals de l'API: un helicòpter a T+3 h conserva les 5,9 ha
 cremades i baixa la previsió d'una hora de 10,6 a 9,6 ha. La captura és fora
 del repositori.
 
+### 11.29. El vent pot canviar durant la simulació
+
+Decidit el 15/11/2026, fet per Codex. Fins ara el vent era un de sol per a
+les dotze hores (§11.18), i un canvi de vent és precisament el que gira un
+incendi. Ara l'escenari pot portar **fins a cent canvis**, cadascun amb el
+minut, la velocitat a 10 m i la direcció d'origen.
+
+- **Cada canvi és instantani i es manté fins al següent.** No hi ha
+  interpolació entre dos canvis: és el mateix tipus de simplificació que la
+  caducitat discreta de les contramesures (§11.27), i fa que el temps es pugui
+  tallar per trams exactes.
+- **El model ho integra per trams.** Un trajecte que travessa un canvi de vent
+  es calcula amb l'el·lipse de cada tram, com ja es feia amb els tractaments
+  temporals, i l'ordre d'arribada del Dijkstra es conserva. El vent a mitja
+  flama es recalcula per a cada model de combustible.
+- **Viatja a l'escenari**, i el fitxer passa a la versió 4. Els límits són els
+  dels lliscadors: 0–60 km/h, minuts únics i ordenats entre 0 i 720.
+
+### 11.30. Focus secundaris per brases, opcionals i reproduïbles
+
+Decidit el 15/11/2026, fet per Codex. La §11.27 deixava les barreres ideals
+perquè el model no tenia salt de brases, i la §11.25 recordava que el foc és
+només de superfície. Les brases són la primera escletxa en aquella frontera.
+
+- **Desactivades per defecte.** Es configuren abans d'iniciar, amb una
+  casella i una llavor. Sense activar-les, el resultat és el de sempre.
+- **Com funciona**: cada cel·la que crema pot emetre una brasa amb una
+  probabilitat que creix amb la intensitat de Byram (§11.25) i és més alta
+  sota combustible llenyós. La brasa vola amb el vent —integrant-ne els
+  canvis (§11.29)—, una distància que també depèn de la intensitat, entre
+  30 m i 2 km. On cau s'encén segons la humitat del combustible fi, la càrrega
+  i la temperatura. Si encén, és una ignició nova dins del mateix Dijkstra.
+- **Atzar reproduïble.** El número aleatori surt d'un *hash* de la llavor i de
+  la cel·la, no d'una seqüència. Això vol dir que el mateix escenari dona el
+  mateix foc, que era una premissa des de la §11.19, i que editar una cosa
+  lluny no canvia les brases de la resta del domini.
+- **No és la taula operativa.** La probabilitat d'ignició és experimental i no
+  la de NWCG; ho diu el codi i ho diu la pantalla.
+- **Una brasa pot saltar un tallafoc.** És la conseqüència buscada: ara una
+  barrera de la §11.27 ja no és absoluta. Les cel·les amb un tractament que
+  atura el foc tampoc no s'encenen per brasa.
+
+La columna d'anàlisi llista els focus secundaris —origen, hora i distància— i
+el mapa els dibuixa.
+
+### 11.31. Les contramesures es tornen físiques: litres i combustible retirat
+
+Decidit el 15/11/2026, fet per Codex. Revisa la §11.27, que reduïa tot a un
+multiplicador de la velocitat amb percentatges inventats. Ara les mesures que
+ho permeten es descriuen amb **el que es fa** i el model en treu l'efecte.
+
+- **Descàrregues en litres.** Aigua, helicòpter, avió amfibi i retardant es
+  defineixen amb litres per passada, nombre de passades (1–20) i minuts entre
+  passades (1–120). La capacitat màxima per passada és la d'un aparell de
+  referència amb font citada al codi: **Bell 412** amb dipòsit ventral,
+  1.350 L; **Canadair CL-415**, 6.137 L; **Air Tractor AT-802F**, 3.104 L. No
+  és la capacitat de tots els aparells, sinó d'un de concret i nomenat.
+- **L'aigua mulla el combustible mort fi.** Els litres es reparteixen sobre la
+  petjada, se'n reté un 30 % i aquesta aigua s'afegeix a la humitat de
+  1 h, que s'asseca amb una constant d'una hora. Amb la nova humitat **es
+  recalcula Rothermel** a la cel·la, i si supera la d'extinció el foc no hi
+  passa. El combustible viu no es toca. El retardant només es representa com a
+  humectació equivalent: no hi ha el residu químic.
+- **La tala retira càrrega.** Es defineix amb el percentatge de combustible
+  que queda (per defecte el 20 %, mínim el 5 %), i el llit de la cel·la es
+  recalcula amb aquesta càrrega. Ja no és una aproximació de la velocitat.
+- **El combustible original segueix sense modificar-se.** Els tractaments
+  són un historial per cel·la que es consulta minut a minut; la humitat es
+  pren constant a trams de cinc minuts perquè el Dijkstra pugui integrar
+  cada tram exactament.
+- **Les mesures noves es creen físiques; els multiplicadors queden.** Un
+  escenari antic amb reduccions en percentatge s'obre i calcula com abans. Les
+  dues coses no es barregen en una mateixa mesura.
+
+De passada, un error de Rothermel: el factor d'amortiment per humitat és un
+polinomi que, amb humitats prou altes, donava negatiu i hauria donat una
+intensitat de reacció negativa. Ara es retalla a zero. Amb el combustible
+xop per les descàrregues, aquesta situació havia deixat de ser teòrica.
+
+**El que segueix sent hipòtesi**: el 30 % de retenció, l'hora d'assecat i
+les probabilitats de les brases no surten de cap calibració. Ho diu la nota
+de la pantalla, i passa a la 12.16.
+
+Comprovat: les 72 proves de simulació i les 28 d'Angular, i la compilació de
+producció sense avisos, amb proves noves per al vent, les brases i els
+tractaments. **Al navegador, no consta que s'hagi mirat**: el fitxer de
+coordinació no en diu res.
+
 ---
 
 ## 12. Decisions pendents
 
-- **12.16. Calibrar els coeficients de les contramesures.** Ve de la §11.27.
-  Les reduccions i les durades del catàleg són il·lustratives. Si la memòria
-  n'ha de treure conclusions quantitatives, cal una font —literatura
-  d'extinció o dades d'operacions— o dir explícitament que no n'hi ha. Queden
-  també sense mesurar el rendiment amb plans màxims (100 mesures, 512 vèrtexs)
-  i una revisió en més d'un navegador.
+- **12.16. Calibrar els coeficients de les contramesures.** Ve de la §11.27,
+  i s'amplia a la §11.31. Les reduccions dels escenaris antics, la retenció
+  del 30 %, l'assecat d'una hora i les probabilitats d'emissió i d'ignició de
+  les brases (§11.30) són hipòtesis. Si la memòria n'ha de treure
+  conclusions quantitatives, cal una font —literatura d'extinció, dades
+  d'operacions, els models de *spotting* d'Albini— o dir explícitament que no
+  n'hi ha. Queden també sense mesurar el rendiment amb plans màxims (100
+  mesures, 512 vèrtexs) i una revisió en més d'un navegador.
+- **12.17. El document de contramesures va endarrerit.**
+  [contramesures.md](contramesures.md) descriu la versió de la §11.28:
+  multiplicadors, escenaris de la versió 3 i «no hi ha spotting». Cal
+  posar-lo al dia amb les §11.29 a §11.31.
 
 - **12.15. Dos pintors que no pinten.** Ve de la §11.22. `fire-appearance.ts`
   (amb set proves) i `fire-field.ts` són al repositori i no els fa servir
