@@ -329,7 +329,7 @@ export function fuelBed(model: FuelModel, moistures: Moistures): FuelBed {
     const netLoad = sum(list, (part) => (part.area / area) * part.load) * (1 - TOTAL_MINERAL);
     const moisture = sum(list, (part) => (part.area / area) * part.moisture);
     const r = Math.min(moisture / extinction, 1);
-    const damping = 1 - 2.59 * r + 5.11 * r * r - 3.52 * r * r * r;
+    const damping = Math.max(0, 1 - 2.59 * r + 5.11 * r * r - 3.52 * r * r * r);
     return { reaction: netLoad * HEAT_CONTENT * damping };
   };
 

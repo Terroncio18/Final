@@ -2,6 +2,9 @@ import { computed, signal } from '@angular/core';
 
 import {
   COUNTERMEASURE_CATALOG,
+  AIRCRAFT,
+  liquidKind,
+  liquidCapacity,
   WIDTH_LIMITS,
   DURATION_LIMITS,
   MAX_VERTICES,
@@ -41,16 +44,16 @@ export { WIDTH_LIMITS, DURATION_LIMITS, MAX_VERTICES } from '../simulation/count
  */
 const HELP: Readonly<Record<CountermeasureKind, string>> = {
   'defense-line':
-    'Barrera permanent: el foc no la travessa. No es modela el temps que la brigada triga a obrir-la.',
+    'Barrera al foc de superfície. Amb brases activades hi pot haver salts. Construcció instantània.',
   firebreak:
-    'Barrera permanent: el foc no la travessa. No es modelen salts de foc per damunt de la franja.',
-  clearing: 'Redueix la propagació dins la franja, de manera permanent. No atura el foc.',
-  'water-line': 'Redueix la propagació dins la franja mentre dura l’efecte; després caduca.',
+    'Barrera al foc de superfície. Les brases poden encendre combustible més enllà de la franja.',
+  clearing: 'Tala amb retirada de material. Conserva un percentatge de combustible i recalcula el model.',
+  'water-line': 'Litres per passada i interval en minuts: humecta el combustible fi de la franja.',
   backfire:
     'Encén la línia en desplegar-la: el que crema compta com a superfície cremada i pot ampliar l’incendi.',
-  helicopter: 'Un clic, una descàrrega: un disc que frena el foc mentre dura l’efecte.',
-  amphibious: 'Un clic, una descàrrega: un disc que frena el foc mentre dura l’efecte.',
-  retardant: 'Franja que frena el foc mentre dura l’efecte; després caduca.',
+  helicopter: 'Un clic fixa el disc de descàrrega. Ajusta litres, passades i temps entre passades.',
+  amphibious: 'Un clic fixa el disc de descàrrega. Ajusta litres, passades i temps entre passades.',
+  retardant: 'Descàrregues sobre una franja. Només humectació equivalent; no modela el residu químic.',
 };
 
 const BARRIERS: ReadonlySet<CountermeasureKind> = new Set(['defense-line', 'firebreak']);
@@ -134,6 +137,19 @@ export class CountermeasurePlan {
       const backfire = measure.kind === 'backfire';
       const barrier = BARRIERS.has(measure.kind);
       const start = measure.startMin ?? 0;
+      const liquid = measure.litresPerPass !== undefined;
+      const removal = measure.fuelRemaining !== undefined;
+      const aircraft =
+        measure.kind in AIRCRAFT ? AIRCRAFT[measure.kind as keyof typeof AIRCRAFT] : null;
+      const completed = liquid
+        ? Math.max(
+            0,
+            Math.min(
+              measure.passes!,
+              Math.floor((this.minute() - start) / measure.passIntervalMin!) + 1,
+            ),
+          )
+        : 0;
       const expired = measure.durationMin > 0 && this.minute() >= start + measure.durationMin;
       return {
         id: measure.id,
@@ -146,7 +162,14 @@ export class CountermeasurePlan {
           .padStart(2, '0')}:${Math.floor((start * 60) % 60)
           .toString()
           .padStart(2, '0')}`,
-        status: start > this.minute() ? 'Programada' : expired ? 'Caducada' : 'Desplegada',
+        status:
+          start > this.minute()
+            ? 'Programada'
+            : liquid
+              ? `${completed}/${measure.passes} passades · humectació`
+              : expired
+                ? 'Caducada'
+                : 'Desplegada',
         name: `${entry.label} ${ordinal}`,
         colour: entry.color,
         icon: entry.icon,
@@ -156,20 +179,33 @@ export class CountermeasurePlan {
             : metres >= 1000
               ? `${one.format(metres / 1000)} km`
               : `${whole.format(metres)} m`,
-        effect: backfire
-          ? 'Ignició en desplegar-la'
-          : barrier
-            ? 'Barrera permanent'
-            : measure.durationMin > 0
-              ? `−${percent} % de propagació, ${measure.durationMin} min`
-              : `−${percent} % de propagació, permanent`,
+        liquid,
+        litresPerPass: measure.litresPerPass ?? 0,
+        passes: measure.passes ?? 1,
+        passIntervalMin: measure.passIntervalMin ?? 10,
+        capacityL: liquidCapacity(measure.kind),
+        aircraft,
+        remainingPercent: Math.round((measure.fuelRemaining ?? 1) * 100),
+        removal,
+        totalLitres: (measure.litresPerPass ?? 0) * (measure.passes ?? 1),
+        effect: liquid
+          ? `${whole.format(measure.litresPerPass!)} L × ${measure.passes} · cada ${measure.passIntervalMin} min`
+          : removal
+            ? `${Math.round(measure.fuelRemaining! * 100)} % de combustible restant`
+            : backfire
+              ? 'Ignició en desplegar-la'
+              : barrier
+                ? 'Barrera permanent'
+                : measure.durationMin > 0
+                  ? `−${percent} % de propagació, ${measure.durationMin} min`
+                  : `−${percent} % de propagació, permanent`,
         widthM: measure.widthM,
         widthEditable: true,
         strengthPercent: percent,
-        strengthEditable: !backfire && !barrier,
+        strengthEditable: !liquid && !removal && !backfire && !barrier,
         widthLabel: entry.geometry === 'point' ? 'Diàmetre' : 'Amplada',
         durationMin: measure.durationMin,
-        durationEditable: measure.durationMin > 0,
+        durationEditable: !liquid && measure.durationMin > 0,
       };
     });
   });
@@ -350,14 +386,33 @@ export class CountermeasurePlan {
       kind,
       points: [...points],
       widthM: entry.widthM,
-      strength: entry.strength,
-      durationMin: entry.durationMin,
+      strength: liquidKind(kind) || kind === 'clearing' ? 0 : entry.strength,
+      durationMin: liquidKind(kind) || kind === 'clearing' ? 0 : entry.durationMin,
+      ...(liquidKind(kind)
+        ? {
+            litresPerPass: kind === 'water-line' ? 1000 : liquidCapacity(kind),
+            passes: 1,
+            passIntervalMin: 10,
+          }
+        : {}),
+      ...(kind === 'clearing' ? { fuelRemaining: 0.2 } : {}),
       ...(this.minute() > 0 ? { startMin: this.minute() } : {}),
     };
     const ordinal = this.measures().filter((other) => other.kind === kind).length + 1;
     const done = this.commit([...this.measures(), measure], `Afegit: ${entry.label} ${ordinal}.`);
     if (done) this.selected.set(measure.id);
     return done;
+  }
+
+  setLiquid(
+    id: string,
+    field: 'litresPerPass' | 'passes' | 'passIntervalMin',
+    value: number,
+  ): boolean {
+    return this.patch(id, { [field]: value });
+  }
+  setRemaining(id: string, percent: number): boolean {
+    return this.patch(id, { fuelRemaining: percent / 100 });
   }
 
   private patch(id: string, change: Partial<Countermeasure>): boolean {

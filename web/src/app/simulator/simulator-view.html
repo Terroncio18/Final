@@ -103,6 +103,7 @@
         <div class="mode-switch" role="group" aria-label="Origen de la meteorologia">
           <button
             type="button"
+            [disabled]="computing() || !!result()"
             [class.on]="weatherMode() === 'live'"
             (click)="weatherMode.set('live')"
           >
@@ -110,6 +111,7 @@
           </button>
           <button
             type="button"
+            [disabled]="computing() || !!result()"
             [class.on]="weatherMode() === 'manual'"
             (click)="weatherMode.set('manual')"
           >
@@ -140,7 +142,7 @@
             <button
               type="button"
               class="ghost-button"
-              [disabled]="weatherLoading()"
+              [disabled]="weatherLoading() || computing() || !!result()"
               (click)="refreshWeather()"
             >
               <app-icon name="reset" /> Actualitzar
@@ -165,8 +167,8 @@
               aria-valuemax="355"
               [attr.aria-valuenow]="now().fromDeg"
               [attr.aria-valuetext]="'Vent ' + fromPhrase() + ', ' + now().fromDeg + '°'"
-              [attr.aria-disabled]="weatherMode() === 'live'"
-              [attr.tabindex]="weatherMode() === 'live' ? -1 : 0"
+              [attr.aria-disabled]="computing() || (weatherMode() === 'live' && !result())"
+              [attr.tabindex]="computing() || (weatherMode() === 'live' && !result()) ? -1 : 0"
               title="Arrossega l'agulla cap on bufa el vent"
               (pointerdown)="turnWind($event)"
               (pointermove)="turnWind($event)"
@@ -216,11 +218,46 @@
             min="0"
             max="60"
             [value]="now().wind"
-            [disabled]="weatherMode() === 'live'"
+            [disabled]="computing() || (weatherMode() === 'live' && !result())"
             [style.--fill]="fill(now().wind, 0, 60)"
             (input)="setNumber('wind', $event)"
           />
           <div class="range-bounds"><span>0 km/h</span><span>60 km/h</span></div>
+
+          @if (result()) {
+            <p class="terrain-note">
+              Canvia la velocitat o gira l'agulla i aplica el vent a T + {{ elapsed() }} h. El foc
+              anterior es conserva. Direcció: origen del vent.
+            </p>
+          }
+          @if (windDraft()) {
+            <div class="tools-row">
+              <button type="button" [disabled]="!canStart()" (click)="applyWind()">
+                Aplicar el vent
+              </button>
+              <button type="button" [disabled]="computing()" (click)="windDraft.set(null)">
+                Cancel·lar canvi
+              </button>
+            </div>
+            <p class="terrain-note" role="status">
+              Canvi pendent a T + {{ elapsed() }} h; reproducció pausada.
+            </p>
+          }
+          @if (windRows().length) {
+            <ul class="start-list" aria-label="Canvis de vent">
+              @for (change of windRows(); track change.startMin) {
+                <li>
+                  <span
+                    ><strong>T + {{ change.time }} h · {{ change.speedKmh }} km/h</strong>
+                    <small
+                      >Des de {{ change.origin }} ({{ change.fromDeg }}°) ·
+                      {{ change.pending ? 'Programat' : 'Aplicat' }}</small
+                    >
+                  </span>
+                </li>
+              }
+            </ul>
+          }
 
           <label class="slider-label" for="humidity">
             <span><app-icon name="droplet" /> Humitat relativa</span>
@@ -441,6 +478,47 @@
         }
       </details>
 
+      <details class="fold control-section" open>
+        <summary><h3>FOCUS SECUNDARIS PER BRASES</h3></summary>
+        <label
+          ><input
+            type="checkbox"
+            [checked]="spottingEnabled()"
+            [disabled]="!!result() || computing()"
+            (change)="spottingEnabled.set(!spottingEnabled())"
+          />
+          Activar transport de brases</label
+        >
+        <label class="scenario-name"
+          ><span>Llavor aleatòria reproduïble</span>
+          <input
+            type="number"
+            min="0"
+            max="4294967295"
+            step="1"
+            [value]="spottingSeed()"
+            [disabled]="!!result() || computing()"
+            (change)="setSpottingSeed($event)"
+          />
+        </label>
+        <p class="terrain-note">
+          Configura-ho abans d'iniciar. Model experimental: la intensitat, el vent, el combustible i
+          la humitat condicionen l'emissió i la ignició. Una brasa pot saltar un tallafoc.
+        </p>
+        @if (result() && spottingEnabled()) {
+          <p class="terrain-note" role="status">
+            {{ visibleSpots().length }} focus per brases fins a T + {{ elapsed() }} h.
+          </p>
+          <div class="tools-row">
+            @for (spot of spotRows(); track spot.cell) {
+              <button type="button" (click)="focusSpot(spot.cell)">
+                {{ spot.label }} · {{ spot.time }} h · {{ spot.distance }} m
+              </button>
+            }
+          </div>
+        }
+      </details>
+
       <!-- Deploy at the playback cursor; earlier fire history is preserved. -->
       <details class="fold control-section" open>
         <summary>
@@ -531,7 +609,7 @@
         }
         @if (planStale()) {
           <p class="terrain-note measure-note" role="status">
-            Previsió actualitzada. Es conserva el foc anterior al desplegament. Prem reproduir per
+            Previsió actualitzada. Es conserva el foc anterior al canvi. Prem reproduir per
             continuar des d'aquest minut.
           </p>
         }
@@ -583,6 +661,58 @@
                         />
                       </label>
                     }
+                    @if (row.liquid) {
+                      <label
+                        ><span>Litres per passada</span>
+                        <input
+                          type="number"
+                          min="1"
+                          [max]="row.capacityL"
+                          step="1"
+                          [value]="row.litresPerPass"
+                          [disabled]="computing() || row.locked"
+                          (change)="setMeasureNumber(row.id, 'litresPerPass', $event)"
+                        />
+                      </label>
+                      <label
+                        ><span>Passades</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="20"
+                          step="1"
+                          [value]="row.passes"
+                          [disabled]="computing() || row.locked"
+                          (change)="setMeasureNumber(row.id, 'passes', $event)"
+                        />
+                      </label>
+                      <label
+                        ><span>Temps entre passades (min)</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="120"
+                          step="1"
+                          [value]="row.passIntervalMin"
+                          [disabled]="computing() || row.locked"
+                          (change)="setMeasureNumber(row.id, 'passIntervalMin', $event)"
+                        />
+                      </label>
+                    }
+                    @if (row.removal) {
+                      <label
+                        ><span>Combustible restant (%)</span>
+                        <input
+                          type="number"
+                          min="5"
+                          max="100"
+                          step="1"
+                          [value]="row.remainingPercent"
+                          [disabled]="computing() || row.locked"
+                          (change)="setMeasureNumber(row.id, 'remaining', $event)"
+                        />
+                      </label>
+                    }
                     @if (row.durationEditable) {
                       <label>
                         <span>Durada (min)</span>
@@ -615,6 +745,18 @@
                     }
                   </div>
                 }
+                @if (row.liquid) {
+                  <p class="terrain-note">
+                    Total: {{ row.totalLitres }} L. Primera passada al desplegament.
+                  </p>
+                  @if (row.aircraft; as aircraft) {
+                    <p class="terrain-note">
+                      <a [href]="aircraft.source" target="_blank" rel="noopener noreferrer"
+                        >{{ aircraft.name }} · capacitat {{ aircraft.capacityL }} L</a
+                      >
+                    </p>
+                  }
+                }
               </li>
             }
           </ul>
@@ -632,14 +774,37 @@
         }
 
         <p class="terrain-note">
-          Cada mesura s'aplica al minut de desplegament; la durada compta des d'aquell instant. Les
-          mesures del passat queden bloquejades: torna a l'inici per editar-les. Els percentatges
-          són coeficients del simulacre, no eficàcia operativa validada: no es modelen dotacions,
-          temps de construcció, salts de foc ni foc de capçades. La graella és de 30 m: la petjada
-          real és la de les cel·les tocades i pot ser més ampla que la franja dibuixada. El pla no
-          viatja a l'enllaç: es conserva en desar l'escenari.
+          Cada mesura s'aplica al minut de desplegament. Les descàrregues augmenten la humitat del
+          combustible fi; la tala retira càrrega i conserva restes. Les mesures del passat queden
+          bloquejades: torna a l'inici per editar-les. Retenció del 30 % i assecat amb constant d'una
+          hora: hipòtesis experimentals. El retardant només representa humectació equivalent,
+          sense residu químic. No es modelen dotacions ni temps de construcció.
+          La graella és de 30 m: la petjada real és la de les
+          cel·les tocades i pot ser més ampla que la franja dibuixada. El pla no viatja a l'enllaç:
+          es conserva en desar l'escenari.
         </p>
       </details>
+
+      @if (treatedCell(); as cell) {
+        <section class="control-section" aria-label="Combustible tractat">
+          <h3>COMBUSTIBLE TRACTAT</h3>
+          <p class="terrain-note">{{ cell.where }}</p>
+          <dl class="terrain-facts">
+            <div>
+              <dt>Humitat del combustible fi</dt>
+              <dd>{{ cell.moisture }} %</dd>
+            </div>
+            <div>
+              <dt>Càrrega seca</dt>
+              <dd>{{ cell.load }} t/ha</dd>
+            </div>
+            <div>
+              <dt>Combustible restant</dt>
+              <dd>{{ cell.remaining }} %</dd>
+            </div>
+          </dl>
+        </section>
+      }
 
       <div class="simulation-controls">
         @if (plan.draft().length) {
@@ -659,7 +824,12 @@
           <p class="terrain-note measure-note failed" role="alert">{{ error }}</p>
         }
         <div class="play-controls">
-          <button type="button" class="button primary" [disabled]="!canStart()" (click)="start()">
+          <button
+            type="button"
+            class="button primary"
+            [disabled]="!canStart() || !!windDraft()"
+            (click)="start()"
+          >
             <app-icon name="play" /> {{ result() ? 'Tornar a calcular' : 'Iniciar simulació' }}
           </button>
           <button
@@ -857,7 +1027,7 @@
           <div class="timeline-actions">
             <button
               type="button"
-              [disabled]="!result() || computing()"
+              [disabled]="!result() || computing() || !!windDraft()"
               [attr.aria-label]="playing() ? 'Aturar' : 'Reproduir'"
               (click)="togglePlay()"
             >
@@ -1181,10 +1351,10 @@
         <span>
           Un simulacre, no una predicció
           <small>
-            El combustible combina cartografia oficial i estimacions de coberta; la meteorologia no
-            canvia en {{ horizon.hours }} hores; només hi ha foc de superfície, sense capçades ni
-            focus secundaris. La dificultat de control només llegeix la longitud de flama. No
-            serveix per prendre decisions d'emergència.
+            El combustible combina cartografia oficial i estimacions de coberta; el vent segueix els
+            canvis programats; humitat ambiental i temperatura són constants. Foc de superfície
+            sense capçades, amb transport experimental de brases opcional. La dificultat de control
+            només llegeix la longitud de flama. No serveix per prendre decisions d'emergència.
           </small>
         </span>
       </div>

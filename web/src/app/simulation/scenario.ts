@@ -1,6 +1,8 @@
 import { formatPoint, formatPoints, parsePoint, parsePoints, type Point } from './point';
 import { parseCountermeasures, type Countermeasure } from './countermeasures';
 import { domainAround } from './domain';
+import { parseSpotting, type SpottingOptions } from './spotting';
+import { parseWindChanges, type WindChange } from './wind';
 
 /**
  * A scenario: everything it takes to compute the same fire again.
@@ -26,6 +28,8 @@ export interface Scenario {
   /** °C. */
   readonly temperature: number;
   readonly countermeasures?: readonly Countermeasure[];
+  readonly windChanges?: readonly WindChange[];
+  readonly spotting?: SpottingOptions;
 }
 
 /** What the sliders of the screen can hold: a file cannot ask for more. */
@@ -36,7 +40,7 @@ const LIMITS = {
 } as const;
 
 const HEADER = '# IgnisLab · escenari de simulació';
-const VERSION = '3';
+const VERSION = '4';
 
 /**
  * The scenario as a text file: one `key = value` per line, in Catalan, with
@@ -47,6 +51,12 @@ const VERSION = '3';
  * opens it with a notepad, and survive being edited by hand.
  */
 export function formatScenario(scenario: Scenario, saved: Date): string {
+  if (scenario.spotting && typeof parseSpotting(scenario.spotting) === 'string')
+    throw new Error('Configuració de brases incorrecta.');
+  if (scenario.windChanges) {
+    const winds = parseWindChanges(scenario.windChanges);
+    if (typeof winds === 'string') throw new Error(winds);
+  }
   if (scenario.countermeasures) {
     const measures = parseCountermeasures(scenario.countermeasures);
     if (typeof measures === 'string') throw new Error(measures);
@@ -74,6 +84,14 @@ export function formatScenario(scenario: Scenario, saved: Date): string {
     `vent_des_de = ${scenario.windFrom}`,
     `humitat = ${scenario.humidity}`,
     `temperatura = ${scenario.temperature}`,
+    ...(scenario.spotting ? [`brases = ${JSON.stringify(scenario.spotting)}`] : []),
+    ...(scenario.windChanges
+      ? [
+          '',
+          '# Canvis de vent: startMin en minuts, speedKmh a 10 m i fromDeg d’on ve.',
+          `canvis_vent = ${JSON.stringify(scenario.windChanges)}`,
+        ]
+      : []),
     ...(scenario.countermeasures
       ? [
           '',
@@ -112,7 +130,13 @@ export function parseScenario(text: string): Scenario | string {
     return /^[A-Za-z0-9_]+$/.test(value) ? value : null;
   };
   const version = values.get('versio');
-  if (version !== undefined && version !== '1' && version !== '2' && version !== VERSION)
+  if (
+    version !== undefined &&
+    version !== '1' &&
+    version !== '2' &&
+    version !== '3' &&
+    version !== VERSION
+  )
     return 'Versió d’escenari no compatible.';
   const region = code('regio');
   const province = code('provincia');
@@ -135,6 +159,30 @@ export function parseScenario(text: string): Scenario | string {
   const from = number('vent_des_de');
   if (wind === null || humidity === null || temperature === null || from === null) {
     return 'A l’escenari li falta la meteorologia: vent, direcció, humitat o temperatura.';
+  }
+  let spotting: SpottingOptions | undefined;
+  if (values.has('brases')) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(values.get('brases')!);
+    } catch {
+      return 'Les brases no són un JSON vàlid.';
+    }
+    const checked = parseSpotting(raw);
+    if (typeof checked === 'string') return checked;
+    spotting = checked;
+  }
+  let windChanges: readonly WindChange[] | undefined;
+  if (values.has('canvis_vent')) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(values.get('canvis_vent')!);
+    } catch {
+      return 'Els canvis de vent no són un JSON vàlid.';
+    }
+    const checked = parseWindChanges(raw);
+    if (typeof checked === 'string') return checked;
+    windChanges = checked;
   }
   let countermeasures: readonly Countermeasure[] | undefined;
   if (values.has('contramesures')) {
@@ -164,6 +212,8 @@ export function parseScenario(text: string): Scenario | string {
     humidity: Math.round(humidity),
     temperature: Math.round(temperature),
     ...(countermeasures !== undefined ? { countermeasures } : {}),
+    ...(windChanges !== undefined ? { windChanges } : {}),
+    ...(spotting !== undefined ? { spotting } : {}),
   };
 }
 

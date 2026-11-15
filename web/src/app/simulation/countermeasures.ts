@@ -20,7 +20,39 @@ export interface Countermeasure {
   readonly strength: number;
   readonly durationMin: number;
   readonly startMin?: number;
+  readonly litresPerPass?: number;
+  readonly passes?: number;
+  readonly passIntervalMin?: number;
+  /** Fraction of the original dry fuel load remaining after removal. */
+  readonly fuelRemaining?: number;
 }
+
+/** Named reference configurations, not a universal capacity for every aircraft. */
+export const AIRCRAFT = {
+  helicopter: {
+    name: 'Bell 412 · dipòsit ventral',
+    capacityL: 1350,
+    source:
+      'https://firewebext.ffm.vic.gov.au/BurnsToday/sau/SAU_External/documents/Aircraft%20Identification%20Reference%20%28updated%202014%29.pdf',
+  },
+  amphibious: {
+    name: 'Canadair CL-415',
+    capacityL: 6137,
+    source:
+      'https://www.avincis.com/wp-content/uploads/2024/11/A4-CL-415-Specifications-Flyer-Low-Res.pdf',
+  },
+  retardant: {
+    name: 'Air Tractor AT-802F',
+    capacityL: 3104,
+    source: 'https://airtractor.com/wp-content/uploads/2022/09/Air-Tractor_802F-Brochure_2022.pdf',
+  },
+} as const;
+export const liquidKind = (kind: CountermeasureKind) =>
+  kind === 'helicopter' || kind === 'amphibious' || kind === 'water-line' || kind === 'retardant';
+export const liquidCapacity = (kind: CountermeasureKind) =>
+  kind in AIRCRAFT ? AIRCRAFT[kind as keyof typeof AIRCRAFT].capacityL : 10000;
+export const physicalMeasure = (m: Countermeasure) =>
+  m.litresPerPass !== undefined || m.fuelRemaining !== undefined;
 
 interface MeasureDefinition {
   readonly kind: CountermeasureKind;
@@ -64,7 +96,7 @@ export const COUNTERMEASURE_CATALOG: readonly MeasureDefinition[] = [
   {
     kind: 'clearing',
     label: 'Tala i desbrossament',
-    note: 'Reducció permanent de propagació',
+    note: 'Retirada parcial de combustible; conserva restes',
     icon: 'trees',
     group: 'ground',
     geometry: 'line',
@@ -100,7 +132,7 @@ export const COUNTERMEASURE_CATALOG: readonly MeasureDefinition[] = [
   {
     kind: 'helicopter',
     label: 'Helicòpter',
-    note: "Disc d'aigua temporal idealitzat",
+    note: 'Bell 412 · fins a 1.350 L per passada',
     icon: 'droplet',
     group: 'air',
     geometry: 'point',
@@ -112,7 +144,7 @@ export const COUNTERMEASURE_CATALOG: readonly MeasureDefinition[] = [
   {
     kind: 'amphibious',
     label: 'Avió amfibi',
-    note: "Disc d'aigua temporal idealitzat",
+    note: 'CL-415 · fins a 6.137 L per passada',
     icon: 'plane',
     group: 'air',
     geometry: 'point',
@@ -124,7 +156,7 @@ export const COUNTERMEASURE_CATALOG: readonly MeasureDefinition[] = [
   {
     kind: 'retardant',
     label: 'Retardant',
-    note: 'Franja de reducció temporal idealitzada',
+    note: 'AT-802F · fins a 3.104 L per passada',
     icon: 'plane',
     group: 'air',
     geometry: 'line',
@@ -179,11 +211,40 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
       return 'La franja necessita dos punts diferents.';
     if (!finite(raw.widthM) || raw.widthM < WIDTH_LIMITS.min || raw.widthM > WIDTH_LIMITS.max)
       return `L'amplada ha d'estar entre ${CELL_M} i 3000 m.`;
+    const liquid =
+      raw.litresPerPass !== undefined ||
+      raw.passes !== undefined ||
+      raw.passIntervalMin !== undefined;
+    const removal = raw.fuelRemaining !== undefined;
+    if (
+      liquid &&
+      (!liquidKind(def.kind) ||
+        !finite(raw.litresPerPass) ||
+        raw.litresPerPass < 1 ||
+        raw.litresPerPass > liquidCapacity(def.kind) ||
+        !Number.isInteger(raw.passes) ||
+        raw.passes < 1 ||
+        raw.passes > 20 ||
+        !finite(raw.passIntervalMin) ||
+        raw.passIntervalMin < 1 ||
+        raw.passIntervalMin > 120)
+    )
+      return `Descàrrega incorrecta: 1–${liquidCapacity(def.kind)} L per passada, 1–20 passades i 1–120 min entre passades.`;
+    if (
+      removal &&
+      (def.kind !== 'clearing' ||
+        !finite(raw.fuelRemaining) ||
+        raw.fuelRemaining < 0.05 ||
+        raw.fuelRemaining > 1)
+    )
+      return 'La tala ha de conservar entre el 5 i el 100 % de la càrrega original.';
+    if ((liquid || removal) && (raw.strength !== 0 || raw.durationMin !== 0))
+      return 'Les mesures de líquid o càrrega no admeten reducció artificial ni durada fixa.';
     if (!finite(raw.strength) || raw.strength < 0 || raw.strength > 0.95)
       return 'La reducció ha d’estar entre 0 i 95 %.';
     if (
       !finite(raw.durationMin) ||
-      (temporary(def.kind)
+      (!liquid && temporary(def.kind)
         ? raw.durationMin < DURATION_LIMITS.min || raw.durationMin > DURATION_LIMITS.max
         : raw.durationMin !== 0)
     )
@@ -202,6 +263,14 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
       strength: raw.strength,
       durationMin: raw.durationMin,
       ...(raw.startMin !== undefined ? { startMin: raw.startMin } : {}),
+      ...(liquid
+        ? {
+            litresPerPass: raw.litresPerPass,
+            passes: raw.passes,
+            passIntervalMin: raw.passIntervalMin,
+          }
+        : {}),
+      ...(removal ? { fuelRemaining: raw.fuelRemaining } : {}),
     });
   }
   return result;
@@ -300,6 +369,7 @@ export function compileCountermeasures(
   const ignitions = new Set<number>();
   const timedIgnitions = new Map<number, number>();
   for (const measure of measures) {
+    if (physicalMeasure(measure)) continue;
     const from = measure.startMin ?? 0;
     for (const cell of countermeasureCells(centre, measure)) {
       const barrier = measure.kind === 'firebreak' || measure.kind === 'defense-line';

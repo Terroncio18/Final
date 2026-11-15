@@ -18,6 +18,16 @@ const scenario: Scenario = {
 };
 
 describe('scenario files', () => {
+  it('round-trips wind history, liquid passes, residual fuel and the ember seed together', () => {
+    const complete:Scenario={...scenario,windChanges:[{startMin:90,speedKmh:40,fromDeg:180}],spotting:{enabled:true,seed:31415},
+      countermeasures:[{id:'h',kind:'helicopter',points:[[2.71,39.76]],widthM:90,strength:0,durationMin:0,startMin:100,litresPerPass:1200,passes:3,passIntervalMin:12},
+        {id:'c',kind:'clearing',points:[[2.7,39.76],[2.71,39.76]],widthM:60,strength:0,durationMin:0,fuelRemaining:0.2}]};
+    expect(parseScenario(formatScenario(complete,new Date(0)))).toEqual(complete);
+    const text=formatScenario(scenario,new Date(0));
+    expect(typeof parseScenario(text+'canvis_vent = [{"startMin":-1}]')).toBe('string');
+    expect(typeof parseScenario(text+'brases = {"enabled":true,"seed":-1}')).toBe('string');
+    expect(parseScenario(text.replace('versio = 4','versio = 3'))).toEqual(scenario);
+  });
   it('reads back exactly what it wrote', () => {
     const text = formatScenario(scenario, new Date('2026-11-14T19:00:00Z'));
     expect(parseScenario(text)).toEqual(scenario);
@@ -77,17 +87,17 @@ describe('scenario files', () => {
         },
       ],
     };
-    expect(formatScenario(planned, new Date(0))).toContain('versio = 3');
+    expect(formatScenario(planned, new Date(0))).toContain('versio = 4');
     expect(parseScenario(formatScenario(planned, new Date(0)))).toEqual(planned);
     const legacy = {
       ...planned,
       countermeasures: planned.countermeasures!.map(({ startMin, ...m }) => m),
     };
     expect(
-      parseScenario(formatScenario(legacy, new Date(0)).replace('versio = 3', 'versio = 2')),
+      parseScenario(formatScenario(legacy, new Date(0)).replace('versio = 4', 'versio = 2')),
     ).toEqual(legacy);
     expect(
-      parseScenario(formatScenario(scenario, new Date(0)).replace('versio = 3', 'versio = 1')),
+      parseScenario(formatScenario(scenario, new Date(0)).replace('versio = 4', 'versio = 1')),
     ).toEqual(scenario);
   });
 
@@ -95,7 +105,7 @@ describe('scenario files', () => {
     const text = formatScenario(scenario, new Date(0));
     expect(parseScenario(text + 'contramesures = nope')).toMatch(/JSON/);
     expect(parseScenario(text + 'contramesures = [{}]')).toMatch(/desconegut/);
-    expect(parseScenario(text.replace('versio = 3', 'versio = 99'))).toMatch(/Versió/);
+    expect(parseScenario(text.replace('versio = 4', 'versio = 99'))).toMatch(/Versió/);
     const outside = [
       { id: 'x', kind: 'helicopter', points: [[0, 0]], widthM: 30, strength: 0.7, durationMin: 20 },
     ];

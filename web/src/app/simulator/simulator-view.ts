@@ -15,6 +15,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { Chrome } from '../chrome';
 import { CountermeasureDisplay } from '../map/countermeasure-display';
+import { SpottingDisplay, spotPoint } from '../map/spotting-display';
 import { MapService } from '../map/map.service';
 import { PlacesService } from '../map/places.service';
 import {
@@ -27,6 +28,7 @@ import { FireSurface } from '../simulation/fire-surface';
 import { FORECASTS, FORECAST_COLOURS, forecastOffsets } from '../simulation/fire-display';
 import { frontEmitters } from '../simulation/fire-emitters';
 import { spread, type SpreadResult } from '../simulation/fire-spread';
+import { parseWindChanges, spreadWinds, windAt, type WindChange } from '../simulation/wind';
 import { MunicipalitiesService } from '../simulation/municipalities.service';
 import {
   formatPoint,
@@ -255,6 +257,43 @@ export class SimulatorView {
   protected readonly widthLimits = WIDTH_LIMITS;
   protected readonly durationLimits = DURATION_LIMITS;
   private readonly measureDisplay = new CountermeasureDisplay();
+  private readonly spottingDisplay = new SpottingDisplay();
+  protected readonly spottingEnabled = signal(false);
+  protected readonly spottingSeed = signal(2026);
+  private readonly spottingConfig = computed(() => ({
+    enabled: this.spottingEnabled(),
+    seed: this.spottingSeed(),
+  }));
+  protected readonly visibleSpots = computed(() =>
+    (this.result()?.spotIgnitions ?? []).filter((s) => s.minute <= this.minutes()),
+  );
+  protected readonly spotRows = computed(() =>
+    this.visibleSpots()
+      .slice(-8)
+      .map((s, i) => ({
+        ...s,
+        label: `Focus per brasa ${this.visibleSpots().length - Math.min(8, this.visibleSpots().length) + i + 1}`,
+        time: this.clock(s.minute),
+        distance: Math.round(s.distanceM),
+      })),
+  );
+  protected readonly treatedCell = computed(() => {
+    const centre = this.ignition();
+    const selected = this.plan.measures().find((m) => m.id === this.plan.selected());
+    const point = this.maps.pointer() ?? selected?.points[0];
+    if (!centre || !point) return null;
+    const cell = cellOf(centre, point);
+    const state =
+      cell === null ? undefined : this.result()?.fuelTreatments?.at(cell, this.minutes());
+    if (!state) return null;
+    const format = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
+    return {
+      where: this.maps.pointer() ? 'Cel·la sota el cursor' : 'Cel·la de la mesura seleccionada',
+      moisture: format.format(state.moisture1h * 100),
+      load: format.format(state.bed.loadTonHa),
+      remaining: Math.round(state.remaining * 100),
+    };
+  });
   /** The domain the plan was last checked against, as the address writes it. */
   private planDomain: string | null = null;
   /** Set after the forecast has been updated for an in-simulation deployment. */
@@ -271,6 +310,16 @@ export class SimulatorView {
 
   protected readonly wind = signal(22);
   protected readonly direction = signal(315);
+  protected readonly windChanges = signal<readonly WindChange[]>([]);
+  protected readonly windDraft = signal<{ speedKmh: number; fromDeg: number } | null>(null);
+  protected readonly windRows = computed(() =>
+    this.windChanges().map((change) => ({
+      ...change,
+      time: this.clock(change.startMin),
+      origin: this.compass(change.fromDeg).short,
+      pending: change.startMin > this.minutes(),
+    })),
+  );
   protected readonly humidity = signal(28);
   protected readonly temperature = signal(32);
 
@@ -468,7 +517,7 @@ export class SimulatorView {
    * The manual signals are never overwritten by an observation, so going back
    * to manual finds the sliders where they were left.
    */
-  protected readonly now = computed(() => {
+  private readonly baseWeather = computed(() => {
     const seen = this.weatherMode() === 'live' ? this.weather.observation() : null;
     const wind = seen ? Math.round(seen.windKmh) : this.wind();
     const fromDeg = seen ? seen.windFromDeg : this.direction();
@@ -485,6 +534,31 @@ export class SimulatorView {
         temperature,
       ),
     };
+  });
+
+  private readonly activeWeather = computed(() => {
+    const base = this.baseWeather();
+    const active = windAt(this.windChanges(), this.minutes());
+    return active
+      ? {
+          ...base,
+          wind: active.speedKmh,
+          fromDeg: active.fromDeg,
+          towardsDeg: (active.fromDeg + 180) % 360,
+        }
+      : base;
+  });
+  protected readonly now = computed(() => {
+    const active = this.activeWeather(),
+      draft = this.windDraft();
+    return draft
+      ? {
+          ...active,
+          wind: draft.speedKmh,
+          fromDeg: draft.fromDeg,
+          towardsDeg: (draft.fromDeg + 180) % 360,
+        }
+      : active;
   });
 
   /** The point of the compass a bearing is nearest to. */
@@ -615,16 +689,16 @@ export class SimulatorView {
    * not something a file can ask for later. It comes back as manual values.
    */
   protected saveScenario(): void {
-    if (this.plan.draft().length) {
+    if (this.plan.draft().length || this.windDraft() || this.computing()) {
       this.scenarioNote.set({
-        text: 'Finalitza o cancel·la la franja abans de desar.',
+        text: 'Finalitza els canvis pendents i espera que acabi el càlcul abans de desar.',
         failed: true,
       });
       return;
     }
     const centre = this.ignition();
     if (!centre) return;
-    const now = this.now();
+    const now = this.baseWeather();
     const place = this.chosen()?.name ?? this.municipality();
     const name = this.scenarioName().trim() || `${place} · ${this.scenarioSummary()}`;
     const text = formatScenario(
@@ -641,6 +715,8 @@ export class SimulatorView {
         temperature: Math.round(now.temperature),
         // Left out when empty, so a scenario without a plan is the file it always was.
         ...(this.plan.measures().length ? { countermeasures: this.plan.measures() } : {}),
+        ...(this.windChanges().length ? { windChanges: this.windChanges() } : {}),
+        spotting: this.spottingConfig(),
       },
       new Date(),
     );
@@ -672,6 +748,9 @@ export class SimulatorView {
     }
     this.reset();
     this.weatherMode.set('manual');
+    this.windChanges.set(scenario.windChanges ?? []);
+    this.spottingEnabled.set(scenario.spotting?.enabled ?? false);
+    this.spottingSeed.set(scenario.spotting?.seed ?? 2026);
     this.wind.set(scenario.wind);
     this.direction.set(scenario.windFrom);
     this.humidity.set(scenario.humidity);
@@ -1196,6 +1275,12 @@ export class SimulatorView {
       );
     });
 
+    effect(() => {
+      const map = this.maps.ready() ? this.maps.map : null,
+        centre = this.ignition();
+      if (map && centre) this.spottingDisplay.set(map, centre, this.visibleSpots());
+    });
+
     // The line in progress, with the segment that follows the pointer.
     effect(() => {
       if (!this.maps.ready()) return;
@@ -1238,8 +1323,8 @@ export class SimulatorView {
     // question: it is taken off rather than left on screen under new sliders.
     effect(() => {
       this.starts();
-      this.fuelState();
-      this.now().towardsDeg;
+      this.baseWeather();
+      this.spottingConfig();
       this.terrain.terrain();
       this.fuels.grid();
       untracked(() => {
@@ -1266,8 +1351,7 @@ export class SimulatorView {
         console.error(error);
         return;
       }
-      const bounds = domainAround(centre),
-        weather = untracked(this.now);
+      const bounds = domainAround(centre);
       const reduced = matchMedia('(prefers-reduced-motion: reduce)');
       const scale = () => this.maps.metresPerPixel() ?? undefined;
       painter.paint(untracked(this.minutes), 0, untracked(this.visibleForecasts), scale());
@@ -1284,6 +1368,7 @@ export class SimulatorView {
         paintedForecast: boolean | undefined,
         motionWas: boolean | undefined;
       this.redrawFire = (minute, forecast) => {
+        const weather = untracked(this.activeWeather);
         painter.paint(minute, reduced.matches ? 0 : visualSeconds, forecast, scale());
         this.maps.refreshFire();
         this.maps.resetFireParticles();
@@ -1324,6 +1409,7 @@ export class SimulatorView {
             paintedForecast = forecast;
           }
           if (minute !== emittersMinute && (now - lastEmitters >= 100 || jumped)) {
+            const weather = untracked(this.activeWeather);
             if (jumped) this.maps.resetFireParticles();
             this.maps.setFireParticles(
               frontEmitters(result.arrival, terrain.elevation, minute, bounds),
@@ -1381,6 +1467,7 @@ export class SimulatorView {
     inject(DestroyRef).onDestroy(() => {
       this.run += 1;
       // Before the map goes: the layers and the click listener are this screen's.
+      this.spottingDisplay.detach();
       this.measureDisplay.detach();
       this.plan.cancel();
       this.terrain.clear();
@@ -1393,7 +1480,9 @@ export class SimulatorView {
 
   protected setNumber(which: 'wind' | 'humidity' | 'temperature', event: Event): void {
     const value = Number((event.target as HTMLInputElement).value);
-    ({ wind: this.wind, humidity: this.humidity, temperature: this.temperature })[which].set(value);
+    if (this.computing()) return;
+    if (which === 'wind') this.editWind({ speedKmh: value });
+    else ({ humidity: this.humidity, temperature: this.temperature })[which].set(value);
   }
 
   /**
@@ -1405,7 +1494,7 @@ export class SimulatorView {
    * dial can mean, and more than one station can tell.
    */
   protected turnWind(event: PointerEvent): void {
-    if (this.weatherMode() === 'live') return;
+    if (this.computing() || (this.weatherMode() === 'live' && !this.result())) return;
     const dial = event.currentTarget as HTMLElement;
     if (event.type === 'pointerdown') {
       // Captured, so the drag carries on outside the dial. A pointer that is
@@ -1426,12 +1515,12 @@ export class SimulatorView {
     // Too close to the pivot the angle is noise.
     if (Math.hypot(east, south) < 6) return;
     const towards = (Math.atan2(east, -south) * 180) / Math.PI;
-    this.direction.set((((Math.round(towards / 5) * 5 + 180) % 360) + 360) % 360);
+    this.editWind({ fromDeg: (((Math.round(towards / 5) * 5 + 180) % 360) + 360) % 360 });
   }
 
   /** The same with the keyboard: arrows by five degrees, page keys by a point. */
   protected nudgeWind(event: KeyboardEvent): void {
-    if (this.weatherMode() === 'live') return;
+    if (this.computing() || (this.weatherMode() === 'live' && !this.result())) return;
     const steps: Record<string, number> = {
       ArrowRight: 5,
       ArrowUp: 5,
@@ -1443,11 +1532,48 @@ export class SimulatorView {
     const step = steps[event.key];
     if (step === undefined && event.key !== 'Home') return;
     event.preventDefault();
-    this.direction.set(event.key === 'Home' ? 0 : (this.direction() + step + 360) % 360);
+    this.editWind({ fromDeg: event.key === 'Home' ? 0 : (this.now().fromDeg + step + 360) % 360 });
+  }
+
+  private editWind(change: Partial<{ speedKmh: number; fromDeg: number }>): void {
+    if (this.computing()) return;
+    const next = { speedKmh: this.now().wind, fromDeg: this.now().fromDeg, ...change };
+    if (!this.result()) {
+      this.wind.set(next.speedKmh);
+      this.direction.set(next.fromDeg);
+      // A T=0 override from a loaded scenario is also the initial wind.
+      this.windChanges.update((items) => items.filter((w) => w.startMin !== 0));
+      return;
+    }
+    this.playing.set(false);
+    this.plan.cancel();
+    this.tool.set(null);
+    this.windDraft.set(next);
+  }
+
+  protected async applyWind(): Promise<void> {
+    const draft = this.windDraft();
+    if (!draft || !this.result() || !this.canStart()) return;
+    const before = this.windChanges();
+    const changes = parseWindChanges(
+      [
+        ...before.filter((w) => w.startMin !== this.minutes()),
+        { ...draft, startMin: this.minutes() },
+      ].sort((a, b) => a.startMin - b.startMin),
+    );
+    if (typeof changes === 'string') {
+      this.runError.set(changes);
+      return;
+    }
+    this.windChanges.set(changes);
+    this.windDraft.set(null);
+    await this.start(this.minutes(), undefined, before);
   }
 
   protected setMinutes(event: Event): void {
     if (this.computing()) return;
+    // A pending wind edit belongs to the old cursor, never to a later seek.
+    this.windDraft.set(null);
     // Dragging the clock is taking it over: the playback stops.
     this.playing.set(false);
     this.minutes.set(Number((event.target as HTMLInputElement).value));
@@ -1495,13 +1621,24 @@ export class SimulatorView {
   protected async start(
     continueAt?: number,
     previousPlan?: readonly Countermeasure[],
+    previousWinds?: readonly WindChange[],
   ): Promise<void> {
     const terrain = this.terrain.terrain();
     const centre = this.ignition();
     const fuels = this.fuels.grid();
     if (!terrain || !centre || !fuels || !this.canStart()) return;
 
-    const { beds } = this.fuelState();
+    const baseline = this.baseWeather();
+    const moistures = moisturesFor(baseline.temperature, baseline.humidity, LIVE_MOISTURE);
+    const beds = Object.fromEntries(
+      Object.values(FUEL_MODELS).map((model) => [
+        model.id,
+        {
+          bed: fuelBed(model, moistures),
+          midflame: midflameWind(model, baseline.wind),
+        },
+      ]),
+    );
     const { bed, midflame } = beds[1];
     const ignitions = this.starts()
       .map((point) => cellOf(centre, point))
@@ -1509,6 +1646,7 @@ export class SimulatorView {
 
     const mine = (this.run += 1);
     this.playing.set(false);
+    this.windDraft.set(null);
     if (continueAt === undefined) {
       this.result.set(null);
       this.minutes.set(0);
@@ -1530,7 +1668,12 @@ export class SimulatorView {
           midflame,
           fuels: fuels.models,
           fuelBeds: beds,
-          towardsDeg: this.now().towardsDeg,
+          towardsDeg: baseline.towardsDeg,
+          windChanges: spreadWinds(this.windChanges()),
+          fuelMoistures: moistures,
+          spotting: this.spottingConfig(),
+          wind10mKmh: baseline.wind,
+          temperatureC: baseline.temperature,
           ignitions,
           horizon: this.horizon.minutes + FORECAST_MARGIN_MINUTES,
           // Left out when empty, so a run without measures is the run it always was.
@@ -1550,6 +1693,7 @@ export class SimulatorView {
     } catch (error) {
       if (mine === this.run) {
         if (previousPlan) this.plan.measures.set(previousPlan);
+        if (previousWinds) this.windChanges.set(previousWinds);
         this.runError.set(
           error instanceof Error ? error.message : 'No s’ha pogut calcular el foc.',
         );
@@ -1561,6 +1705,7 @@ export class SimulatorView {
 
   /** Takes the simulation off, whether it has finished or not. */
   protected reset(): void {
+    this.windDraft.set(null);
     this.runError.set(null);
     this.run += 1;
     this.playing.set(false);
@@ -1572,7 +1717,7 @@ export class SimulatorView {
   }
 
   protected togglePlay(): void {
-    if (!this.result() || this.computing()) return;
+    if (!this.result() || this.computing() || this.windDraft()) return;
     this.plan.cancel();
     this.tool.set(null);
     // Pressing play at the end starts over, which is what the button means there.
@@ -1613,6 +1758,7 @@ export class SimulatorView {
 
   protected pickMeasure(kind: CountermeasureKind): void {
     if (this.computing()) return;
+    this.windDraft.set(null);
     this.playing.set(false);
     this.plan.minute.set(this.result() ? this.minutes() : 0);
     this.plan.begin(kind);
@@ -1649,7 +1795,14 @@ export class SimulatorView {
    */
   protected setMeasureNumber(
     id: string,
-    which: 'width' | 'duration' | 'strength',
+    which:
+      | 'width'
+      | 'duration'
+      | 'strength'
+      | 'litresPerPass'
+      | 'passes'
+      | 'passIntervalMin'
+      | 'remaining',
     event: Event,
   ): void {
     const input = event.target as HTMLInputElement;
@@ -1657,7 +1810,9 @@ export class SimulatorView {
     this.editPlan(() => {
       if (which === 'width') this.plan.setWidth(id, value);
       else if (which === 'duration') this.plan.setDuration(id, value);
-      else this.plan.setStrength(id, value);
+      else if (which === 'strength') this.plan.setStrength(id, value);
+      else if (which === 'remaining') this.plan.setRemaining(id, value);
+      else this.plan.setLiquid(id, which, value);
     });
     const row = this.plan.rows().find((item) => item.id === id);
     if (row)
@@ -1666,8 +1821,32 @@ export class SimulatorView {
           ? row.widthM
           : which === 'duration'
             ? row.durationMin
-            : row.strengthPercent,
+            : which === 'strength'
+              ? row.strengthPercent
+              : which === 'remaining'
+                ? row.remainingPercent
+                : row[which],
       );
+  }
+
+  protected setSpottingSeed(event: Event): void {
+    const input = event.target as HTMLInputElement,
+      value = Number(input.value);
+    if (
+      !this.result() &&
+      !this.computing() &&
+      Number.isInteger(value) &&
+      value >= 0 &&
+      value <= 4294967295
+    )
+      this.spottingSeed.set(value);
+    input.value = String(this.spottingSeed());
+  }
+  protected focusSpot(cell: number): void {
+    const centre = this.ignition();
+    if (!centre) return;
+    const [lon, lat] = spotPoint(cell, centre);
+    this.maps.goToBounds([lon - 0.005, lat - 0.004, lon + 0.005, lat + 0.004]);
   }
 
   /** Frames the domain again, from wherever the camera has been dragged to. */

@@ -1,9 +1,20 @@
 import { CELL_M, GRID } from './domain';
+import type { SpreadWind } from './wind';
+import { FuelTreatments } from './fuel-treatments';
+import {
+  emberFlight,
+  emberRandom,
+  emberIgnitionProbability,
+  parseSpotting,
+  type SpottingOptions,
+  type SpotIgnition,
+} from './spotting';
 import {
   compileCountermeasures,
   treatedTravel,
   treatmentFactor,
   type Countermeasure,
+  physicalMeasure,
 } from './countermeasures';
 import type { Point } from './point';
 import { ignitionDistances } from './fire-distances';
@@ -14,6 +25,8 @@ import {
   M_PER_FT,
   windFactor,
   type FuelBed,
+  type Moistures,
+  FUEL_MODELS,
 } from './rothermel';
 
 /**
@@ -32,6 +45,11 @@ export interface SpreadInput {
   readonly fuelBeds?: Readonly<Record<number, { bed: FuelBed; midflame: number }>>;
   /** Where the wind blows **towards**, degrees from north, clockwise. */
   readonly towardsDeg: number;
+  readonly windChanges?: readonly SpreadWind[];
+  readonly fuelMoistures?: Moistures;
+  readonly spotting?: SpottingOptions;
+  readonly wind10mKmh?: number;
+  readonly temperatureC?: number;
   /** The cells the fire starts in, as indices into the grid. */
   readonly ignitions: readonly number[];
   /** How long to simulate, in minutes. */
@@ -71,6 +89,8 @@ export interface SpreadResult {
   readonly reachedEdge: number;
   /** Mean no-wind, no-slope rate over burnable cells, m/min. */
   readonly baseRate: number;
+  readonly fuelTreatments?: FuelTreatments;
+  readonly spotIgnitions?: readonly SpotIgnition[];
 }
 
 /** How many cells away a single step may land, along either axis. */
@@ -243,6 +263,51 @@ export async function spread(
   const treatments = input.countermeasures?.measures.length
     ? compileCountermeasures(input.countermeasures.centre, input.countermeasures.measures)
     : undefined;
+  if (input.spotting && typeof parseSpotting(input.spotting) === 'string')
+    throw new Error('Configuració de brases incorrecta.');
+  const spotting = input.spotting?.enabled ?? false;
+  if (
+    spotting &&
+    (!input.fuelMoistures ||
+      !Number.isFinite(input.wind10mKmh) ||
+      input.wind10mKmh! < 0 ||
+      !Number.isFinite(input.temperatureC))
+  )
+    throw new Error('Falten dades meteorològiques per a les brases.');
+  const spots = new Map<number, SpotIgnition>();
+  const physical = input.countermeasures?.measures.some(physicalMeasure) ?? false;
+  if (
+    (physical || spotting) &&
+    (!input.fuelMoistures ||
+      Object.values(input.fuelMoistures).some((v) => !Number.isFinite(v) || v < 0))
+  )
+    throw new Error('Falta la humitat inicial del combustible.');
+  const fuelTreatments = physical
+    ? new FuelTreatments(
+        input.countermeasures!.centre,
+        input.countermeasures!.measures,
+        input.fuelMoistures!,
+        input.fuels,
+      )
+    : undefined;
+  const winds = input.windChanges ?? [];
+  if (
+    winds.length > 100 ||
+    winds.some(
+      (w, i) =>
+        !Number.isFinite(w.startMin) ||
+        w.startMin < 0 ||
+        w.startMin > 720 ||
+        (i > 0 && w.startMin <= winds[i - 1].startMin) ||
+        !Number.isFinite(w.speedKmh) ||
+        w.speedKmh < 0 ||
+        !Number.isFinite(w.towardsDeg) ||
+        !Number.isFinite(w.midflame) ||
+        w.midflame < 0 ||
+        Object.values(w.fuelMidflame).some((v) => !Number.isFinite(v) || v < 0),
+    )
+  )
+    throw new Error('Seqüència de vent incorrecta.');
   const beds = new Map<number, { bed: FuelBed; phiWind: number; r0: number }>();
   for (const [id, value] of Object.entries(input.fuelBeds ?? {})) {
     beds.set(Number(id), {
@@ -311,6 +376,111 @@ export async function spread(
     if (row % 256 === 0) await breathe();
   }
 
+  // One cached ellipse per cell bounds memory independently of wind changes.
+  // Its epoch can move forward or back when a long edge straddles a transition.
+  const windFields = winds.map((w) => ({
+    start: w.startMin,
+    east: Math.sin((w.towardsDeg * Math.PI) / 180),
+    north: Math.cos((w.towardsDeg * Math.PI) / 180),
+    uniform: windFactor(bed, w.midflame),
+    models: new Map(
+      [...beds].map(([id, local]) => {
+        const midflame = w.fuelMidflame[id];
+        if (midflame === undefined) throw new Error('Falta el vent d’un model de combustible.');
+        return [id, windFactor(local.bed, midflame)] as const;
+      }),
+    ),
+  }));
+  const dynamic = winds.length > 0 || physical;
+  const cachedFuel = new Map<number, FuelBed>();
+  const cachedEpoch = dynamic ? new Int16Array(count).fill(-2) : null;
+  const cachedRate = dynamic ? new Float32Array(count) : null;
+  const cachedE = dynamic ? new Float32Array(count) : null;
+  const cachedN = dynamic ? new Float32Array(count) : null;
+  const cachedEcc = dynamic ? new Float32Array(count) : null;
+  const epochAt = (minute: number) => {
+    for (let i = windFields.length - 1; i >= 0; i--) if (windFields[i].start <= minute) return i;
+    return -1;
+  };
+  const ellipse = (cell: number, epoch: number, minute: number) => {
+    const changed = fuelTreatments?.at(cell, minute)?.bed;
+    if (cachedEpoch![cell] === epoch && cachedFuel.get(cell) === changed) return;
+    cachedEpoch![cell] = epoch;
+    if (changed) cachedFuel.set(cell, changed);
+    else cachedFuel.delete(cell);
+    if (epoch < 0 && !changed) {
+      cachedRate![cell] = rate[cell];
+      cachedE![cell] = headE[cell];
+      cachedN![cell] = headN[cell];
+      cachedEcc![cell] = ecc[cell];
+      return;
+    }
+    const model = input.fuels?.[cell],
+      local = model === undefined ? uniform : beds.get(model)!;
+    const w = epoch >= 0 ? windFields[epoch] : { east: windE, north: windN };
+    const localBed = changed ?? local.bed;
+    const midflame =
+      epoch >= 0
+        ? model === undefined
+          ? winds[epoch].midflame
+          : winds[epoch].fuelMidflame[model]
+        : model === undefined
+          ? input.midflame
+          : input.fuelBeds![model].midflame;
+    const phiWind = windFactor(localBed, midflame);
+    const row = Math.floor(cell / GRID),
+      column = cell % GRID;
+    const gradE =
+      (elevation[row * GRID + Math.min(GRID - 1, column + 1)] -
+        elevation[row * GRID + Math.max(0, column - 1)]) /
+      span;
+    const gradN =
+      -(
+        elevation[Math.min(GRID - 1, row + 1) * GRID + column] -
+        elevation[Math.max(0, row - 1) * GRID + column]
+      ) / span;
+    const tan = Math.hypot(gradE, gradN);
+    const slope = localBed.slopeK * tan;
+    const sumE = phiWind * w.east + slope * gradE;
+    const sumN = phiWind * w.north + slope * gradN;
+    const phi = Math.hypot(sumE, sumN);
+    cachedRate![cell] = localBed.r0 * M_PER_FT * (1 + phi) * (treatments?.permanent[cell] ?? 1);
+    cachedE![cell] = phi ? sumE / phi : 0;
+    cachedN![cell] = phi ? sumN / phi : 0;
+    const ratio = phi ? lengthToBreadth(effectiveWind(localBed, phi)) : 1;
+    cachedEcc![cell] = Math.sqrt(1 - 1 / (ratio * ratio));
+  };
+  const windyTravel = (
+    cell: number,
+    distance: number,
+    start: number,
+    east: number,
+    north: number,
+  ) => {
+    let remaining = distance,
+      now = start;
+    const windows = treatments?.temporary.get(cell);
+    while (remaining > 0) {
+      if (now >= horizon) return Infinity;
+      const epoch = epochAt(now);
+      ellipse(cell, epoch, now);
+      const cosine = east * cachedE![cell] + north * cachedN![cell];
+      const along = (cachedRate![cell] * (1 - cachedEcc![cell])) / (1 - cachedEcc![cell] * cosine);
+      const treatment = windows?.find((w) => now < w.until);
+      const speed = along * (treatment?.factor ?? 1);
+      const until = Math.min(
+        windFields[epoch + 1]?.start ?? Infinity,
+        treatment?.until ?? Infinity,
+        fuelTreatments?.at(cell, now)?.until ?? fuelTreatments?.next(cell, now) ?? Infinity,
+      );
+      if (speed > 0 && remaining <= speed * (until - now)) return now - start + remaining / speed;
+      if (until === Infinity) return Infinity;
+      remaining -= speed * (until - now);
+      now = until;
+    }
+    return now - start;
+  };
+
   // ---- Each step: its length and its direction, worked out once. ----
   const stepOffset = STEPS.map(([dx, dy]) => dy * GRID + dx);
   const stepLength = STEPS.map(([dx, dy]) => Math.hypot(dx, dy) * CELL_M);
@@ -360,6 +530,60 @@ export async function spread(
     // An older, slower entry for a cell that has since been reached sooner.
     if (time > arrival[cell]) continue;
 
+    if (spotting) {
+      const sourceModel = FUEL_MODELS[input.fuels?.[cell] ?? 1];
+      const sourceBed =
+        fuelTreatments?.at(cell, time)?.bed ??
+        (input.fuels ? beds.get(input.fuels[cell])!.bed : bed);
+      if (dynamic) ellipse(cell, epochAt(time), time);
+      const sourceRate =
+        (dynamic ? cachedRate![cell] : rate[cell]) *
+        treatmentFactor(treatments?.temporary.get(cell), time);
+      const candidate = emberFlight(
+        cell,
+        time,
+        firelineIntensity(sourceBed, sourceRate),
+        sourceModel.id >= 4,
+        input.spotting!.seed,
+        (t) => {
+          const epoch = epochAt(t),
+            w = epoch >= 0 ? winds[epoch] : undefined;
+          return {
+            speedKmh: w?.speedKmh ?? input.wind10mKmh!,
+            towardsDeg: w?.towardsDeg ?? input.towardsDeg,
+            until: windFields[epoch + 1]?.start ?? Infinity,
+          };
+        },
+      );
+      if (
+        candidate &&
+        candidate.minute <= horizon &&
+        candidate.minute < arrival[candidate.cell] &&
+        rate[candidate.cell] > 0 &&
+        treatmentFactor(treatments?.temporary.get(candidate.cell), candidate.minute) > 0
+      ) {
+        const targetModel = FUEL_MODELS[input.fuels?.[candidate.cell] ?? 1];
+        const target = fuelTreatments?.at(candidate.cell, candidate.minute);
+        const fineKgM2 =
+          targetModel.particles
+            .filter((p) => p.kind === 'dead1')
+            .reduce((sum, p) => sum + p.load * 0.22417, 0) * (target?.remaining ?? 1);
+        const probability = emberIgnitionProbability(
+          target?.moisture1h ?? input.fuelMoistures!.dead1,
+          targetModel.extinction,
+          fineKgM2,
+          input.temperatureC!,
+        );
+        if (emberRandom(input.spotting!.seed, cell, 3) < probability) {
+          const stored = new Float32Array([candidate.minute]);
+          if (stored[0] < candidate.minute) new Uint32Array(stored.buffer)[0] += 1;
+          arrival[candidate.cell] = stored[0];
+          heap.push(stored[0], candidate.cell);
+          spots.set(candidate.cell, { ...candidate, minute: stored[0] });
+        }
+      }
+    }
+
     const column = cell % GRID;
     const row = (cell - column) / GRID;
 
@@ -382,9 +606,11 @@ export async function spread(
         const cosine = stepE[step] * headE[at] + stepN[step] * headN[at];
         const along = (rate[at] * (1 - ecc[at])) / (1 - ecc[at] * cosine);
         const distance = stepLength[step] * segment.share;
-        travel += treatments
-          ? treatedTravel(distance, along, time + travel, treatments.temporary.get(at))
-          : distance / along;
+        travel += dynamic
+          ? windyTravel(at, distance, time + travel, stepE[step], stepN[step])
+          : treatments
+            ? treatedTravel(distance, along, time + travel, treatments.temporary.get(at))
+            : distance / along;
         if (!Number.isFinite(travel)) break;
         if (
           treatments &&
@@ -416,6 +642,22 @@ export async function spread(
     }
   }
 
+  // Read each cell's ellipse at arrival, before overwriting the baseline arrays.
+  if (dynamic) {
+    for (let cell = 0; cell < count; cell++) {
+      if (!Number.isFinite(arrival[cell])) continue;
+      ellipse(cell, epochAt(arrival[cell]), arrival[cell]);
+      rate[cell] = cachedRate![cell];
+      headE[cell] = cachedE![cell];
+      headN[cell] = cachedN![cell];
+      const model = input.fuels?.[cell];
+      intensity[cell] = firelineIntensity(
+        fuelTreatments?.at(cell, arrival[cell])?.bed ??
+          (model === undefined ? bed : beds.get(model)!.bed),
+        rate[cell],
+      );
+    }
+  }
   // Statistics describe the treatment active when the front arrives, not T=0.
   if (treatments)
     for (const [cell, windows] of treatments.temporary) {
@@ -427,6 +669,14 @@ export async function spread(
     arrival,
     horizon,
     burnable,
+    ...(fuelTreatments ? { fuelTreatments } : {}),
+    ...(spotting
+      ? {
+          spotIgnitions: [...spots.values()]
+            .filter((s) => arrival[s.cell] === s.minute)
+            .sort((a, b) => a.minute - b.minute),
+        }
+      : {}),
     ...measure(arrival, rate, headE, headN, intensity, ignitions, horizon, timedIgnitions),
     baseRate: burnable ? baseSum / burnable : 0,
   };
