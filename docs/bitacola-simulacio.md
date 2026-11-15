@@ -6,7 +6,7 @@ de base per a la memòria del TFG.
 Continuació de [bitacola.md](bitacola.md), la fase 1 —el mapa i el formulari—,
 tancada el 5 de novembre de 2026.
 
-Darrera actualització: 14 de novembre de 2026.
+Darrera actualització: 15 de novembre de 2026.
 
 Les seccions van numerades **des del §10**. El codi cita les decisions pel seu
 número als comentaris —§2.29, §3.4— i dos documents que comencessin tots dos a
@@ -1715,9 +1715,112 @@ ignició il·legible, fitxers que no ho són, nom del fitxer—, les 29 proves d
 simulació i la compilació sense avisos. **Al navegador no s'ha mirat**: ho
 prova Pere.
 
+### 11.27. Les contramesures canvien la velocitat, no el combustible
+
+Decidit el 15/11/2026, i tanca la 12.12. El detall tècnic complet —taula
+d'efectes, límits, format— és a [contramesures.md](contramesures.md); aquí
+queda el que es va decidir i per què.
+
+**Com es va fer.** En paral·lel i amb dos agents: Codex el model i els
+escenaris (`countermeasures.ts`, `fire-spread.ts`, `scenario.ts`), Claude el
+panell i el mapa (`countermeasure-plan.ts`, `countermeasure-display.ts`). El
+contracte entre les dues meitats —el tipus `Countermeasure` i la
+rasterització— es va fixar primer, en un commit propi (`e3d6abd`), perquè cap
+de les dues bandes l'hagués d'endevinar. La coordinació va viure en un fitxer
+fora del repositori.
+
+**La resposta a la 12.12: es toca la velocitat de propagació.** Les tres vies
+que plantejava —treure combustible, apujar-ne la humitat, aturar el front—
+es redueixen a dues operacions sobre el camp de velocitats que el Dijkstra ja
+recorre (§11.19):
+
+- **Barrera**: la cel·la no propaga. És la línia de defensa (30 m) i el
+  tallafoc (60 m).
+- **Multiplicador**: la velocitat es multiplica per `1 − reducció`. Permanent
+  per a la tala i desbrossament (50 %); amb caducitat per a la línia d'aigua
+  (70 %, 30 min), l'helicòpter (70 %, 20 min), l'avió amfibi (80 %, 30 min) i
+  el retardant (60 %, 180 min).
+- **Contrafoc**: no frena res, encén. Són ignicions noves al minut del
+  desplegament, i per això **pot augmentar** l'àrea cremada.
+
+No es reescriu el llit de Rothermel: el combustible original no es modifica
+mai, i la intensitat de Byram (§11.25) baixa perquè surt de la velocitat ja
+reduïda. Desbrossar no reconstrueix el model d'Anderson de la cel·la; n'és una
+aproximació. Era la via que no obligava a recalcular Rothermel per a cada
+mesura, i la que manté separats el terreny i el que s'hi fa a sobre.
+
+**Els números són paràmetres, no rendiments.** Els valors de la llista són
+il·lustratius i es poden editar al panell; cap no surt d'una calibració amb
+brigades o aeronaus. El catàleg ho porta escrit al codi, i el document de les
+contramesures també.
+
+**Les barreres són ideals.** Sense salt de brases, sense capçades i sense
+probabilitat de fallada, una línia que el model no deixa travessar no
+demostra que una de real aguantés. És la mateixa frontera de la §11.19 i de
+la §11.25: foc de superfície i prou.
+
+**Geometria a la graella de 30 m.** Una franja o un disc agafen totes les
+cel·les que toquen, amb la distància exacta del quadrat al segment. És
+conservador: la petjada pot sortir més ampla que el traç, sobretot en línies
+de 30 m. Els salts llargs del Dijkstra comproven les cel·les travessades i els
+contactes en diagonal, perquè una barrera prima no es pugui saltar pel
+vèrtex. On dues mesures se solapen mana la reducció més forta, i no es
+multipliquen: dues del 70 % no fan una del 91 %.
+
+**El temps es talla per trams.** Una reducció temporal només frena el tros de
+trajecte que cau dins de la seva finestra, tant en activar-se com en caducar.
+Això conserva l'ordre d'arribada que el Dijkstra necessita. La caducitat és
+discreta —a `startMin + durationMin` l'efecte desapareix—, no una evaporació.
+
+**Al mapa són eines, com la d'ignició** (§11.15). Els botons desactivats que
+la §11.17 havia deixat a la columna de configuració passen a ser el catàleg.
+Una franja es fa clicant vèrtexs i es tanca amb un botó explícit; una
+descàrrega és un clic; Escape deixa l'eina. El pla és una classe de
+*signals* que es prova sense mapa, i es dibuixa sobre el relleu amb l'amplada
+real. Una franja a mitges no deixa calcular ni desar.
+
+**Els escenaris passen a la versió 3** (§11.26): una línia
+`contramesures = [...]` amb JSON dins del text. Les versions 1 i 2 s'obren
+igual. Aquí, a diferència de la resta del fitxer, **un pla mal format es
+rebutja sencer**: perdre una barrera en silenci canviaria la pregunta que es
+fa al model, i això és pitjor que no obrir el fitxer.
+
+### 11.28. Les contramesures es despleguen amb el foc en marxa
+
+Decidit el 15/11/2026. La primera versió del pla (§11.27) només deixava
+preparar mesures abans de calcular. Ara cada mesura porta **el minut en què
+es desplega**, `startMin`, i es pot posar durant la reproducció.
+
+- **Triar una eina pausa el rellotge.** En col·locar la descàrrega o tancar la
+  franja es registra el minut del cursor i es recalcula la previsió. El foc
+  anterior al desplegament **es conserva idèntic**: les proves comproven que
+  les arribades i totes les sèries d'abans no canvien, per a les vuit eines.
+- **El desplegament és instantani.** No es modelen ni el temps de construir
+  una línia ni el que triga un mitjà a arribar. És una simplificació
+  conscient: el que es pregunta és què fa la mesura, no si arriba a temps.
+- **El que ja ha actuat no s'edita.** Una mesura del passat queda bloquejada
+  —la llista diu «Programada», «Desplegada» o «Caducada»—; tornar a l'inici
+  permet revisar tot el pla. Si el recàlcul falla, es recuperen el pla i el
+  resultat anteriors.
+- **Una barrera tardana no apaga el que ja crema**, i el contrafoc es
+  comprova contra les barreres actives en aquell minut.
+
+Comprovat: 82 proves (56 de simulació i 26 d'Angular) i la compilació de
+producció sense avisos. Aquesta vegada **sí que s'ha mirat al navegador**, amb
+Sóller i dades reals de l'API: un helicòpter a T+3 h conserva les 5,9 ha
+cremades i baixa la previsió d'una hora de 10,6 a 9,6 ha. La captura és fora
+del repositori.
+
 ---
 
 ## 12. Decisions pendents
+
+- **12.16. Calibrar els coeficients de les contramesures.** Ve de la §11.27.
+  Les reduccions i les durades del catàleg són il·lustratives. Si la memòria
+  n'ha de treure conclusions quantitatives, cal una font —literatura
+  d'extinció o dades d'operacions— o dir explícitament que no n'hi ha. Queden
+  també sense mesurar el rendiment amb plans màxims (100 mesures, 512 vèrtexs)
+  i una revisió en més d'un navegador.
 
 - **12.15. Dos pintors que no pinten.** Ve de la §11.22. `fire-appearance.ts`
   (amb set proves) i `fire-field.ts` són al repositori i no els fa servir
@@ -1767,8 +1870,10 @@ prova Pere.
   són a la URL (§11.16) i la meteorologia no. O tot viatja a l'enllaç i
   «desar» és guardar un enllaç amb nom, o es desa al navegador i no es pot
   compartir. Sense base de dades, no hi ha tercera via.
-- **12.12. Què fa una contramesura a una cel·la.** Ve de la §11.17, i és del
-  model (§12.5): treure combustible, apujar-ne la humitat, o aturar el front.
+- ~~**12.12. Què fa una contramesura a una cel·la.**~~ Resolta el 15/11/2026
+  a la §11.27: barrera o multiplicador sobre la velocitat, i el contrafoc com
+  a ignicions. El que es plantejava: ve de la §11.17, i és del model (§12.5):
+  treure combustible, apujar-ne la humitat, o aturar el front.
 
 La primera que toca és la 12.4, perquè condiciona on viu la resta: si el foc es
 pinta dins de MapLibre o en un segon canvas, el model no escriu al mateix lloc.
@@ -1860,6 +1965,24 @@ via pública és `setCoordinates()` amb les mateixes coordenades. Va a
 És, molt probablement, el que hi havia darrere de les dues comprovacions que
 la §11.19 i la §11.20 van deixar sense fer —«no s'ha pogut comprovar el dibuix
 del foc sobre el mapa»—, atribuïdes llavors al navegador de proves.
+
+### 13.4. Les proves del model no corren amb el *builder* d'Angular
+
+Les proves de propagació substitueixen mòduls relatius amb *mocks* de Vitest,
+i el *builder* `@angular/build:unit-test` no ho admet. Des del 15/11/2026 les
+proves van en dues tandes: `npm run test:simulation` executa
+`src/app/simulation` amb Vitest directament, i `ng test` en queda exclòs a
+`angular.json`. `npm test` encadena les dues.
+
+### 13.5. Molts contrafocs fan quadràtica la distància a la ignició
+
+L'avanç màxim (§11.25) buscava, per a cada cel·la cremada, la ignició més
+propera recorrent-les totes. Amb un o dos focus no importa; un contrafoc en
+genera centenars o milers —una per cel·la de la franja—, i el cost es
+multiplica. A partir de 33 llavors es calcula ara la transformada de
+distància euclidiana exacta en dues passades (`fire-distances.ts`), lineal en
+la mida de la graella. I l'avanç només compta les ignicions que ja s'han
+desplegat en cada minut.
 
 ---
 
