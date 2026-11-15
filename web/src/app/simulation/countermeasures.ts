@@ -171,6 +171,20 @@ export const MAX_COUNTERMEASURES = 100;
 export const WIDTH_LIMITS = { min: CELL_M, max: 3000 } as const;
 export const DURATION_LIMITS = { min: 1, max: 720 } as const;
 export const MAX_VERTICES = 64;
+/** Every field of `Countermeasure`; anything else in a file is refused. */
+const FIELDS = new Set<string>([
+  'id',
+  'kind',
+  'points',
+  'widthM',
+  'strength',
+  'durationMin',
+  'startMin',
+  'litresPerPass',
+  'passes',
+  'passIntervalMin',
+  'fuelRemaining',
+] satisfies (keyof Countermeasure)[]);
 const temporary = (kind: CountermeasureKind) =>
   kind === 'water-line' || kind === 'helicopter' || kind === 'amphibious' || kind === 'retardant';
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
@@ -190,7 +204,10 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
   const result: Countermeasure[] = [];
   let vertices = 0;
   for (const raw of value) {
-    if (!raw || typeof raw !== 'object') return 'Contramesura incorrecta.';
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'Contramesura incorrecta.';
+    // A field this version does not know may be one that changes the fire.
+    const unknown = Object.keys(raw).find((key) => !FIELDS.has(key));
+    if (unknown !== undefined) return `Camp de contramesura desconegut: «${unknown}».`;
     const def = COUNTERMEASURE_CATALOG.find((d) => d.kind === raw.kind);
     if (!def) return 'Tipus de contramesura desconegut.';
     if (typeof raw.id !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(raw.id) || ids.has(raw.id))

@@ -25,6 +25,14 @@ const make = (patch: Partial<Countermeasure> = {}): Countermeasure => ({
 });
 
 describe('countermeasure geometry and validation', () => {
+  it('refuses a field it does not know, instead of dropping it', () => {
+    expect(parseCountermeasures([make({ startMin: 5 })])).not.toBeTypeOf('string');
+    expect(parseCountermeasures([{ ...make(), efficacy: 0.9 }])).toBe(
+      'Camp de contramesura desconegut: «efficacy».',
+    );
+    expect(parseCountermeasures([[1, 2]])).toBe('Contramesura incorrecta.');
+  });
+
   it('validates every catalogue preset and copies coordinates', () => {
     for (const d of COUNTERMEASURE_CATALOG) {
       const { kind, widthM, strength, durationMin } = d;

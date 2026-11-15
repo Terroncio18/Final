@@ -38,7 +38,13 @@ import {
   type Point,
 } from '../simulation/point';
 import { ProvincesService } from '../simulation/provinces.service';
-import { formatScenario, parseScenario, scenarioFileName } from '../simulation/scenario';
+import {
+  formatScenario,
+  MAX_SCENARIO_SIZE,
+  parseScenario,
+  SCENARIO_TOO_LARGE,
+  scenarioFileName,
+} from '../simulation/scenario';
 import {
   CONTROL_CLASSES,
   flameLength,
@@ -741,6 +747,11 @@ export class SimulatorView {
     // So that choosing the same file again is still a change.
     input.value = '';
     if (!file) return;
+    // Before reading: a file of several gigabytes would hang the tab first.
+    if (file.size > MAX_SCENARIO_SIZE) {
+      this.scenarioNote.set({ text: SCENARIO_TOO_LARGE, failed: true });
+      return;
+    }
     const scenario = parseScenario(await file.text());
     if (typeof scenario === 'string') {
       this.scenarioNote.set({ text: scenario, failed: true });

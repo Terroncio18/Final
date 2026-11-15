@@ -130,7 +130,9 @@ Els escenaris nous són **versió 4**. Al fitxer de text, amb JSON dins de la l�
 Els fitxers de les versions 1 a 3 continuen obrint-se; l'absència de `startMin`
 significa T=0. Un pla, un vent o unes brases mal formats es rebutgen sencers
 amb un missatge: perdre una barrera silenciosament canviaria la pregunta
-simulada. També es rebutgen versions futures desconegudes.
+simulada. També es rebutgen versions futures desconegudes, les contramesures
+amb un camp que aquesta versió no coneix i, abans de llegir-los, els fitxers de
+més d'1 MB.
 
 Límits: 100 mesures, 64 vèrtexs per mesura, 512 en total, amplades de 30 a 3000 m,
 desplegament de 0 a 720 min. Descàrregues: d'1 L a la capacitat de l'aparell per
@@ -154,7 +156,7 @@ Des de `web`: `npm test -- --watch=false` i `npm run build`.
 
 La suite pura s'executa amb Vitest i les proves Angular amb el seu builder: aquest
 últim no admet els mocks de mòduls relatius de les proves de propagació.
-Verificació actual (16/11/2026): **100 proves passen** (72 de simulació i 28
+Verificació actual (16/11/2026): **101 proves passen** (73 de simulació i 28
 Angular); build de producció sense avisos. El càlcul de distància a les ignicions
 usa una transformada euclidiana exacta quan hi ha més de 32 llavors; les
 estadístiques d'avanç només compten les ignicions ja desplegades a cada instant.

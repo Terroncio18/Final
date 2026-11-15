@@ -104,16 +104,26 @@ export function formatScenario(scenario: Scenario, saved: Date): string {
   ].join('\n');
 }
 
+/** Largest scenario accepted. The screen checks it on the file before reading it. */
+export const MAX_SCENARIO_SIZE = 1_000_000;
+export const SCENARIO_TOO_LARGE = 'El fitxer d’escenari és massa gran.';
+
 /**
  * Reads a scenario back, or says why it cannot.
  *
- * Strict about what the simulation cannot run without —the domain and the
- * weather— and lenient about the rest: unknown keys are skipped, so a newer
- * file opens in an older screen, and an ignition that does not parse is
- * dropped rather than guessed, as in the address (§11.16).
+ * - **A newer version is refused whole**: what it adds may change the fire,
+ *   and opening it without that would answer another question in silence.
+ * - **Strict with what changes the fire.** Without the domain or the weather
+ *   the file is refused; a malformed plan, wind or ember block is refused
+ *   whole, and so is a countermeasure carrying a field this version does not
+ *   know.
+ * - **Lenient with the rest**: an unknown `key = value` line is skipped,
+ *   which is what lets a file edited by hand carry notes; a slider value out
+ *   of range is clamped; and an ignition that does not parse is dropped
+ *   rather than guessed, as in the address (§11.16).
  */
 export function parseScenario(text: string): Scenario | string {
-  if (text.length > 1_000_000) return 'El fitxer d’escenari és massa gran.';
+  if (text.length > MAX_SCENARIO_SIZE) return SCENARIO_TOO_LARGE;
   if (!text.includes('IgnisLab')) return 'El fitxer no és un escenari d’IgnisLab.';
 
   const values = new Map<string, string>();
