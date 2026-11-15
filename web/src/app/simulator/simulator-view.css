@@ -1423,33 +1423,6 @@ input[type='range']::-webkit-slider-thumb {
   stroke: #8fbb94;
 }
 
-.model-note {
-  flex-shrink: 0;
-  display: flex;
-  align-items: start;
-  gap: 7px;
-  margin: auto 13px 12px;
-  padding: 9px;
-  font-size: 9px;
-  line-height: 1.5;
-  color: #94a5b2;
-  background: #1e2831;
-  border: 1px solid #303d48;
-  border-radius: 4px;
-  --icon-size: 12px;
-}
-
-.model-note app-icon {
-  margin-top: 2px;
-}
-
-.model-note small {
-  display: block;
-  margin-top: 4px;
-  font-size: 8px;
-  color: #718490;
-}
-
 /* ──────────────────────── the status bar ──────────────────────── */
 
 .statusbar {

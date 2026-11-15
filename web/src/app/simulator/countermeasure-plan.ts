@@ -34,28 +34,6 @@ export interface PlanNote {
  */
 export { WIDTH_LIMITS, DURATION_LIMITS, MAX_VERTICES } from '../simulation/countermeasures';
 
-/**
- * What each tool has to say about itself while it is in the hand: what the
- * model does with it and, where it matters, what it does not.
- *
- * Kept on this side and not in the catalogue because it is the screen's
- * wording; what the model does is the model's, and docs/contramesures.md is
- * where that is argued.
- */
-const HELP: Readonly<Record<CountermeasureKind, string>> = {
-  'defense-line':
-    'Barrera al foc de superfície. Amb brases activades hi pot haver salts. Construcció instantània.',
-  firebreak:
-    'Barrera al foc de superfície. Les brases poden encendre combustible més enllà de la franja.',
-  clearing: 'Tala amb retirada de material. Conserva un percentatge de combustible i recalcula el model.',
-  'water-line': 'Litres per passada i interval en minuts: humecta el combustible fi de la franja.',
-  backfire:
-    'Encén la línia en desplegar-la: el que crema compta com a superfície cremada i pot ampliar l’incendi.',
-  helicopter: 'Un clic fixa el disc de descàrrega. Ajusta litres, passades i temps entre passades.',
-  amphibious: 'Un clic fixa el disc de descàrrega. Ajusta litres, passades i temps entre passades.',
-  retardant: 'Descàrregues sobre una franja. Només humectació equivalent; no modela el residu químic.',
-};
-
 const BARRIERS: ReadonlySet<CountermeasureKind> = new Set(['defense-line', 'firebreak']);
 
 export function catalogEntry(kind: CountermeasureKind) {
@@ -117,7 +95,7 @@ export class CountermeasurePlan {
 
   readonly tool = computed(() => {
     const kind = this.kind();
-    return kind ? { ...catalogEntry(kind), help: HELP[kind] } : null;
+    return kind ? catalogEntry(kind) : null;
   });
 
   /** A line needs two points to be one. */

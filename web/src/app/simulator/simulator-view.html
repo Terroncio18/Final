@@ -224,12 +224,6 @@
           />
           <div class="range-bounds"><span>0 km/h</span><span>60 km/h</span></div>
 
-          @if (result()) {
-            <p class="terrain-note">
-              Canvia la velocitat o gira l'agulla i aplica el vent a T + {{ elapsed() }} h. El foc
-              anterior es conserva. Direcció: origen del vent.
-            </p>
-          }
           @if (windDraft()) {
             <div class="tools-row">
               <button type="button" [disabled]="!canStart()" (click)="applyWind()">
@@ -314,10 +308,6 @@
             }
           </h3>
         </summary>
-        <p class="section-lead">
-          Model Anderson per cel·la de 30 m. La cartografia oficial té prioritat; les zones restants
-          s'estimen a partir de la coberta del sòl.
-        </p>
         @if (fuels.reading()) {
           <p role="status">Llegint els combustibles…</p>
         }
@@ -357,13 +347,6 @@
               <strong>{{ model.id }} · {{ model.name }}</strong> · {{ model.share }}
             </p>
           }
-          @if (grid.estimatedCells) {
-            <p class="section-lead">
-              WorldCover 2021 identifica cobertes, no el combustible real: bosc → model 8, matollar
-              → 5, herbàcies i cultius → 1, sòl nu → sense combustible. No mesura càrrega ni humitat
-              actuals.
-            </p>
-          }
           @for (source of grid.sources; track source.label) {
             <p class="section-lead">
               <a [href]="source.sourceUrl" target="_blank" rel="noopener noreferrer">{{
@@ -382,9 +365,6 @@
         <summary>
           <h3>ESCENARIS <app-icon name="folder" /></h3>
         </summary>
-        <p class="section-lead">
-          Un escenari desa on són les ignicions i la meteorologia establerta, per tornar-hi després.
-        </p>
 
         <div class="scenario-now">
           <span>Ara</span>
@@ -428,10 +408,6 @@
             </div>
           }
         }
-        <p class="terrain-note">
-          Es desa com un fitxer de text (.txt) amb el domini, les ignicions, la meteorologia en
-          vigor i el pla de contramesures.
-        </p>
       </details>
 
       <details class="fold control-section" open>
@@ -508,10 +484,6 @@
             (change)="setSpottingSeed($event)"
           />
         </label>
-        <p class="terrain-note">
-          Configura-ho abans d'iniciar. Model experimental: la intensitat, el vent, el combustible i
-          la humitat condicionen l'emissió i la ignició. Una brasa pot saltar un tallafoc.
-        </p>
         @if (result() && spottingEnabled()) {
           <p class="terrain-note" role="status">
             {{ visibleSpots().length }} focus per brases fins a T + {{ elapsed() }} h.
@@ -536,10 +508,6 @@
             }
           </h3>
         </summary>
-        <p class="section-lead">
-          Tria una eina per pausar i desplegar-la a T + {{ elapsed() }} h. Dibuixa-la al mapa: la
-          previsió s'actualitza automàticament.
-        </p>
         @for (group of countermeasures; track group.title) {
           <h4>{{ group.title }}</h4>
           <div class="measure-grid">
@@ -572,7 +540,6 @@
               } @else {
                 Fes clic per posar cada vèrtex i prem «Finalitzar» per tancar la línia.
               }
-              {{ active.help }}
             </p>
             <div class="tools-row">
               @if (active.geometry === 'line') {
@@ -753,9 +720,7 @@
                   </div>
                 }
                 @if (row.liquid) {
-                  <p class="terrain-note">
-                    Total: {{ row.totalLitres }} L. Primera passada al desplegament.
-                  </p>
+                  <p class="terrain-note">Total: {{ row.totalLitres }} L</p>
                   @if (row.aircraft; as aircraft) {
                     <p class="terrain-note">
                       <a [href]="aircraft.source" target="_blank" rel="noopener noreferrer"
@@ -779,16 +744,6 @@
         } @else {
           <p class="empty-list">Cap contramesura al pla.</p>
         }
-
-        <p class="terrain-note">
-          Cada mesura s'aplica al minut de desplegament. Les descàrregues augmenten la humitat del
-          combustible fi; la tala retira càrrega i conserva restes. Les mesures del passat queden
-          bloquejades: torna a l'inici per editar-les. Retenció del 30 % i assecat amb constant
-          d'una hora: hipòtesis experimentals. El retardant només representa humectació equivalent,
-          sense residu químic. No es modelen dotacions ni temps de construcció. La graella és de 30
-          m: la petjada real és la de les cel·les tocades i pot ser més ampla que la franja
-          dibuixada. El pla no viatja a l'enllaç: es conserva en desar l'escenari.
-        </p>
       </details>
 
       @if (treatedCell(); as cell) {
@@ -1351,19 +1306,6 @@
           </dl>
         </details>
       }
-
-      <div class="model-note">
-        <app-icon name="info" />
-        <span>
-          Un simulacre, no una predicció
-          <small>
-            El combustible combina cartografia oficial i estimacions de coberta; el vent segueix els
-            canvis programats; humitat ambiental i temperatura són constants. Foc de superfície
-            sense capçades, amb transport experimental de brases opcional. La dificultat de control
-            només llegeix la longitud de flama. No serveix per prendre decisions d'emergència.
-          </small>
-        </span>
-      </div>
     </aside>
   </main>
 
