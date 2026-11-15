@@ -42,6 +42,16 @@ describe('water and dry fuel treatment', () => {
     expect(field.at(cell, 60)!.moisture1h).toBeLessThan(field.at(cell, 45)!.moisture1h);
     expect(field.at(cell, 30)!.bed.loadTonHa).toBe(fuelBed(FUEL_MODELS[1], moistures).loadTonHa);
   });
+  it('takes the water as dried off once what is left is negligible, and stops following it', () => {
+    const field = new FuelTreatments(centre, [water({ passes: 1 })], moistures);
+    const wet = field.at(cell, 35)!;
+    expect(wet.moisture1h).toBeGreaterThan(moistures.dead1 + WETTING.driedMoisture);
+    expect(wet.until).toBe(40);
+    const dry = field.at(cell, 30 + 60 * 12)!;
+    expect(dry.moisture1h).toBe(moistures.dead1);
+    expect(dry.until).toBe(Infinity);
+    expect(field.at(cell, 1000)).toBe(dry);
+  });
   it('dilutes an equal volume over a larger diameter and caps excess water', () => {
     const small = new FuelTreatments(centre, [water()], moistures);
     const large = new FuelTreatments(centre, [water({ widthM: 180 })], moistures);

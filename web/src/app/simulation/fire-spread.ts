@@ -296,6 +296,12 @@ export async function spread(
         input.fuels,
       )
     : undefined;
+  // Read for every step of every cell: a byte per cell, not a map lookup.
+  const treatedFuel = fuelTreatments ? new Uint8Array(count) : undefined;
+  if (fuelTreatments) for (const cell of fuelTreatments.cells()) treatedFuel![cell] = 1;
+  // The same for the cells with a timed multiplier or a late barrier.
+  const timed = treatments?.temporary.size ? new Uint8Array(count) : undefined;
+  if (timed) for (const cell of treatments!.temporary.keys()) timed[cell] = 1;
   const winds = input.windChanges ?? [];
   if (
     winds.length > 100 ||
@@ -614,18 +620,23 @@ export async function spread(
         const cosine = stepE[step] * headE[at] + stepN[step] * headN[at];
         const along = (rate[at] * (1 - ecc[at])) / (1 - ecc[at] * cosine);
         const distance = stepLength[step] * segment.share;
-        travel += dynamic
-          ? windyTravel(at, distance, time + travel, stepE[step], stepN[step])
-          : treatments
-            ? treatedTravel(distance, along, time + travel, treatments.temporary.get(at))
-            : distance / along;
+        // Only a cell whose fuel was treated, or a run whose wind changes,
+        // needs the time-dependent path; the rest of the grid keeps the
+        // baseline ellipse, which is exactly what that path would read for it.
+        travel +=
+          (dynamic && winds.length > 0) || treatedFuel?.[at] === 1
+            ? windyTravel(at, distance, time + travel, stepE[step], stepN[step])
+            : timed?.[at] === 1
+              ? treatedTravel(distance, along, time + travel, treatments!.temporary.get(at))
+              : distance / along;
         if (!Number.isFinite(travel)) break;
         if (
-          treatments &&
+          timed &&
           CORNERS[step].some(
             ({ offset, fraction }) =>
+              timed[cell + offset] === 1 &&
               Math.abs(fraction - segment.end) < 1e-9 &&
-              treatmentFactor(treatments.temporary.get(cell + offset), time + travel) === 0,
+              treatmentFactor(treatments!.temporary.get(cell + offset), time + travel) === 0,
           )
         ) {
           travel = Infinity;

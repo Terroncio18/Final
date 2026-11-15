@@ -2072,6 +2072,60 @@ que les flames van on el front és més calent—, les 80 proves de simulació i
 28 d'Angular, i la compilació sense avisos. **Al navegador no s'ha mirat**: ho
 prova Pere.
 
+### 11.36. Cada contramesura costa el que fa, i no tota la graella
+
+Decidit el 16/11/2026, després que Pere notés que cada contramesura afegida
+feia més lent el càlcul. Cada desplegament torna a calcular el foc sencer des
+del minut 0 (§11.28), de manera que el que costa una mesura es paga a cada
+desplegament següent.
+
+**Mesurat**, sobre la graella real de 1024 × 1024, herba sota arbrat (model 2),
+vent de 20 km/h i 18 h de càlcul, amb descàrregues d'helicòpter de 1.350 L:
+
+| Descàrregues | Abans | Ara |
+| --- | --- | --- |
+| 0 | 0,59 s | 0,58 s |
+| 1 | 1,51 s | 0,74 s |
+| 5 | 1,81 s | 0,80 s |
+| 10 | 2,27 s | 0,89 s |
+| 20 | 3,23 s | 1,10 s |
+
+I els temps d'arribada **són idèntics** cel·la per cel·la als del codi
+anterior, amb 1 i amb 20 descàrregues. Al navegador les xifres seran més altes,
+però en la mateixa proporció.
+
+D'on venia el cost, i què s'hi ha fet:
+
+- **Una sola mesura física passava tota la graella al camí lent.** Amb vent
+  canviant o tractaments (§11.29, §11.31), cada pas de Dijkstra anava pel càlcul
+  dependent del temps, també a les cel·les que cap mesura no toca. Ara només hi
+  van les cel·les tractades —o totes, si el vent canvia—; la resta llegeix
+  l'el·lipse de sempre, que és exactament el que el camí lent els hauria donat.
+- **Dues consultes a un `Map` per cada tram de cada pas**: si la cel·la tenia
+  tractament de combustible, i si un cantó tenia un tractament temporal. Són
+  milions de consultes per càlcul. Ara són dues màscares d'un byte per cel·la,
+  fetes una vegada.
+- **L'aigua no s'assecava mai.** L'excés d'humitat decau exponencialment i no
+  arriba a zero, de manera que una cel·la mullada es recorria a trams de cinc
+  minuts fins al final del càlcul, cada vegada que un pas la travessava. Ara,
+  quan l'aigua que queda és de menys d'**una dècima de punt** d'humitat
+  (`WETTING.driedMoisture`) i no ve cap altra passada, la cel·la torna a ser el
+  seu combustible. Amb la constant d'una hora, uns cinc o sis hores després de
+  la descàrrega. Aquella dècima mou la velocitat de Rothermel bastant menys
+  d'un 1 %, i en les proves no ha canviat cap arribada.
+- **L'estat d'una cel·la tractada es desa per a cada tram**, i no només el
+  darrer: Dijkstra hi passa en ordres de temps diferents i el desat únic es
+  refeia a cada consulta.
+
+El que no es fa, i per què: **calcular només a partir del minut del
+desplegament**. El foc d'abans no canvia, però els passos que travessen aquell
+minut s'han de tornar a calcular des de totes les cel·les ja cremades, i el
+guany seria de la part cremada abans del desplegament, que sol ser petita.
+
+Comprovat: una prova nova de l'assecat, les 81 proves de simulació i les 28
+d'Angular, i la compilació sense avisos. **Al navegador no s'ha mirat**: ho
+prova Pere.
+
 ---
 
 ## 12. Decisions pendents
