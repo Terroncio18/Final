@@ -28,6 +28,19 @@
   white-space: nowrap;
 }
 
+.measure-drawing .tools-row {
+  flex-wrap: wrap;
+}
+
+.measure-drawing .tools-row button {
+  flex: 1 1 auto;
+  width: auto;
+}
+
+.measure-drawing .tools-row button:last-child {
+  flex-basis: 100%;
+}
+
 .measure-note.failed {
   color: #e8a37c;
 }

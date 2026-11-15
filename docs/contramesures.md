@@ -86,7 +86,15 @@ euclidiana exacta de cost lineal quan un contrafoc genera moltes llavors.
 
 El panell permet editar amplada, durada i reducció experimental. Una franja
 inacabada impedeix iniciar o desar, fins que es finalitza o es cancel·la.
-No s'ha pogut completar la comprovació visual interactiva: el navegador integrat
-no connecta amb localhost i el control del navegador local rebutja entrades per
-interferència d'usuari. Per tant, dibuix real, aspecte sobre el relleu i interacció
-amb el mapa queden pendents de revisió manual; no es donen per verificats pels tests.
+Comprovació visual al navegador integrat amb Sóller i les dades reals de l'API:
+dibuix d'un tallafoc, desfer un vèrtex, finalitzar, descàrrega puntual, edició de
+reducció i durada, Escape, exclusió amb l'eina d'ignició i càlcul real. Editar el
+pla retira el resultat i atura la reproducció. Desar, recarregar la pàgina i
+carregar recupera les dues mesures amb els paràmetres exactes. Revisada la vista
+a T+3 h sobre el relleu; corregit el desbordament de Cancel·lar a la columna estreta.
+Captura local: `C:/Proyectos/TFG/Pere/contramesures-verificacio.jpg`.
+
+L'antic bloqueig de localhost es va resoldre iniciant el servidor fora de
+l'aïllament de xarxa. Vista local de revisió: `http://127.0.0.1:4302/`.
+Queden fora d'aquesta verificació una campanya exhaustiva de navegadors,
+mesures de rendiment amb plans màxims i la calibració científica dels coeficients.
