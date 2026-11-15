@@ -68,6 +68,12 @@ export interface SpreadResult {
   /** Terrestrial cells with a known, burnable fuel model. */
   readonly burnable: number;
   /**
+   * Heat released per unit area by each cell's untreated fuel, BTU/ft²: the
+   * H·w of Byram's intensity. Zero where nothing burns. For the drawing, which
+   * multiplies it by the speed the front really crosses the cell at.
+   */
+  readonly heat: Float32Array;
+  /**
    * One entry per minute, from 0 to the horizon inclusive. Worked out once,
    * so moving the timeline reads a number instead of scanning a million cells.
    */
@@ -323,6 +329,7 @@ export async function spread(
   const headN = new Float32Array(count); // ... and north
   const ecc = new Float32Array(count);
   const intensity = new Float32Array(count); // kW/m at the head rate
+  const heat = new Float32Array(count); // BTU/ft², untreated
 
   const towards = (input.towardsDeg * Math.PI) / 180;
   const windE = Math.sin(towards);
@@ -366,6 +373,7 @@ export async function spread(
 
       rate[index] = r0 * (1 + phi) * factor;
       intensity[index] = firelineIntensity(bed, rate[index]);
+      heat[index] = bed.heatPerArea;
       if (phi > 0) {
         headE[index] = sumE / phi;
         headN[index] = sumN / phi;
@@ -669,6 +677,7 @@ export async function spread(
     arrival,
     horizon,
     burnable,
+    heat,
     ...(fuelTreatments ? { fuelTreatments } : {}),
     ...(spotting
       ? {

@@ -2022,6 +2022,56 @@ pendent 12.18.
 Comprovat: les 75 proves de simulació i les 28 d'Angular, i la compilació
 sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
 
+### 11.35. Les flames fan la mida de la intensitat, i un front aturat no en té
+
+Decidit el 16/11/2026, a petició de Pere. Fins ara les flames (§11.20) sortien
+repartides per igual al llarg del front, totes de la mateixa mida a l'atzar, i
+seguien enceses on el front esperava: un helicòpter a l'inici de la simulació
+deixava una corona de flames quieta durant una hora i mitja.
+
+Abans d'això es va comprovar què feia aquell helicòpter, amb una graella de
+prova: 1.350 L sobre 11 cel·les d'herba (model 1) pugen la humitat fina del 6
+al 31 %, per sobre del 12 % d'extinció. El foc s'atura mentre l'aigua no
+s'asseca —unes 1,5 h amb la constant d'una hora— i després es reprèn: a les
+4 h, 88 ha en comptes de 142. No és un error, sinó la §11.31 fent el que diu;
+sobre matollar la mateixa aigua quasi no fa res.
+
+**La intensitat de cada punt del front** és la de Byram (§11.25), però amb
+dues diferències que la fan servir per dibuixar:
+
+- **La velocitat és la real**, la que surt dels temps d'arribada: el pendent
+  del pla que passa pels tres vèrtexs de cada triangle del front
+  (`activeFront`, que ara en dona el ritme en minuts per cel·la). Així hi
+  entren totes les coses que alenteixen el foc —barreres, multiplicadors,
+  aigua, esperes—, i no la velocitat de cap teòrica de la cel·la.
+- **La calor és la de la cel·la on el front entra**, tractada si una
+  contramesura l'ha mullada o n'ha tret combustible. El resultat del càlcul
+  porta ara `heat`, la calor per superfície de cada cel·la sense tractar; la
+  tractada surt de l'historial de tractaments. Amb el combustible per sobre de
+  la humitat d'extinció, Rothermel no hi dona calor.
+
+**De la intensitat a la flama dibuixada**: la longitud de flama de Byram i,
+d'aquí, una mida entre 0 i 1 en escala logarítmica, de 0,3 a 12 m.
+
+- **Per sota de 0,3 m no hi ha flama.** El front s'arrossega o espera, i el
+  que queda és la brasa de terra, que ja s'apagava sola amb el temps (§11.20).
+  Una herba que espera una hora i mitja dona uns 0,2 m: sense flames. Un foc
+  lent sota arbrat (model 8) fa mig metre: amb flames petites.
+- **La flama més petita és un quart de la més gran**, perquè es vegi a 30 km.
+- **Més alçada i amplada com més intensa**, i **més flames on el front és més
+  intens**: cada partícula tria on néixer amb una probabilitat proporcional al
+  quadrat de la mida. El nombre total de partícules no canvia.
+
+Segueix sent una imatge, com deia la §11.20: una flama de tres metres no ocupa
+ni un píxel. El que és nou és que la seva mida relativa surt del model.
+Només canvia el dibuix: ni els temps d'arribada ni cap xifra de l'anàlisi.
+
+Comprovat: cinc proves noves —el ritme del front, la corba de mida, que un
+front més ràpid fa flames més grans, que un front aturat o mullat no en fa, i
+que les flames van on el front és més calent—, les 80 proves de simulació i les
+28 d'Angular, i la compilació sense avisos. **Al navegador no s'ha mirat**: ho
+prova Pere.
+
 ---
 
 ## 12. Decisions pendents

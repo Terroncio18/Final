@@ -1384,6 +1384,10 @@ export class SimulatorView {
         return;
       }
       const bounds = domainAround(centre);
+      // What each cell gives off as it burns: its fuel, as treated at that
+      // minute if a countermeasure wetted it or took fuel out (§11.35).
+      const heatAt = (cell: number, minute: number) =>
+        result.fuelTreatments?.at(cell, minute)?.bed.heatPerArea ?? result.heat[cell];
       const reduced = matchMedia('(prefers-reduced-motion: reduce)');
       const scale = () => this.maps.metresPerPixel() ?? undefined;
       painter.paint(untracked(this.minutes), 0, untracked(this.visibleForecasts), scale());
@@ -1405,7 +1409,7 @@ export class SimulatorView {
         this.maps.refreshFire();
         this.maps.resetFireParticles();
         this.maps.setFireParticles(
-          frontEmitters(result.arrival, terrain.elevation, minute, bounds),
+          frontEmitters(result.arrival, terrain.elevation, minute, bounds, heatAt),
           weather.towardsDeg,
           weather.wind,
         );
@@ -1444,7 +1448,7 @@ export class SimulatorView {
             const weather = untracked(this.activeWeather);
             if (jumped) this.maps.resetFireParticles();
             this.maps.setFireParticles(
-              frontEmitters(result.arrival, terrain.elevation, minute, bounds),
+              frontEmitters(result.arrival, terrain.elevation, minute, bounds, heatAt),
               weather.towardsDeg,
               weather.wind,
             );

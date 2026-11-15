@@ -35,6 +35,23 @@ export interface Emitters {
   readonly count: number;
   /** Mercator units per metre at the latitude of the domain. */
   readonly unitsPerMetre: number;
+  /** How big the flame is drawn at each emitter, 0 to 1 (fire-emitters.ts). */
+  readonly strength: Float32Array;
+  /** Running total of each emitter's chance of being picked. */
+  readonly weights: Float32Array;
+}
+
+/** The emitter whose share of `weights` holds `u`, a number in [0, 1). */
+function pick(weights: Float32Array, count: number, u: number): number {
+  const target = u * weights[count - 1];
+  let low = 0,
+    high = count - 1;
+  while (low < high) {
+    const middle = (low + high) >> 1;
+    if (weights[middle] > target) high = middle;
+    else low = middle + 1;
+  }
+  return low;
 }
 
 const FLAMES = 1000;
@@ -161,6 +178,8 @@ export class FireParticles implements CustomLayerInterface {
   /** Flame anchors follow the interpolated front; smoke keeps its birthplace. */
   private readonly flameBirth = new Float32Array(FLAMES * 3);
   private readonly flamePhase = new Float32Array(FLAMES).fill(2);
+  /** The strength of the emitter each flame was born at. */
+  private readonly flameStrength = new Float32Array(FLAMES);
   private readonly smokeBirth = new Float32Array(SMOKE * 3);
   private readonly smokePhase = new Float32Array(SMOKE).fill(2);
 
@@ -308,7 +327,7 @@ export class FireParticles implements CustomLayerInterface {
    * Coordinates are Mercator; all visual lengths are metres, not model outputs.
    */
   private place(emitters: Emitters, seconds: number): void {
-    const { positions, count, unitsPerMetre: unit } = emitters;
+    const { positions, count, unitsPerMetre: unit, strength, weights } = emitters;
 
     /** Gives particle `i` a new birthplace if its phase has started over. */
     const born = (
@@ -317,10 +336,13 @@ export class FireParticles implements CustomLayerInterface {
       i: number,
       phase: number,
       follow = false,
+      strengths?: Float32Array,
     ) => {
       if (phase < phases[i] || (follow && this.sampledEmitters !== emitters)) {
         const seed = follow ? i + 15 : i + Math.floor(seconds * 3) * 157 + 15;
-        const emitter = Math.floor(random(seed) * count) * 3;
+        const chosen = pick(weights, count, random(seed));
+        if (strengths) strengths[i] = strength[chosen];
+        const emitter = chosen * 3;
         birth[i * 3] = positions[emitter];
         birth[i * 3 + 1] = positions[emitter + 1];
         birth[i * 3 + 2] = positions[emitter + 2];
@@ -338,14 +360,17 @@ export class FireParticles implements CustomLayerInterface {
 
     for (let i = 0; i < FLAMES; i += 1) {
       const phase = fract(random(i + 57) + seconds * (0.3 + random(i + 112) * 0.45));
-      born(this.flameBirth, this.flamePhase, i, phase, true);
-      const lean = phase * 12;
-      const rise = 5 + phase * (24 + random(i + 40) * 65);
+      born(this.flameBirth, this.flamePhase, i, phase, true, this.flameStrength);
+      // A weak front's flames are lower and narrower, a strong one's taller.
+      const s = this.flameStrength[i];
+      const lean = phase * 12 * s;
+      const rise = (5 + phase * (24 + random(i + 40) * 65)) * (0.3 + 0.9 * s);
       const out = i * STRIDE;
       this.flameData[out] = this.flameBirth[i * 3] + this.windEast * lean * unit;
       this.flameData[out + 1] = this.flameBirth[i * 3 + 1] - this.windNorth * lean * unit;
       this.flameData[out + 2] = this.flameBirth[i * 3 + 2] + rise * unit;
-      this.flameData[out + 3] = (24 + random(i + 76) * 51) * (1 - phase * 0.5) * unit;
+      this.flameData[out + 3] =
+        (24 + random(i + 76) * 51) * (1 - phase * 0.5) * (0.45 + 0.65 * s) * unit;
       this.flameData[out + 4] =
         Math.min(phase * 7, 1) * Math.pow(1 - phase, 0.65) * (0.65 + random(i + 345) * 0.35);
     }

@@ -389,8 +389,13 @@ function loadOf(model: FuelModel): number {
  * front of— and it is the head's when the rate is the head's.
  */
 export function firelineIntensity(bed: FuelBed, rateMPerMin: number): number {
+  return byramIntensity(bed.heatPerArea, rateMPerMin);
+}
+
+/** The same, from the heat per area (BTU/ft²) instead of the whole bed. */
+export function byramIntensity(heatPerArea: number, rateMPerMin: number): number {
   // BTU/ft² × ft/min ÷ 60 = BTU/ft/s; one of those is 3,459 kW/m.
-  return ((bed.heatPerArea * rateMPerMin * FT_PER_M) / 60) * 3.459;
+  return ((heatPerArea * rateMPerMin * FT_PER_M) / 60) * 3.459;
 }
 
 /** Byram's flame length (1959), in metres, for an intensity in kW/m. */

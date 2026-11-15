@@ -68,12 +68,20 @@ export interface FrontSegment {
   x1: number;
   y1: number;
   length: number;
+  /**
+   * Minutes the front takes to cross one cell there, from the slope of the
+   * arrival times across the triangle: what the fire is really doing, barriers,
+   * water and waits included. Large where the front is stalled.
+   */
+  pace: number;
+  /** The cell the front is about to enter: the corner reached next. */
+  ahead: number;
 }
 
 /** Marching triangles: continuous isochrone in grid coordinates, never an invented ellipse. */
 export function activeFront(arrival: Float32Array, size: number, minute: number): FrontSegment[] {
   const segments: FrontSegment[] = [];
-  const triangle = (points: readonly (readonly [number, number, number])[]) => {
+  const triangle = (points: readonly (readonly [number, number, number, number])[]) => {
     // A barrier/unreached cell has no interpolatable arrival time.
     if (points.some((p) => !Number.isFinite(p[2]) || p[2] < 0)) return;
     const cuts: [number, number][] = [];
@@ -87,7 +95,22 @@ export function activeFront(arrival: Float32Array, size: number, minute: number)
     if (cuts.length !== 2) return;
     const [a, b] = cuts;
     const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    if (length > 1e-6) segments.push({ x0: a[0], y0: a[1], x1: b[0], y1: b[1], length });
+    if (length <= 1e-6) return;
+    // The plane through the three arrival times; its slope is minutes per cell.
+    const [p, q, r] = points;
+    const ux = q[0] - p[0],
+      uy = q[1] - p[1],
+      ut = q[2] - p[2];
+    const vx = r[0] - p[0],
+      vy = r[1] - p[1],
+      vt = r[2] - p[2];
+    const det = ux * vy - uy * vx;
+    const pace = Math.hypot((ut * vy - uy * vt) / det, (ux * vt - ut * vx) / det);
+    let ahead = -1,
+      next = Infinity;
+    for (const point of points)
+      if (point[2] > minute && point[2] < next) [ahead, next] = [point[3], point[2]];
+    segments.push({ x0: a[0], y0: a[1], x1: b[0], y1: b[1], length, pace, ahead });
   };
   for (let y = 0; y + 1 < size; y++)
     for (let x = 0; x + 1 < size; x++) {
@@ -98,10 +121,10 @@ export function activeFront(arrival: Float32Array, size: number, minute: number)
         t3 = arrival[i + size];
       if (Math.min(t0, t1, t2, t3) > minute || Math.max(t0, t1, t2, t3) <= minute) continue;
       const times = [t0, t1, t2, t3];
-      const a = [x + 0.5, y + 0.5, times[0]] as const,
-        b = [x + 1.5, y + 0.5, times[1]] as const;
-      const c = [x + 1.5, y + 1.5, times[2]] as const,
-        d = [x + 0.5, y + 1.5, times[3]] as const;
+      const a = [x + 0.5, y + 0.5, times[0], i] as const,
+        b = [x + 1.5, y + 0.5, times[1], i + 1] as const;
+      const c = [x + 1.5, y + 1.5, times[2], i + size + 1] as const,
+        d = [x + 0.5, y + 1.5, times[3], i + size] as const;
       triangle([a, b, c]);
       triangle([a, c, d]);
     }
