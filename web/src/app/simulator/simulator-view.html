@@ -564,7 +564,7 @@
                         <input
                           type="number"
                           inputmode="numeric"
-                          step="30"
+                          step="1"
                           [min]="widthLimits.min"
                           [max]="widthLimits.max"
                           [value]="row.widthM"
@@ -578,11 +578,25 @@
                         <input
                           type="number"
                           inputmode="numeric"
-                          step="5"
+                          step="1"
                           [min]="durationLimits.min"
                           [max]="durationLimits.max"
                           [value]="row.durationMin"
                           (change)="setMeasureNumber(row.id, 'duration', $event)"
+                        />
+                      </label>
+                    }
+                    @if (row.strengthEditable) {
+                      <label>
+                        <span>Reducció (%)</span>
+                        <input
+                          type="number"
+                          inputmode="decimal"
+                          min="0"
+                          max="95"
+                          step="1"
+                          [value]="row.strengthPercent"
+                          (change)="setMeasureNumber(row.id, 'strength', $event)"
                         />
                       </label>
                     }
@@ -610,6 +624,11 @@
       </details>
 
       <div class="simulation-controls">
+        @if (plan.draft().length) {
+          <p class="terrain-note" role="status">
+            Finalitza o cancel·la la franja abans de simular.
+          </p>
+        }
         <div class="simulation-state">
           <span class="live-dot" [class.waiting]="!result()"></span>
           <span>{{ state().short }}</span>

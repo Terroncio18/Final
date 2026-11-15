@@ -6,6 +6,7 @@ import {
   type Countermeasure,
 } from './countermeasures';
 import type { Point } from './point';
+import { ignitionDistances } from './fire-distances';
 import {
   effectiveWind,
   firelineIntensity,
@@ -432,6 +433,8 @@ function measure(
   const hottest = new Float32Array(minutes);
   const farthest = new Float32Array(minutes);
   const starts = ignitions.map((cell) => [cell % GRID, Math.floor(cell / GRID)] as const);
+  // A backfire can seed thousands of cells. Avoid O(burned cells × seeds).
+  const distances = ignitions.length > 32 ? ignitionDistances(ignitions) : null;
   const sumE = new Float64Array(minutes);
   const sumN = new Float64Array(minutes);
   let reachedEdge = Infinity;
@@ -461,8 +464,9 @@ function measure(
       cells[minute] += 1;
       if (rate[index] > fastest[minute]) fastest[minute] = rate[index];
       if (intensity[index] > hottest[minute]) hottest[minute] = intensity[index];
-      let nearest = Infinity;
-      for (const [x, y] of starts) nearest = Math.min(nearest, Math.hypot(column - x, row - y));
+      let nearest = distances ? Math.sqrt(distances[index]) : Infinity;
+      if (!distances)
+        for (const [x, y] of starts) nearest = Math.min(nearest, Math.hypot(column - x, row - y));
       if (nearest > farthest[minute]) farthest[minute] = nearest;
       sumE[minute] += headE[index];
       sumN[minute] += headN[index];

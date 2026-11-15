@@ -76,6 +76,7 @@ function discRing(centre: Point, diameterM: number): [number, number][] {
     const angle = (i / 48) * 2 * Math.PI;
     ring.push([centre[0] + dLon * Math.cos(angle), centre[1] + dLat * Math.sin(angle)]);
   }
+  ring[ring.length - 1] = [...ring[0]];
   return ring;
 }
 

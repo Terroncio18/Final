@@ -3,6 +3,7 @@ vi.mock('./domain', () => ({ GRID: 16, CELL_M: 30, domainAround: () => [0, 0, 16
 import { spread, type SpreadInput } from './fire-spread';
 import { fuelBed, FUEL_MODELS } from './rothermel';
 import type { Countermeasure } from './countermeasures';
+import { ignitionDistances } from './fire-distances';
 
 const bed = fuelBed(FUEL_MODELS[1], { dead1: 0.08, dead10: 0.08, dead100: 0.08, live: 1 });
 const input: SpreadInput = {
@@ -31,6 +32,24 @@ const run = (measures: readonly Countermeasure[]) =>
   spread({ ...input, countermeasures: { centre: [8, 8], measures } });
 
 describe('countermeasures in the propagation solver', () => {
+  it('computes exact nearest-ignition distances for dense backfires in linear grid work', () => {
+    for (const seeds of [
+      [],
+      [0],
+      [0, 255, 120],
+      Array.from({ length: 64 }, (_, i) => (i * 37) % 256),
+    ]) {
+      const field = ignitionDistances(seeds);
+      for (let i = 0; i < 256; i++) {
+        const expected = Math.min(
+          ...seeds.map(
+            (s) => ((i % 16) - (s % 16)) ** 2 + (Math.floor(i / 16) - Math.floor(s / 16)) ** 2,
+          ),
+        );
+        expect(field[i]).toBe(expected);
+      }
+    }
+  });
   it('preserves the baseline exactly for an empty plan, including all statistics', async () => {
     expect(await run([])).toEqual(await spread(input));
   });

@@ -77,3 +77,16 @@ combustible, contrafoc i persistència. No substitueixen una calibració amb dad
 d'extinció ni una validació operativa.
 
 Des de `web`: `npm test -- --watch=false` i `npm run build`.
+
+La suite pura s'executa amb Vitest i les proves Angular amb el seu builder: aquest
+últim no admet els mocks de mòduls relatius de les proves de propagació.
+Verificació final: 71 proves passen (48 de simulació i 23 Angular); build de
+producció sense avisos. El càlcul de distància a les ignicions usa una transformada
+euclidiana exacta de cost lineal quan un contrafoc genera moltes llavors.
+
+El panell permet editar amplada, durada i reducció experimental. Una franja
+inacabada impedeix iniciar o desar, fins que es finalitza o es cancel·la.
+No s'ha pogut completar la comprovació visual interactiva: el navegador integrat
+no connecta amb localhost i el control del navegador local rebutja entrades per
+interferència d'usuari. Per tant, dibuix real, aspecte sobre el relleu i interacció
+amb el mapa queden pendents de revisió manual; no es donen per verificats pels tests.

@@ -190,6 +190,35 @@ describe('the countermeasure plan', () => {
     expect(plan.rows().map((row) => row.name)).toEqual([`${line.label} 1`, `${line.label} 2`]);
   });
 
+  it('edits experimental strength and rejects invalid percentages without changing the plan', () => {
+    const plan = drawn(temporary.kind);
+    const id = plan.measures()[0].id;
+    expect(plan.setStrength(id, 45)).toBe(true);
+    expect(plan.measures()[0].strength).toBe(0.45);
+    const before = plan.measures();
+    for (const invalid of [-1, 96, NaN, Infinity])
+      expect(plan.setStrength(id, invalid)).toBe(false);
+    expect(plan.measures()).toBe(before);
+    expect(plan.rows()[0].strengthPercent).toBe(45);
+  });
+
+  it('clears an unfinished draft along with the committed plan', () => {
+    const plan = drawn();
+    plan.click(c, bounds);
+    plan.clear();
+    expect(plan.measures()).toEqual([]);
+    expect(plan.draft()).toEqual([]);
+    expect(plan.kind()).toBeNull();
+  });
+
+  it('keeps the current plan when a replacement is invalid', () => {
+    const plan = drawn();
+    const before = plan.measures();
+    plan.replace([{ ...before[0], widthM: NaN }], bounds);
+    expect(plan.measures()).toBe(before);
+    expect(plan.note()?.failed).toBe(true);
+  });
+
   it('takes off what falls outside a new domain, and says how many', () => {
     const plan = drawn();
     const far = domainAround([3.2, 39.76]);

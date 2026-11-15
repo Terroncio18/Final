@@ -135,6 +135,9 @@ export const COUNTERMEASURE_CATALOG: readonly MeasureDefinition[] = [
 ];
 
 export const MAX_COUNTERMEASURES = 100;
+export const WIDTH_LIMITS = { min: CELL_M, max: 3000 } as const;
+export const DURATION_LIMITS = { min: 1, max: 720 } as const;
+export const MAX_VERTICES = 64;
 const temporary = (kind: CountermeasureKind) =>
   kind === 'water-line' || kind === 'helicopter' || kind === 'amphibious' || kind === 'retardant';
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
@@ -163,7 +166,7 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
       !Array.isArray(raw.points) ||
       !raw.points.every(validPoint) ||
       (def.geometry === 'point' ? raw.points.length !== 1 : raw.points.length < 2) ||
-      raw.points.length > 64
+      raw.points.length > MAX_VERTICES
     )
       return 'Geometria de contramesura incorrecta.';
     vertices += raw.points.length;
@@ -173,13 +176,15 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
       !raw.points.some((p: Point) => p[0] !== raw.points[0][0] || p[1] !== raw.points[0][1])
     )
       return 'La franja necessita dos punts diferents.';
-    if (!finite(raw.widthM) || raw.widthM < CELL_M || raw.widthM > 3000)
+    if (!finite(raw.widthM) || raw.widthM < WIDTH_LIMITS.min || raw.widthM > WIDTH_LIMITS.max)
       return `L'amplada ha d'estar entre ${CELL_M} i 3000 m.`;
     if (!finite(raw.strength) || raw.strength < 0 || raw.strength > 0.95)
       return 'La reducció ha d’estar entre 0 i 95 %.';
     if (
       !finite(raw.durationMin) ||
-      (temporary(def.kind) ? raw.durationMin < 1 || raw.durationMin > 720 : raw.durationMin !== 0)
+      (temporary(def.kind)
+        ? raw.durationMin < DURATION_LIMITS.min || raw.durationMin > DURATION_LIMITS.max
+        : raw.durationMin !== 0)
     )
       return 'Durada incorrecta: 1–720 min per als efectes temporals; 0 per als permanents.';
     ids.add(raw.id);

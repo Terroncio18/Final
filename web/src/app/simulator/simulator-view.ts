@@ -211,7 +211,7 @@ function chartPaths(values: readonly number[], width = 300, height = 100) {
   selector: 'app-simulator-view',
   imports: [RouterLink, Icon],
   templateUrl: './simulator-view.html',
-  styleUrl: './simulator-view.css',
+  styleUrls: ['./simulator-view.css', './countermeasures.css'],
   // Escape puts down whatever tool is in the hand, wherever the focus is.
   host: { '(document:keydown.escape)': 'cancelTool()' },
 })
@@ -611,6 +611,13 @@ export class SimulatorView {
    * not something a file can ask for later. It comes back as manual values.
    */
   protected saveScenario(): void {
+    if (this.plan.draft().length) {
+      this.scenarioNote.set({
+        text: 'Finalitza o cancel·la la franja abans de desar.',
+        failed: true,
+      });
+      return;
+    }
     const centre = this.ignition();
     if (!centre) return;
     const now = this.now();
@@ -807,6 +814,7 @@ export class SimulatorView {
   protected readonly canStart = computed(
     () =>
       !this.computing() &&
+      this.plan.draft().length === 0 &&
       this.terrain.terrain() !== null &&
       this.starts().length > 0 &&
       !this.fuelIssue(),
@@ -1593,15 +1601,27 @@ export class SimulatorView {
    * and each of those would be a refused value and a result thrown away. A
    * value the plan refuses is put back as it was, with the reason beside it.
    */
-  protected setMeasureNumber(id: string, which: 'width' | 'duration', event: Event): void {
+  protected setMeasureNumber(
+    id: string,
+    which: 'width' | 'duration' | 'strength',
+    event: Event,
+  ): void {
     const input = event.target as HTMLInputElement;
     const value = input.value.trim() === '' ? NaN : Number(input.value.replace(',', '.'));
     this.editPlan(() => {
       if (which === 'width') this.plan.setWidth(id, value);
-      else this.plan.setDuration(id, value);
+      else if (which === 'duration') this.plan.setDuration(id, value);
+      else this.plan.setStrength(id, value);
     });
     const row = this.plan.rows().find((item) => item.id === id);
-    if (row) input.value = String(which === 'width' ? row.widthM : row.durationMin);
+    if (row)
+      input.value = String(
+        which === 'width'
+          ? row.widthM
+          : which === 'duration'
+            ? row.durationMin
+            : row.strengthPercent,
+      );
   }
 
   /** Frames the domain again, from wherever the camera has been dragged to. */

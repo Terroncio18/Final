@@ -2,6 +2,9 @@ import { computed, signal } from '@angular/core';
 
 import {
   COUNTERMEASURE_CATALOG,
+  WIDTH_LIMITS,
+  DURATION_LIMITS,
+  MAX_VERTICES,
   parseCountermeasures,
   type Countermeasure,
   type CountermeasureKind,
@@ -23,13 +26,10 @@ export interface PlanNote {
  * The same bounds the model's own validation holds (parseCountermeasures), so
  * that a plan a scenario file may carry is one these inputs can show and
  * edit. The lower width is the cell: a strip narrower than thirty metres is
- * one the grid cannot tell from no strip at all. The model does not export
- * the figures, so they are repeated here; commit() still has the last word.
+ * one the grid cannot resolve. These constants come from the model;
+ * commit() validates the complete plan before accepting any edit.
  */
-export const WIDTH_LIMITS = { min: 30, max: 3000 } as const;
-export const DURATION_LIMITS = { min: 1, max: 720 } as const;
-/** As many vertices as the model accepts in one measure. */
-export const MAX_VERTICES = 64;
+export { WIDTH_LIMITS, DURATION_LIMITS, MAX_VERTICES } from '../simulation/countermeasures';
 
 /**
  * What each tool has to say about itself while it is in the hand: what the
@@ -144,8 +144,9 @@ export class CountermeasurePlan {
               ? `−${percent} % de propagació, ${measure.durationMin} min`
               : `−${percent} % de propagació, permanent`,
         widthM: measure.widthM,
-        // A backfire is a line of ignitions: its width is the model's, not a choice.
-        widthEditable: !backfire,
+        widthEditable: true,
+        strengthPercent: percent,
+        strengthEditable: !backfire && !barrier,
         widthLabel: entry.geometry === 'point' ? 'Diàmetre' : 'Amplada',
         durationMin: measure.durationMin,
         durationEditable: measure.durationMin > 0,
@@ -225,6 +226,7 @@ export class CountermeasurePlan {
   }
 
   clear(): void {
+    this.cancel();
     this.commit([], null);
     this.selected.set(null);
   }
@@ -256,6 +258,14 @@ export class CountermeasurePlan {
     return this.patch(id, { durationMin: Math.round(value) });
   }
 
+  setStrength(id: string, percent: number): boolean {
+    if (!Number.isFinite(percent) || percent < 0 || percent > 95) {
+      this.note.set({ text: 'La reducció experimental ha d’anar de 0 a 95 %.', failed: true });
+      return false;
+    }
+    return this.patch(id, { strength: percent / 100 });
+  }
+
   /**
    * Puts a whole plan in place: the one a scenario file carried.
    *
@@ -263,12 +273,17 @@ export class CountermeasurePlan {
    * when the domain moves under a plan.
    */
   replace(measures: readonly Countermeasure[], bounds: Bounds | null): void {
+    const renumbered = measures.map((measure, i) => ({ ...measure, id: `m${i + 1}` }));
+    const checked = parseCountermeasures(renumbered);
+    if (typeof checked === 'string') {
+      this.note.set({ text: checked, failed: true });
+      return;
+    }
     this.cancel();
     this.selected.set(null);
     // Fresh ids: two files may both have an «m1», and the list tracks by id.
-    this.nextId = 1;
-    const renumbered = measures.map((measure) => ({ ...measure, id: `m${this.nextId++}` }));
-    this.measures.set(renumbered);
+    this.nextId = checked.length + 1;
+    this.measures.set(checked);
     this.note.set(null);
     this.confine(bounds);
   }
