@@ -1,4 +1,6 @@
 import { formatPoint, formatPoints, parsePoint, parsePoints, type Point } from './point';
+import { parseCountermeasures, type Countermeasure } from './countermeasures';
+import { domainAround } from './domain';
 
 /**
  * A scenario: everything it takes to compute the same fire again.
@@ -23,6 +25,7 @@ export interface Scenario {
   readonly humidity: number;
   /** °C. */
   readonly temperature: number;
+  readonly countermeasures?: readonly Countermeasure[];
 }
 
 /** What the sliders of the screen can hold: a file cannot ask for more. */
@@ -33,7 +36,7 @@ const LIMITS = {
 } as const;
 
 const HEADER = '# IgnisLab · escenari de simulació';
-const VERSION = '1';
+const VERSION = '2';
 
 /**
  * The scenario as a text file: one `key = value` per line, in Catalan, with
@@ -44,6 +47,10 @@ const VERSION = '1';
  * opens it with a notepad, and survive being edited by hand.
  */
 export function formatScenario(scenario: Scenario, saved: Date): string {
+  if (scenario.countermeasures) {
+    const measures = parseCountermeasures(scenario.countermeasures);
+    if (typeof measures === 'string') throw new Error(measures);
+  }
   return [
     HEADER,
     '# Es pot obrir des del simulador amb «Carregar». Les línies amb # són notes.',
@@ -67,6 +74,13 @@ export function formatScenario(scenario: Scenario, saved: Date): string {
     `vent_des_de = ${scenario.windFrom}`,
     `humitat = ${scenario.humidity}`,
     `temperatura = ${scenario.temperature}`,
+    ...(scenario.countermeasures
+      ? [
+          '',
+          '# Pla de contramesures preparat a T=0; coordenades [longitud,latitud].',
+          `contramesures = ${JSON.stringify(scenario.countermeasures)}`,
+        ]
+      : []),
     '',
   ].join('\n');
 }
@@ -80,6 +94,7 @@ export function formatScenario(scenario: Scenario, saved: Date): string {
  * dropped rather than guessed, as in the address (§11.16).
  */
 export function parseScenario(text: string): Scenario | string {
+  if (text.length > 1_000_000) return 'El fitxer d’escenari és massa gran.';
   if (!text.includes('IgnisLab')) return 'El fitxer no és un escenari d’IgnisLab.';
 
   const values = new Map<string, string>();
@@ -95,6 +110,9 @@ export function parseScenario(text: string): Scenario | string {
     const value = values.get(key) ?? '';
     return /^[A-Za-z0-9_]+$/.test(value) ? value : null;
   };
+  const version = values.get('versio');
+  if (version !== undefined && version !== '1' && version !== VERSION)
+    return 'Versió d’escenari no compatible.';
   const region = code('regio');
   const province = code('provincia');
   const municipality = code('municipi');
@@ -117,6 +135,21 @@ export function parseScenario(text: string): Scenario | string {
   if (wind === null || humidity === null || temperature === null || from === null) {
     return 'A l’escenari li falta la meteorologia: vent, direcció, humitat o temperatura.';
   }
+  let countermeasures: readonly Countermeasure[] | undefined;
+  if (values.has('contramesures')) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(values.get('contramesures')!);
+    } catch {
+      return 'El pla de contramesures no és un JSON vàlid.';
+    }
+    const parsed = parseCountermeasures(raw);
+    if (typeof parsed === 'string') return parsed;
+    const [w, s, e, n] = domainAround(centre);
+    if (parsed.some((m) => m.points.some(([lon, lat]) => lon < w || lon > e || lat < s || lat > n)))
+      return 'Una contramesura surt del domini de l’escenari.';
+    countermeasures = parsed;
+  }
 
   return {
     name: values.get('nom') ?? '',
@@ -129,6 +162,7 @@ export function parseScenario(text: string): Scenario | string {
     windFrom: ((Math.round(from) % 360) + 360) % 360,
     humidity: Math.round(humidity),
     temperature: Math.round(temperature),
+    ...(countermeasures !== undefined ? { countermeasures } : {}),
   };
 }
 

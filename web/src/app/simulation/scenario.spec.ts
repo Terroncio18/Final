@@ -61,4 +61,35 @@ describe('scenario files', () => {
     );
     expect(scenarioFileName('  ')).toBe('ignislab-escenari.txt');
   });
+
+  it('round-trips a complete countermeasure plan and still reads version 1 files', () => {
+    const planned: Scenario = {
+      ...scenario,
+      countermeasures: [
+        {
+          id: 'water-1',
+          kind: 'helicopter',
+          points: [[2.71, 39.76]],
+          widthM: 90,
+          strength: 0.7,
+          durationMin: 20,
+        },
+      ],
+    };
+    expect(parseScenario(formatScenario(planned, new Date(0)))).toEqual(planned);
+    expect(
+      parseScenario(formatScenario(scenario, new Date(0)).replace('versio = 2', 'versio = 1')),
+    ).toEqual(scenario);
+  });
+
+  it('refuses corrupted, outside-domain or unsupported plans without dropping measures', () => {
+    const text = formatScenario(scenario, new Date(0));
+    expect(parseScenario(text + 'contramesures = nope')).toMatch(/JSON/);
+    expect(parseScenario(text + 'contramesures = [{}]')).toMatch(/desconegut/);
+    expect(parseScenario(text.replace('versio = 2', 'versio = 99'))).toMatch(/Versió/);
+    const outside = [
+      { id: 'x', kind: 'helicopter', points: [[0, 0]], widthM: 30, strength: 0.7, durationMin: 20 },
+    ];
+    expect(parseScenario(text + 'contramesures = ' + JSON.stringify(outside))).toMatch(/domini/);
+  });
 });

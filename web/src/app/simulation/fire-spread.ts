@@ -1,5 +1,12 @@
 import { CELL_M, GRID } from './domain';
 import {
+  compileCountermeasures,
+  treatedTravel,
+  treatmentFactor,
+  type Countermeasure,
+} from './countermeasures';
+import type { Point } from './point';
+import {
   effectiveWind,
   firelineIntensity,
   lengthToBreadth,
@@ -28,6 +35,11 @@ export interface SpreadInput {
   readonly ignitions: readonly number[];
   /** How long to simulate, in minutes. */
   readonly horizon: number;
+  /** Prepared at T=0; temporary effects expire in simulated minutes. */
+  readonly countermeasures?: {
+    readonly centre: Point;
+    readonly measures: readonly Countermeasure[];
+  };
 }
 
 export interface SpreadResult {
@@ -225,6 +237,9 @@ export async function spread(
   if (elevation.length !== count || (input.fuels && input.fuels.length !== count)) {
     throw new Error('Mida de la graella incorrecta.');
   }
+  const treatments = input.countermeasures?.measures.length
+    ? compileCountermeasures(input.countermeasures.centre, input.countermeasures.measures)
+    : undefined;
   const beds = new Map<number, { bed: FuelBed; phiWind: number; r0: number }>();
   for (const [id, value] of Object.entries(input.fuelBeds ?? {})) {
     beds.set(Number(id), {
@@ -261,9 +276,11 @@ export async function spread(
       if (model === 0) continue;
       const local = model === undefined ? uniform : beds.get(model);
       if (!local) throw new Error('Falta combustible conegut en una cel·la terrestre.');
+      if (treatments?.blocked[index]) continue;
       const { bed, phiWind, r0 } = local;
+      const factor = treatments?.permanent[index] ?? 1;
       burnable += 1;
-      baseSum += r0;
+      baseSum += r0 * factor;
 
       const west = Math.max(column - 1, 0);
       const east = Math.min(column + 1, GRID - 1);
@@ -279,7 +296,7 @@ export async function spread(
       const sumN = phiWind * windN + (tan > 0 ? (phiSlope * gradN) / tan : 0);
       const phi = Math.hypot(sumE, sumN);
 
-      rate[index] = r0 * (1 + phi);
+      rate[index] = r0 * (1 + phi) * factor;
       intensity[index] = firelineIntensity(bed, rate[index]);
       if (phi > 0) {
         headE[index] = sumE / phi;
@@ -301,7 +318,12 @@ export async function spread(
   // ---- Dijkstra, with time as the distance. ----
   const arrival = new Float32Array(count).fill(Infinity);
   const heap = new Heap();
-  for (const cell of input.ignitions) {
+  // Backfire burns real cells; sea, unburnable land and barriers cannot be lit.
+  const extraIgnitions = treatments?.ignitions.filter((cell) => rate[cell] > 0) ?? [];
+  if (treatments?.ignitions.length && !extraIgnitions.length)
+    throw new Error('El contrafoc no toca cap cel·la amb combustible.');
+  const ignitions = [...new Set([...input.ignitions, ...extraIgnitions])];
+  for (const cell of ignitions) {
     if (!Number.isInteger(cell) || cell < 0 || cell >= count || rate[cell] === 0) {
       throw new Error('Una ignició cau en una cel·la sense combustible.');
     }
@@ -339,7 +361,10 @@ export async function spread(
         }
         const cosine = stepE[step] * headE[at] + stepN[step] * headN[at];
         const along = (rate[at] * (1 - ecc[at])) / (1 - ecc[at] * cosine);
-        travel += (stepLength[step] * segment.share) / along;
+        const distance = stepLength[step] * segment.share;
+        travel += treatments
+          ? treatedTravel(distance, along, time + travel, treatments.temporary.get(at))
+          : distance / along;
       }
       // Match the stored float precision so heap entries are not falsely stale.
       const reached = Math.fround(time + travel);
@@ -359,11 +384,18 @@ export async function spread(
     }
   }
 
+  // Statistics describe the treatment active when the front arrives, not T=0.
+  if (treatments)
+    for (const [cell, windows] of treatments.temporary) {
+      const factor = treatmentFactor(windows, arrival[cell]);
+      rate[cell] *= factor;
+      intensity[cell] *= factor;
+    }
   return {
     arrival,
     horizon,
     burnable,
-    ...measure(arrival, rate, headE, headN, intensity, input.ignitions, horizon),
+    ...measure(arrival, rate, headE, headN, intensity, ignitions, horizon),
     baseRate: burnable ? baseSum / burnable : 0,
   };
 }
