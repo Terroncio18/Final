@@ -1282,7 +1282,9 @@ Coses que han costat temps i convé no redescobrir.
 | AEMET OpenData | Meteorologia | Espanya | En ús (§11.18) |
 | IPMA | Meteorologia | Portugal | En ús (§11.18) |
 | OpenStreetMap (Overpass) | Topònims i cims | ES i PT | En ús (pantalla de simulació) |
-| ICNF — Pontos de água (`BDG/Pontos_agua`) | Punts d'aigua de la xarxa DFCI, classes «Aéreo» i «Misto» | Portugal continental | En ús (12.23, fase 2 §11.41) |
+| ICNF — Pontos de água (`BDG/Pontos_agua`) | Punts d'aigua de la xarxa DFCI, classes «Aéreo» i «Misto» | Portugal continental | En ús, servit per la nostra API (fase 2 §11.45) |
+| GVA — PPIFDF, punts d'aigua (WFS `terramapas.icv.gva.es/0509_PlanificacionPPIFDF`) | Punts d'aigua, amb aptitud per a helicòpter i amfibi | País Valencià | En ús, servit per la nostra API (fase 2 §11.45) |
+| REDIAM — punts d'aigua per a l'extinció d'incendis (WMS `REDIAM_puntos_agua`) | Punts d'aigua del Pla INFOCA | Andalusia | En ús, servit per la nostra API (fase 2 §11.45) |
 | ENAIRE — base de dades aeronàutica (`Aero_SRV_VIGOR_V2`, capa 3) | Aeròdroms i aeròdroms amb heliport de l'AIP | Espanya | En ús (12.23, fase 2 §11.41) |
 | OpenStreetMap (Overpass, en directe) | Parcs de bombers (`amenity=fire_station`); aeròdroms (`aeroway=aerodrome`) on ENAIRE no en té | ES i PT | En ús, **no oficial** (12.23) |
 
@@ -1365,6 +1367,8 @@ Les dades no tenen cap llicència amb nom, i això és una troballa:
 | OpenStreetMap | ODbL 1.0 | «© OpenStreetMap contributors», amb la llicència al costat |
 | ESA WorldCover 2021 | CC BY 4.0 | «© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium» |
 | IDEIB — IV Inventari Forestal | Per confirmar: el servei no en publica cap | «Govern de les Illes Balears–SITIBSA», el crèdit que declara la capa |
+| GVA — punts d'aigua (PPIFDF) | CC BY | «Generalitat Valenciana» |
+| REDIAM — punts d'aigua per a l'extinció | CC BY 4.0 | «REDIAM, Junta de Andalucía» |
 | ICNF — Pontos de água | Per confirmar: el servei no en publica cap; el mateix tema en conjunts municipals de dados.gov.pt és CC0 | «Instituto da Conservação da Natureza e das Florestas, IP», el crèdit que declara el servei |
 | ENAIRE — dades aeronàutiques | Per confirmar: no s'han trobat les condicions d'ús del servei | «ENAIRE» |
 
