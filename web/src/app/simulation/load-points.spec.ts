@@ -11,7 +11,7 @@ import {
 } from './countermeasures';
 import type { Point } from './point';
 import { formatScenario, parseScenario, type Scenario } from './scenario';
-import { inLake, parseIcnfWater, parseLakes } from './resources';
+import { inLake, parseLakes } from './resources';
 
 const drop: Point = [2.7, 39.7];
 /** About 8,6 km east. */
@@ -115,7 +115,7 @@ describe('load points (§11.44)', () => {
     expect(aircraftAt(m, 30 - leg - 0.01, load)).toBeNull();
   });
 
-  it('reads official lakes, holes included, and keeps the ICNF type of a water point', () => {
+  it('reads official lakes, holes included', () => {
     const square = (x: number, y: number, s: number): Point[] => [
       [x, y],
       [x + s, y],
@@ -136,17 +136,5 @@ describe('load points (§11.44)', () => {
     expect(inLake([2.1, 39.1], lakes)).toBe(true);
     expect(inLake([2.5, 39.5], lakes)).toBe(false);
     expect(inLake([3.5, 39.5], lakes)).toBe(false);
-    const [water] = parseIcnfWater(
-      {
-        features: [
-          {
-            geometry: { type: 'Point', coordinates: [2.5, 39.5] },
-            properties: { Nome: 'Barragem', Tipo: 'Albufeira de barragem' },
-          },
-        ],
-      },
-      [2, 39, 3, 40],
-    );
-    expect(water.detail).toBe('Albufeira de barragem');
   });
 });

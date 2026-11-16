@@ -432,7 +432,7 @@ export class CountermeasurePlan {
         this.note.set({ text: load, failed: true });
         return;
       }
-      if (this.add(tool.kind, drop, load)) this.cancel();
+      this.chooseLoad(load);
       return;
     }
     // One measure per tool taken: once it is down, the tool is put away.
@@ -457,6 +457,18 @@ export class CountermeasurePlan {
     }
     this.draft.update((points) => [...points, here]);
     this.note.set(null);
+  }
+
+  /**
+   * Where the aircraft whose drop is waiting loads, already checked: a click
+   * the picker accepted, or one of the official places outside the domain,
+   * which the map cannot show (§11.45).
+   */
+  chooseLoad(load: Point): void {
+    const kind = this.kind(),
+      drop = this.loading();
+    if (!kind || !drop || !aircraftKind(kind)) return;
+    if (this.add(kind, drop, [load[0], load[1]])) this.cancel();
   }
 
   /**

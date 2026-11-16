@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   enaireAerodromesUrl,
-  icnfWaterUrl,
   overpassQuery,
   parseEnaireAerodromes,
-  parseIcnfWater,
+  parseWaterPoints,
+  waterFor,
+  waterPointsUrl,
+  widen,
   parseOverpass,
   type Extent,
 } from './resources';
@@ -13,11 +15,10 @@ import {
 const extent: Extent = [2.5, 39.6, 2.9, 39.9];
 
 describe('resources', () => {
-  it('asks ICNF only for the classes aircraft can use, inside the domain', () => {
-    const url = new URL(icnfWaterUrl(extent));
-    expect(url.searchParams.get('where')).toBe("Classe IN ('Aéreo','Misto')");
-    expect(url.searchParams.get('geometry')).toBe('2.5,39.6,2.9,39.9');
-    expect(url.searchParams.get('f')).toBe('geojson');
+  it('asks our API for the water points of the domain', () => {
+    expect(waterPointsUrl(extent)).toBe(
+      '/api/water-points?bbox=2.500000,39.600000,2.900000,39.900000',
+    );
   });
 
   it('asks ENAIRE for aerodromes, not bare heliports or model fields', () => {
@@ -31,24 +32,64 @@ describe('resources', () => {
     expect(overpassQuery(extent, true)).toContain('["aeroway"="aerodrome"](39.6,2.5,39.9,2.9)');
   });
 
-  it('reads ICNF water points, drops what is outside and what has no point', () => {
+  it('reads the API water points, with what each source says about aircraft', () => {
     const body = {
-      type: 'FeatureCollection',
-      features: [
+      points: [
         {
-          geometry: { type: 'Point', coordinates: [2.7, 39.7] },
-          properties: { Nome: ' Barragem ' },
+          source: 'GVA',
+          id: 'a',
+          name: 'M908',
+          lon: -0.51,
+          lat: 38.55,
+          type: 'Depósito',
+          helicopter: true,
+          amphibious: false,
         },
-        { geometry: { type: 'Point', coordinates: [2.7, 39.7] }, properties: { Nome: null } },
-        { geometry: { type: 'Point', coordinates: [3.5, 39.7] }, properties: { Nome: 'Fora' } },
-        { geometry: null, properties: { Nome: 'Sense punt' } },
-        { geometry: { type: 'Point', coordinates: ['x', 39.7] }, properties: {} },
+        {
+          source: 'REDIAM',
+          id: 'b',
+          name: 'HW2169',
+          lon: -7.1,
+          lat: 37.6,
+          type: 'EMBALSE',
+          helicopter: null,
+          amphibious: null,
+        },
+        {
+          source: 'ICNF',
+          id: 'c',
+          name: '',
+          lon: -8.4,
+          lat: 41.3,
+          type: null,
+          helicopter: true,
+          amphibious: null,
+        },
+        { source: 'OSM', id: 'd', name: 'x', lon: 0, lat: 0 },
+        { source: 'GVA', id: 'e', name: 'x', lon: 'x', lat: 0 },
       ],
     };
-    expect(parseIcnfWater(body, extent)).toEqual([
-      { kind: 'water', name: 'Barragem', point: [2.7, 39.7], source: 'ICNF' },
-      { kind: 'water', name: "Punt d'aigua", point: [2.7, 39.7], source: 'ICNF' },
-    ]);
+    const read = parseWaterPoints(body);
+    expect(read.map((r) => r.name)).toEqual(['M908', 'HW2169', "Punt d'aigua"]);
+    expect(read[0]).toMatchObject({
+      kind: 'water',
+      source: 'GVA',
+      detail: 'Depósito',
+      helicopter: true,
+      amphibious: false,
+    });
+    expect(read.map((r) => waterFor('helicopter', r))).toEqual([true, true, true]);
+    // GVA says no; a REDIAM reservoir is open water; an ICNF point of no type is not.
+    expect(read.map((r) => waterFor('amphibious', r))).toEqual([false, true, false]);
+    expect(() => parseWaterPoints({ error: 'x' })).toThrow();
+  });
+
+  it('widens an extent by metres on every side', () => {
+    const [w, s, e, n] = widen([0, 40, 1, 41], 30_000);
+    expect(41 - n).toBeCloseTo(-30_000 / 111_320, 6);
+    expect(40 - s).toBeCloseTo(30_000 / 111_320, 6);
+    expect(-w).toBeGreaterThan(30_000 / 111_320);
+    expect(e - 1).toBeCloseTo(-w, 9);
   });
 
   it('names an ENAIRE aerodrome with its ICAO code', () => {
@@ -68,7 +109,6 @@ describe('resources', () => {
   });
 
   it('refuses an answer that is not a feature collection', () => {
-    expect(() => parseIcnfWater({ error: { code: 400 } }, extent)).toThrow();
     expect(() => parseOverpass({ remark: 'timeout' }, extent, false)).toThrow();
   });
 

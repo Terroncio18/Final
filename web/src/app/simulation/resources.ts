@@ -9,9 +9,10 @@ import type { Point } from './point';
  * Each source is the official one where an official one exists and answers
  * from the browser, and OpenStreetMap otherwise, said as such:
  *
- * - **water points**: ICNF, the national network of Portugal, filtered to the
- *   classes aircraft can use (`Aéreo`, `Misto`). Spain publishes them per
- *   autonomous community and none was found open (§14);
+ * - **water points**: our own API (§11.45), which serves the official
+ *   networks prepared offline —GVA in the Valencian Community, REDIAM in
+ *   Andalusia, ICNF in Portugal— in the domain and 30 km around it. The rest
+ *   of Spain publishes none openly;
  * - **aerodromes**: ENAIRE's aeronautical database (the AIP's aerodromes and
  *   heliport-aerodromes) in Spain; OpenStreetMap `aeroway=aerodrome` only where
  *   ENAIRE has none in the domain, which is Portugal;
@@ -19,15 +20,18 @@ import type { Point } from './point';
  *   official layer was found in either country.
  */
 export type ResourceKind = 'station' | 'water' | 'aerodrome';
-export type ResourceSource = 'ICNF' | 'ENAIRE' | 'OSM';
+export type ResourceSource = 'GVA' | 'REDIAM' | 'ICNF' | 'ENAIRE' | 'OSM';
 
 export interface Resource {
   readonly kind: ResourceKind;
   readonly name: string;
   readonly point: Point;
   readonly source: ResourceSource;
-  /** ICNF's type of water point (reservoir, lake, ocean…), where it says. */
+  /** The source's type of water point (reservoir, lake, pond…), where it says. */
   readonly detail?: string;
+  /** Whether a helicopter / a scooper can load here; null where the source does not say. */
+  readonly helicopter?: boolean | null;
+  readonly amphibious?: boolean | null;
 }
 
 /**
@@ -40,10 +44,10 @@ export interface Lake {
 }
 
 /**
- * ICNF types that are open water large enough to be more than a tank: the
- * ones a scooper could use. The rest (tanks, wells, pools…) are for the
- * helicopter's bucket only. No minimum size is checked: none was found
- * published (12.26).
+ * Types that are open water large enough to be more than a tank, for the
+ * sources that do not say whether a scooper can load (ICNF, REDIAM): the
+ * reservoirs, lakes, the ocean and estuaries. GVA says it itself. No minimum
+ * size is checked: none was found published (12.26).
  */
 export const OPEN_WATER = new Set([
   'Albufeira de barragem',
@@ -51,13 +55,36 @@ export const OPEN_WATER = new Set([
   'Lago',
   'Oceano',
   'Estuário',
+  'EMBALSE',
 ]);
+
+/**
+ * Whether an aircraft can load at a water point: what the source says, and
+ * where it says nothing, a helicopter can (every source lists points for
+ * aerial or mixed use) and a scooper only on open water.
+ */
+export function waterFor(aircraft: 'helicopter' | 'amphibious', r: Resource): boolean {
+  if (r.kind !== 'water') return false;
+  if (aircraft === 'helicopter') return r.helicopter !== false;
+  return r.amphibious === true || (r.amphibious == null && OPEN_WATER.has(r.detail ?? ''));
+}
+
+/** How far around the domain loading places are looked for (§11.45). */
+export const LOAD_MARGIN_M = 30_000;
+
+/** An extent grown by some metres on every side. */
+export function widen(extent: Extent, metres: number): Extent {
+  const [w, s, e, n] = extent;
+  const lat = metres / 111_320;
+  const lon = metres / (111_320 * Math.cos((((s + n) / 2) * Math.PI) / 180));
+  return [w - lon, s - lat, e + lon, n + lat];
+}
 
 /** `[west, south, east, north]`, degrees. */
 export type Extent = readonly [number, number, number, number];
 
-export const ICNF_WATER_URL =
-  'https://sigservices.icnf.pt/server/rest/services/BDG/Pontos_agua/MapServer/0/query';
+/** Water points from the official networks, served by our API (§11.45). */
+export const WATER_POINTS_URL = '/api/water-points';
 export const ENAIRE_AERODROMES_URL =
   'https://servais.enaire.es/insignia/rest/services/INSIGNIA_SRV/Aero_SRV_VIGOR_V2/FeatureServer/3/query';
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
@@ -81,14 +108,9 @@ function arcgisQuery(base: string, extent: Extent, where: string, fields: string
   return `${base}?${params}`;
 }
 
-/** Water points aircraft can load from: the `Aéreo` and `Misto` classes. */
-export function icnfWaterUrl(extent: Extent): string {
-  return arcgisQuery(
-    ICNF_WATER_URL,
-    extent,
-    "Classe IN ('Aéreo','Misto')",
-    'Nome,Classe,Tipo,Operacionalidade',
-  );
+/** The domain; the API adds the 30 km itself. */
+export function waterPointsUrl(extent: Extent): string {
+  return `${WATER_POINTS_URL}?bbox=${extent.map((n) => n.toFixed(6)).join(',')}`;
 }
 
 /** Lakes and reservoirs of the Balearic Islands; elsewhere the answer is empty. */
@@ -186,16 +208,27 @@ function geojsonPoints(body: unknown): { point: Point; properties: Record<string
   return result;
 }
 
-export function parseIcnfWater(body: unknown, extent: Extent): Resource[] {
-  return geojsonPoints(body)
-    .filter(({ point }) => inside(point, extent))
-    .map(({ point, properties }) => ({
-      kind: 'water' as const,
-      name: text(properties['Nome']) || "Punt d'aigua",
-      point,
-      source: 'ICNF' as const,
-      ...(text(properties['Tipo']) ? { detail: text(properties['Tipo']) } : {}),
-    }));
+const flag = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null);
+const SOURCES = new Set<ResourceSource>(['GVA', 'REDIAM', 'ICNF']);
+
+/** The API's answer (contract in COORDINACIO_NIT/contracte-punts-aigua.md). */
+export function parseWaterPoints(body: unknown): Resource[] {
+  const points = (body as { points?: unknown })?.points;
+  if (!Array.isArray(points)) throw new Error('Resposta sense punts.');
+  const result: Resource[] = [];
+  for (const p of points) {
+    if (!p || !finite(p.lon) || !finite(p.lat) || !SOURCES.has(p.source)) continue;
+    result.push({
+      kind: 'water',
+      name: text(p.name) || "Punt d'aigua",
+      point: [p.lon, p.lat],
+      source: p.source,
+      ...(text(p.type) ? { detail: text(p.type) } : {}),
+      helicopter: flag(p.helicopter),
+      amphibious: flag(p.amphibious),
+    });
+  }
+  return result;
 }
 
 export function parseEnaireAerodromes(body: unknown, extent: Extent): Resource[] {

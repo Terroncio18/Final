@@ -28,6 +28,7 @@ import {
   MOP_UP_MAX_FLAME_M,
   MAX_LOAD_MIN,
   distanceM,
+  dropPoint,
   aircraftKind,
   type AircraftKind,
   CREW_DEFAULTS,
@@ -39,7 +40,7 @@ import {
 } from '../simulation/countermeasures';
 import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from '../simulation/domain';
 import { agentsAt } from '../simulation/agents';
-import { inLake, OPEN_WATER } from '../simulation/resources';
+import { inLake, inside, waterFor } from '../simulation/resources';
 import { FireSurface } from '../simulation/fire-surface';
 import { FORECASTS, FORECAST_COLOURS, forecastOffsets } from '../simulation/fire-display';
 import { frontEmitters, frontIntensity } from '../simulation/fire-emitters';
@@ -1268,7 +1269,7 @@ export class SimulatorView {
     if (AIRCRAFT[kind].loadsAt === 'aerodrome')
       return near((r) => r.kind === 'aerodrome') ?? 'Tria un aeròdrom del mapa.';
     const scooper = kind === 'amphibious';
-    const mark = near((r) => r.kind === 'water' && (!scooper || OPEN_WATER.has(r.detail ?? '')));
+    const mark = near((r) => waterFor(kind === 'amphibious' ? 'amphibious' : 'helicopter', r));
     if (mark) return mark;
     const centre = this.ignition(),
       terrain = this.terrain.terrain();
@@ -1278,6 +1279,37 @@ export class SimulatorView {
     return scooper
       ? 'Aquí no hi ha aigua oficial on pugui carregar: el mar, un embassament o un llac.'
       : "Aquí no hi ha aigua oficial on pugui carregar: el mar, un llac o un punt d'aigua.";
+  }
+
+  /**
+   * The official loading places outside the domain, nearest first (§11.45):
+   * the map stops at the square, so these are chosen from a list.
+   */
+  protected readonly loadOptions = computed(() => {
+    const kind = this.plan.kind(),
+      drop = this.plan.loading(),
+      centre = this.ignition();
+    if (!kind || !drop || !centre || !aircraftKind(kind)) return [];
+    const bounds = domainAround(centre);
+    const from = dropPoint({ points: drop });
+    const km = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
+    return this.suppression
+      .resources()
+      .filter(
+        (r) =>
+          !inside(r.point, bounds) &&
+          (AIRCRAFT[kind].loadsAt === 'aerodrome'
+            ? r.kind === 'aerodrome'
+            : waterFor(kind === 'amphibious' ? 'amphibious' : 'helicopter', r)),
+      )
+      .map((r) => ({ point: r.point, name: r.name, metres: distanceM(from, r.point) }))
+      .sort((a, b) => a.metres - b.metres)
+      .slice(0, 5)
+      .map((o) => ({ ...o, distance: `${km.format(o.metres / 1000)} km` }));
+  });
+
+  protected chooseLoad(point: Point): void {
+    this.editPlan(() => this.plan.chooseLoad(point));
   }
 
   constructor() {

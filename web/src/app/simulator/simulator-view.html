@@ -562,6 +562,15 @@
                 Clic esquerre: vèrtex · clic dret: treure l’últim.
               }
             </p>
+            @if (loadOptions().length) {
+              <div class="load-options">
+                @for (option of loadOptions(); track option.point) {
+                  <button type="button" (click)="chooseLoad(option.point)">
+                    {{ option.name }} · {{ option.distance }}
+                  </button>
+                }
+              </div>
+            }
             <div class="tools-row">
               <button type="button" (click)="cancelTool()">Cancel·lar (Esc)</button>
             </div>
