@@ -199,6 +199,8 @@ export class MapService {
 
   /** True while a step is waiting for a click on the map rather than on a mark. */
   private picking = false;
+  /** Moves each time the fire's canvas is repainted (refreshFire). */
+  private fireRevision = 0;
 
   /** Whether the map is draped over the terrain. See setTerrain3D(). */
   private terrain3D = false;
@@ -890,10 +892,16 @@ export class MapService {
       if (!source) return;
       source.play();
       source.pause();
-      // Canvas upload alone does not invalidate the 3D terrain's cached
-      // draped texture in MapLibre 6.15. Publish a content revision through
-      // the public source API so the terrain actually paints this frame.
-      source.setCoordinates(source.coordinates);
+      // With the relief on, each terrain tile keeps the fire draped into a
+      // texture of its own, and a new upload alone does not redo them (§13.3).
+      // What does, in maplibre-gl 6.15, is the source's revision changing: it
+      // is part of each tile's fingerprint, and every tile with the fire under
+      // it is redrawn that same frame. The revision is the feature-state one,
+      // so a counter in the feature state is what moves it (§13.6). It replaces
+      // setCoordinates(), which only reached the tiles in the line of the
+      // canvas's own tile, and left the rest showing an older fire.
+      this.fireRevision += 1;
+      map.setFeatureState({ source: FIRE_SOURCE, id: 0 }, { revisio: this.fireRevision });
       map.triggerRepaint();
     });
   }

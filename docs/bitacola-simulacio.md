@@ -2463,6 +2463,9 @@ via pública és `setCoordinates()` amb les mateixes coordenades. Va a
 la §11.19 i la §11.20 van deixar sense fer —«no s'ha pogut comprovar el dibuix
 del foc sobre el mapa»—, atribuïdes llavors al navegador de proves.
 
+> **Revisat el 16/11/2026** (§13.6): `setCoordinates()` només ho arreglava a
+> mitges, i ja no es fa servir.
+
 ### 13.4. Les proves del model no corren amb el *builder* d'Angular
 
 Les proves de propagació substitueixen mòduls relatius amb *mocks* de Vitest,
@@ -2480,6 +2483,48 @@ multiplica. A partir de 33 llavors es calcula ara la transformada de
 distància euclidiana exacta en dues passades (`fire-distances.ts`), lineal en
 la mida de la graella. I l'avanç només compta les ignicions que ja s'han
 desplegat en cada minut.
+
+### 13.6. El foc tallat en línies rectes: les tessel·les que `setCoordinates` no arriba
+
+Trobat el 16/11/2026, a partir d'una captura de Pere: amb el relleu encès i el
+cursor avançant, el foc sortia tallat per línies rectes, amb un estat a cada
+costat, i en fer zoom o girar la vista es tornava a pintar bé. **No era el
+navegador ni el model: era MapLibre**, i com la §13.3 l'esquivava.
+
+Amb el terreny, `maplibre-gl` 6.15.0 pinta les capes drapejades dins d'una
+textura per a cada tessel·la del terreny i la guarda (`render_to_texture.ts`).
+Les línies rectes eren les vores d'aquestes tessel·les vistes en perspectiva:
+unes tenien el foc nou i les altres un d'abans. Dues regles decideixen quan es
+refà una textura, i el llenç del foc no n'activava cap del tot:
+
+- **L'avís de dades del mapa** (`_handleTerrainDataEvent`, a `map.ts`): quan
+  una font canvia, si és de tipus `'image'` es buiden totes les textures; si
+  no, només les de les tessel·les de la mateixa línia —mare o filla— que la
+  tessel·la de la font. La font del foc és un llenç: per dins hereta d'imatge,
+  però s'anuncia com a `'canvas'`, i va pel segon camí. Un llenç només té una
+  tessel·la, la que en conté el centre, i el foc —30 km de domini— en cobreix
+  diverses del terreny. `setCoordinates()` (§13.3) provocava aquest avís, i per
+  això el foc es refeia en part.
+- **L'empremta de cada textura** (`RTTFingerprint`): es refà quan canvia el
+  zoom, les tessel·les de la font, les capes visibles o la **revisió** de la
+  font. Repintar el llenç no en canvia cap; fer zoom canvia el zoom, i per això
+  el tall desapareixia en moure la vista.
+
+**La revisió és la de l'estat de les entitats** (`SourceFeatureState`), i es
+pot moure amb l'API pública: `refreshFire()` crida
+`map.setFeatureState({ source: 'fire', id: 0 }, { revisio: n })` amb un número
+que puja a cada repintat. MapLibre ho aplica en preparar la font, abans de
+decidir les textures del mateix fotograma, i refà **totes les tessel·les que
+tenen el foc a sota, i només aquestes**: les mateixes que buidaria si la font
+s'anunciés com a imatge. `setCoordinates()` deixa de fer-se servir.
+
+És un ús de l'estat d'entitats que no és el seu —el foc no té entitats—, i
+depèn de com 6.15 construeix l'empremta. Si una versió nova de MapLibre ho
+canvia, el símptoma tornarà a ser aquest, i el lloc on mirar és aquí. Seria
+un error per comunicar a MapLibre: la comprovació `type === 'image'` deixa fora
+`'canvas'` i `'video'`, que són imatges.
+
+**Al navegador no s'ha mirat**: ho prova Pere.
 
 ---
 
