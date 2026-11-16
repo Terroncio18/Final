@@ -20,7 +20,7 @@ import type { Point } from './point';
  *   official layer was found in either country.
  */
 export type ResourceKind = 'station' | 'water' | 'aerodrome';
-export type ResourceSource = 'GVA' | 'REDIAM' | 'ICNF' | 'ENAIRE' | 'OSM';
+export type ResourceSource = 'GVA' | 'REDIAM' | 'ICNF' | 'IGN' | 'ENAIRE' | 'OSM';
 
 export interface Resource {
   readonly kind: ResourceKind;

@@ -32,6 +32,7 @@ import {
   MUNICIPALITIES_SOURCE,
   PLACES_SOURCE,
   RESOURCES_SOURCE,
+  LAKES_SOURCE,
   AGENTS_SOURCE,
   PROVINCES_SOURCE,
   SLOPES_SOURCE,
@@ -39,7 +40,7 @@ import {
 import { FireParticles, type Emitters } from './fire-particles';
 import { addSpawnMarker, type SpawnMarker } from './spawn-marker';
 import { addResourceIcons } from './resource-icons';
-import type { Resource } from '../simulation/resources';
+import type { Lake, Resource } from '../simulation/resources';
 import type { Agent } from '../simulation/agents';
 
 /**
@@ -722,6 +723,24 @@ export class MapService {
           type: 'Feature',
           geometry: { type: 'Point', coordinates: [r.point[0], r.point[1]] },
           properties: { kind: r.kind, name: r.name, source: r.source },
+        })),
+      });
+    });
+  }
+
+  /** Draws the official lakes of the domain (§11.48), or takes them off. */
+  setLakes(lakes: readonly Lake[]): void {
+    this.withStyle((map) => {
+      const source = map.getSource(LAKES_SOURCE) as GeoJSONSource | undefined;
+      source?.setData({
+        type: 'FeatureCollection',
+        features: lakes.map((lake) => ({
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: lake.rings.map((ring) => ring.map((p) => [p[0], p[1]])),
+          },
+          properties: { name: lake.name },
         })),
       });
     });

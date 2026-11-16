@@ -47,6 +47,8 @@ export const LAYERS = {
   domainFill: 'domain-fill',
   domainMask: 'domain-mask',
   domainLine: 'domain-line',
+  lakesFill: 'lakes-fill',
+  lakesLine: 'lakes-line',
   resources: 'resources',
   agentRoutes: 'agent-routes',
   agents: 'agents',
@@ -58,6 +60,7 @@ export const PROVINCES_SOURCE = 'provinces';
 export const MUNICIPALITIES_SOURCE = 'municipalities';
 export const PLACES_SOURCE = 'places';
 export const RESOURCES_SOURCE = 'resources';
+export const LAKES_SOURCE = 'lakes';
 export const AGENTS_SOURCE = 'agents';
 export const CONTOURS_SOURCE = 'contours';
 export const DOMAIN_SOURCE = 'domain';
@@ -323,6 +326,7 @@ export function buildStyle(): StyleSpecification {
         data: NO_POINT,
         attribution: PLACES_ATTRIBUTION,
       },
+      [LAKES_SOURCE]: { type: 'geojson', data: NO_POINT },
       [RESOURCES_SOURCE]: {
         type: 'geojson',
         data: NO_POINT,
@@ -594,6 +598,21 @@ export function buildStyle(): StyleSpecification {
           'text-halo-width': 1.1,
           'text-opacity': 0.85,
         },
+      },
+      {
+        // The official lakes and reservoirs of the domain (§11.48): where an
+        // aircraft may load. Draped, so the water lies on the relief; the named
+        // ones also get a water mark (resources).
+        id: LAYERS.lakesFill,
+        type: 'fill',
+        source: LAKES_SOURCE,
+        paint: { 'fill-color': '#5dbad7', 'fill-opacity': 0.35 },
+      },
+      {
+        id: LAYERS.lakesLine,
+        type: 'line',
+        source: LAKES_SOURCE,
+        paint: { 'line-color': '#9ad8ec', 'line-width': 1.2, 'line-opacity': 0.9 },
       },
       {
         // Stations, water points and aerodromes (12.23): green marks that

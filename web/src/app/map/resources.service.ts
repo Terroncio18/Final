@@ -54,14 +54,17 @@ export class ResourcesService {
     this.asked = key;
     this.extent = extent;
     const cached = this.cache.get(key);
-    // Lakes travel apart: they are not drawn, only consulted when a load point
-    // is chosen, and a failure only means fewer places to load.
+    // Lakes travel apart: they come from another service, and a failure only
+    // means fewer places to load.
     void json(fetch(lakesUrl(extent)))
       .then((body) => {
         if (this.asked === key) this.lakes.set(parseLakes(body));
       })
       .catch(() => {
         if (this.asked === key) this.lakes.set([]);
+      })
+      .finally(() => {
+        if (this.asked === key) this.draw();
       });
     if (cached) return this.show(cached, []);
 
@@ -100,6 +103,7 @@ export class ResourcesService {
   release(): void {
     this.asked = null;
     this.lakes.set([]);
+    this.maps.setLakes([]);
     this.show([], []);
   }
 
@@ -122,8 +126,18 @@ export class ResourcesService {
 
   private draw(): void {
     const extent = this.extent;
-    this.maps.setResources(
-      extent && this.visible() ? this.resources().filter((r) => inside(r.point, extent)) : [],
-    );
+    if (!extent || !this.visible()) {
+      this.maps.setResources([]);
+      this.maps.setLakes([]);
+      return;
+    }
+    // A lake is drawn whole if any of it is in the square; its mark, if it has
+    // a name and its point is inside. No size threshold: none is published.
+    const lakes = this.lakes().filter((l) => l.rings[0].some((p) => inside(p, extent)));
+    const named: Resource[] = lakes
+      .filter((l) => l.name && inside(l.point, extent))
+      .map((l) => ({ kind: 'water', name: l.name!, point: l.point, source: 'IGN' }));
+    this.maps.setLakes(lakes);
+    this.maps.setResources([...this.resources().filter((r) => inside(r.point, extent)), ...named]);
   }
 }
