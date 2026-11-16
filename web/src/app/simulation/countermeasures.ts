@@ -26,6 +26,121 @@ export interface Countermeasure {
   readonly passIntervalMin?: number;
   /** Fraction of the original dry fuel load remaining after removal. */
   readonly fuelRemaining?: number;
+  /**
+   * Crews (12.19): all three or none. Without them a ground measure appears
+   * whole at startMin, as before (§11.28). With them each cell is done when
+   * the crew gets there, from the first vertex in drawing order.
+   */
+  /** Minutes from the decision (startMin) until the crew starts working on site. */
+  readonly arrivalMin?: number;
+  /** Number of people working the measure. */
+  readonly crewSize?: number;
+  /** Production per person: metres of line per hour, or hectares per hour for mop-up. */
+  readonly ratePerPerson?: number;
+}
+
+/** The measures a ground crew builds; the rest stay instantaneous. */
+export const CREW_KINDS = [
+  'defense-line',
+  'firebreak',
+  'clearing',
+  'water-line',
+  'mop-up',
+] as const;
+export type CrewKind = (typeof CREW_KINDS)[number];
+export const crewKind = (kind: CountermeasureKind): kind is CrewKind =>
+  (CREW_KINDS as readonly string[]).includes(kind);
+export const crewMeasure = (m: Countermeasure) => m.crewSize !== undefined;
+
+export interface CrewDefault {
+  readonly arrivalMin: number;
+  readonly crewSize: number;
+  readonly ratePerPerson: number;
+  readonly unit: 'm/h' | 'ha/h';
+  readonly source: string;
+  /** True where no published rate was found: an editable stand-in, not a datum. */
+  readonly placeholder: boolean;
+}
+
+const ORTEGA_2023 =
+  'Ortega, Rodríguez y Silva & Molina (2023), IJWF 32:1503–1514, doi:10.1071/WF22087 — shrub, direct attack, 0.67 m/min per firefighter';
+/**
+ * Default crews. Crew size 20 is the reference crew of the NWCG tables
+ * (sustained line production, 20-person crews). Rates per person:
+ * - hand line: Ortega et al. (2023), Spanish Mediterranean wildfires,
+ *   shrub (fuel models 5–6), direct attack: 0.67 m/min = 40.2 m/h;
+ * - hose line: NWCG Fire Line Production Rate Tables (2021, from PMS 210),
+ *   initial action by engine crews, fuel model 5, 4 persons: 16 chains/h
+ *   (1 chain = 20.1168 m) = 321.9 m/h, i.e. 80.5 m/h each. The table warns it
+ *   is for initial action only;
+ * - firebreak, clearing and mop-up: no published rate found. Placeholders.
+ */
+export const CREW_DEFAULTS: Readonly<Record<CrewKind, CrewDefault>> = {
+  'defense-line': {
+    arrivalMin: 0,
+    crewSize: 20,
+    ratePerPerson: 40.2,
+    unit: 'm/h',
+    source: ORTEGA_2023,
+    placeholder: false,
+  },
+  firebreak: {
+    arrivalMin: 0,
+    crewSize: 20,
+    ratePerPerson: 40.2,
+    unit: 'm/h',
+    source: 'Placeholder: hand-line rate (Ortega et al. 2023); a 60 m firebreak is machine work',
+    placeholder: true,
+  },
+  clearing: {
+    arrivalMin: 0,
+    crewSize: 20,
+    ratePerPerson: 40.2,
+    unit: 'm/h',
+    source: 'Placeholder: hand-line rate (Ortega et al. 2023)',
+    placeholder: true,
+  },
+  'water-line': {
+    arrivalMin: 0,
+    crewSize: 4,
+    ratePerPerson: 80.5,
+    unit: 'm/h',
+    source:
+      'NWCG Fire Line Production Rate Tables (2021), initial action by engine crews, fuel model 5, 4 persons, 16 chains/h',
+    placeholder: false,
+  },
+  'mop-up': {
+    arrivalMin: 0,
+    crewSize: 20,
+    ratePerPerson: 0.05,
+    unit: 'ha/h',
+    source: 'Placeholder: no published mop-up rate found (Ortega et al. 2023 exclude mop-up)',
+    placeholder: true,
+  },
+};
+export const CREW_LIMITS = {
+  arrivalMin: { min: 0, max: 720 },
+  crewSize: { min: 1, max: 500 },
+  'm/h': { min: 1, max: 2000 },
+  'ha/h': { min: 0.001, max: 10 },
+} as const;
+
+/** When each cell of a crew measure is done (contract 12.19). */
+export interface CrewSchedule {
+  /** The same cells as countermeasureCells. */
+  readonly cells: readonly number[];
+  /** Minute each cell is done, aligned with cells. */
+  readonly minutes: Float32Array;
+  readonly workStart: number;
+  readonly workEnd: number;
+  /** Length of the polyline, metres. */
+  readonly lengthM: number;
+}
+/** Where the head of the work is at a minute. */
+export interface CrewHead {
+  readonly point: Point;
+  readonly builtM: number;
+  readonly done: boolean;
 }
 
 /** Named reference configurations, not a universal capacity for every aircraft. */
