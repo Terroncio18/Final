@@ -182,6 +182,14 @@ export class Agents3D implements CustomLayerInterface {
       (40_075_016.686 * Math.cos((centre.lat * Math.PI) / 180)) / (512 * 2 ** map.getZoom());
     const grow = (kind: ModelKind) =>
       Math.max(1, (SCREEN_LENGTH_PX * metresPerPixel) / MODEL_LENGTH_M[kind]);
+    // Everything is placed in metres from the centre of the view, and the
+    // centre goes into the projection, computed in double precision here. In
+    // whole-world mercator units a metre is about 2.5e-8, below what the GPU's
+    // single precision can hold next to a coordinate of 0.5: the vertices
+    // snapped and nearly coplanar faces fought, in a yellow and black
+    // checkerboard (§11.52).
+    const origin = MercatorCoordinate.fromLngLat(centre, 0);
+    const frame: Frame = { map, origin, unit: origin.meterInMercatorCoordinateUnits() };
 
     for (const agent of this.groundAgents) {
       const figure = this.ground.get(agent.id);
@@ -190,7 +198,7 @@ export class Agents3D implements CustomLayerInterface {
       // reports are not the same mesh, and a figure standing exactly on one
       // came out half buried in the other, in specks (§11.51).
       const lift = 0.03 * MODEL_LENGTH_M[agent.kind] * grow(agent.kind);
-      place(figure.model, map, agent.point, lift, agent.heading, grow(agent.kind));
+      place(figure.model, frame, agent.point, lift, agent.heading, grow(agent.kind));
     }
 
     for (const flight of [...this.flights]) {
@@ -200,19 +208,20 @@ export class Agents3D implements CustomLayerInterface {
         this.flights.splice(this.flights.indexOf(flight), 1);
         continue;
       }
-      this.animate(flight, t, grow(flight.pass.kind), map);
+      this.animate(flight, t, grow(flight.pass.kind), frame);
     }
 
-    this.camera.projectionMatrix.fromArray(
-      options.defaultProjectionData.mainMatrix as unknown as number[],
-    );
+    this.camera.projectionMatrix
+      .fromArray(options.defaultProjectionData.mainMatrix as unknown as number[])
+      .multiply(new THREE.Matrix4().makeTranslation(origin.x, origin.y, origin.z))
+      .multiply(new THREE.Matrix4().makeScale(frame.unit, frame.unit, frame.unit));
     renderer.resetState();
     renderer.render(this.scene, this.camera);
     // Passes move by themselves: keep drawing only while one is in the air.
     if (this.flights.length && !document.hidden) map.triggerRepaint();
   }
 
-  private animate(flight: Flight, t: number, grow: number, map: MapLibreMap): void {
+  private animate(flight: Flight, t: number, grow: number, frame: Frame): void {
     const { pass, model, curtain } = flight;
     const length = MODEL_LENGTH_M[pass.kind] * grow;
     const heading = (pass.heading * Math.PI) / 180;
@@ -233,7 +242,7 @@ export class Agents3D implements CustomLayerInterface {
     const point = offset(pass.drop, east, north);
     // A gentle climb and dive along the pitch of the path.
     const pitch = t < PASS.release ? -0.12 : 0.18 * clamp01((t - PASS.release - 0.3) / 1.5);
-    place(model, map, point, height * length, pass.heading, grow, pitch);
+    place(model, frame, point, height * length, pass.heading, grow, pitch);
 
     const opacity =
       t < PASS.fadeIn
@@ -246,11 +255,12 @@ export class Agents3D implements CustomLayerInterface {
 
     // The load falls from the release point and drifts back, then thins out.
     const fall = clamp01((t - PASS.release) / 1.2);
+    // Light: it is spray and not a wall, and at 0,75 it read as a tower (§11.52).
     const curtainOpacity =
-      fall === 0 ? 0 : 0.75 * (1 - smooth(clamp01((t - PASS.release - 1.2) / 2.4)));
+      fall === 0 ? 0 : 0.4 * (1 - smooth(clamp01((t - PASS.release - 1.2) / 2.4)));
     place(
       curtain,
-      map,
+      frame,
       pass.drop,
       PASS.lowAltitude * length,
       pass.heading,
@@ -283,15 +293,24 @@ function spin(model: THREE.Object3D, t: number): void {
   model.updateMatrixWorld(true);
 }
 
+/** The view's centre, where the figures are measured from, in metres. */
+interface Frame {
+  readonly map: MapLibreMap;
+  readonly origin: MercatorCoordinate;
+  /** Mercator units per metre at the origin. */
+  readonly unit: number;
+}
+
 /**
  * Puts a figure at a point of the relief, `above` metres over the ground,
- * facing `heading`, `grow` times its real size. The model's axes are +X
- * forward, +Y left, +Z up (agent-models.ts); mercator's y grows southwards,
- * which the negative y scale turns round (three.js flips the winding).
+ * facing `heading`, `grow` times its real size, in metres from the frame's
+ * origin. The model's axes are +X forward, +Y left, +Z up (agent-models.ts);
+ * mercator's y grows southwards, which the negative y scale turns round
+ * (three.js flips the winding for it).
  */
 function place(
   object: THREE.Object3D,
-  map: MapLibreMap,
+  { map, origin, unit: originUnit }: Frame,
   [lon, lat]: Point,
   above: number,
   heading: number,
@@ -301,12 +320,17 @@ function place(
 ): void {
   const ground = map.getTerrain() ? (map.queryTerrainElevation({ lng: lon, lat }) ?? 0) : 0;
   const at = MercatorCoordinate.fromLngLat({ lng: lon, lat }, ground + above);
-  const unit = at.meterInMercatorCoordinateUnits() * grow;
+  // Mercator stretches with latitude; the figure keeps its size where it is.
+  const size = (at.meterInMercatorCoordinateUnits() / originUnit) * grow;
   // Heading is clockwise from north; the model faces +X (east) at rest.
   const yaw = Math.PI / 2 - (heading * Math.PI) / 180;
   const matrix = new THREE.Matrix4()
-    .makeTranslation(at.x, at.y, at.z)
-    .multiply(new THREE.Matrix4().makeScale(unit, -unit, unit))
+    .makeTranslation(
+      (at.x - origin.x) / originUnit,
+      (at.y - origin.y) / originUnit,
+      (at.z - origin.z) / originUnit,
+    )
+    .multiply(new THREE.Matrix4().makeScale(size, -size, size))
     .multiply(new THREE.Matrix4().makeRotationZ(yaw))
     .multiply(new THREE.Matrix4().makeRotationY(-pitch))
     .multiply(new THREE.Matrix4().makeScale(1, 1, stretchZ));
