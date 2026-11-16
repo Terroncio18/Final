@@ -106,6 +106,16 @@ export const MUNICIPALITY_INDEX_URL = 'data/municipality-index.json';
  */
 export const PLACES_URL = 'data/places';
 
+/**
+ * Where suppression comes from (12.23), each with its own credit: ICNF's water
+ * points, ENAIRE's aerodromes and, where there is no official layer, the
+ * stations (and Portugal's aerodromes) from OpenStreetMap, under the ODbL.
+ */
+export const RESOURCES_ATTRIBUTION =
+  "Mitjans: punts d'aigua © ICNF; aeròdroms © ENAIRE; parcs de bombers © " +
+  '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">' +
+  'OpenStreetMap</a> contributors, ODbL';
+
 /** ODbL asks for the credit and the licence to travel with the data (§6). */
 export const PLACES_ATTRIBUTION =
   'Topònims: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">' +

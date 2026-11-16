@@ -17,6 +17,7 @@ import {
   LABEL_FONT,
   PLACES_ATTRIBUTION,
   REGIONS_URL,
+  RESOURCES_ATTRIBUTION,
 } from './map.config';
 
 /** Layer ids the rest of the app refers to. Later layers are inserted above these. */
@@ -46,6 +47,7 @@ export const LAYERS = {
   domainFill: 'domain-fill',
   domainMask: 'domain-mask',
   domainLine: 'domain-line',
+  resources: 'resources',
 } as const;
 
 export const DEM_SOURCE = 'terrain-dem';
@@ -53,6 +55,7 @@ export const REGIONS_SOURCE = 'regions';
 export const PROVINCES_SOURCE = 'provinces';
 export const MUNICIPALITIES_SOURCE = 'municipalities';
 export const PLACES_SOURCE = 'places';
+export const RESOURCES_SOURCE = 'resources';
 export const CONTOURS_SOURCE = 'contours';
 export const DOMAIN_SOURCE = 'domain';
 
@@ -316,6 +319,11 @@ export function buildStyle(): StyleSpecification {
         type: 'geojson',
         data: NO_POINT,
         attribution: PLACES_ATTRIBUTION,
+      },
+      [RESOURCES_SOURCE]: {
+        type: 'geojson',
+        data: NO_POINT,
+        attribution: RESOURCES_ATTRIBUTION,
       },
       [CONTOURS_SOURCE]: {
         type: 'vector',
@@ -581,6 +589,32 @@ export function buildStyle(): StyleSpecification {
           'text-halo-color': 'rgba(8, 12, 16, 0.8)',
           'text-halo-width': 1.1,
           'text-opacity': 0.85,
+        },
+      },
+      {
+        // Stations, water points and aerodromes (12.23): green marks that
+        // stand up on the relief like the names (§13.1), told apart by the
+        // glyph. Over the names, because they are what this screen acts on;
+        // the name of each only from close up.
+        id: LAYERS.resources,
+        type: 'symbol',
+        source: RESOURCES_SOURCE,
+        layout: {
+          'icon-image': ['concat', 'resource-', ['get', 'kind']],
+          'icon-allow-overlap': true,
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.8, 13, 1],
+          'text-field': ['step', ['zoom'], '', 13, ['get', 'name']],
+          'text-font': [LABEL_FONT],
+          'text-size': 11,
+          'text-offset': [0, 1.4],
+          'text-anchor': 'top',
+          'text-optional': true,
+          'text-max-width': 9,
+        },
+        paint: {
+          'text-color': '#bfe8c9',
+          'text-halo-color': 'rgba(8, 12, 16, 0.85)',
+          'text-halo-width': 1.1,
         },
       },
     ],

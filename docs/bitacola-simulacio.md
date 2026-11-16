@@ -2295,6 +2295,65 @@ tallafoc deixaria passar, i la lectura d'intensitat del front— i dues del pla
 línia es conserva—; les 84 proves de simulació i les 33 d'Angular, i la
 compilació sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
 
+### 11.41. Parcs, punts d'aigua i aeròdroms al mapa, de la font oficial on n'hi ha
+
+Fet la nit del 16/11/2026, sense Pere, a la branca `senyals-mapa` (12.23). Al
+simulador, dins del domini i només dins, hi ha marques verdes per a tres coses:
+**parcs de bombers**, **punts d'aigua per als mitjans aeris** i **aeròdroms**.
+Es distingeixen pel dibuix —una casa, una gota, un avió— i el nom surt de prop
+(zoom 13). Es poden amagar al menú de capes, com els topònims.
+
+**Les fonts, i el que no s'ha trobat.** La premissa de la 12.23 era fer servir
+la font oficial i dir-ho quan no n'hi ha:
+
+| Què | Font | Cobertura | Oficial |
+| --- | --- | --- | --- |
+| Punts d'aigua | ICNF, `sigservices.icnf.pt/.../BDG/Pontos_agua/MapServer/0`, classes «Aéreo» i «Misto» | Portugal continental (17.112 punts, tots els tipus) | Sí |
+| Aeròdroms | ENAIRE, `servais.enaire.es/insignia/.../Aero_SRV_VIGOR_V2/FeatureServer/3`, tipus `AD` i `AH` | Espanya | Sí |
+| Aeròdroms (Portugal) | OpenStreetMap, `aeroway=aerodrome`, **només si ENAIRE no en dona cap** | On no arriba ENAIRE | No |
+| Parcs de bombers | OpenStreetMap, `amenity=fire_station` | ES i PT | No |
+
+- **Punts d'aigua de Balears: no s'han trobat.** L'IDEIB no té cap capa de punts
+  d'aigua entre els serveis públics (`geoserveis/rest/services/public`), ni el
+  seu catàleg en torna cap. El que hi ha són els manuals de la Generalitat de
+  Catalunya sobre com s'inventarien. Ni la resta de comunitats s'han mirat una
+  per una. **A Espanya, de moment, no surt cap punt d'aigua.** Al
+  Mediterrani, el punt de càrrega de l'helicòpter sovint és la mar, i això cap
+  capa ho diu. Queda a la 12.24.
+- **Parcs de bombers: cap capa oficial nacional** ni a Espanya (la BTN de l'IGN
+  no els porta com a classe) ni a Portugal (el cens de la ANEPC no és obert; hi
+  ha capes municipals, com Cascais o Lisboa). OpenStreetMap, dient-ho.
+- **Bases de mitjans aeris contra incendis** (MITECO i comunitats): les bases es
+  citen a notes de premsa, però no s'ha trobat cap capa. Un aeròdrom d'ENAIRE no
+  diu si hi ha retardant: és on podria carregar un avió, no on carrega.
+- **Les llicències de l'ICNF i d'ENAIRE no s'han pogut confirmar**: els serveis
+  no en publiquen cap. Es dona el crèdit que declaren (§6 de la fase 1).
+
+**Del navegador, sense ruta pròpia.** Els tres serveis responen amb CORS
+(comprovat amb l'origen de desenvolupament), de manera que no cal tocar l'API.
+Cada font falla per separat: si una no respon, el menú de capes ho diu —«Sense
+resposta: ICNF»— i les altres es dibuixen igual. Una resposta completa es guarda
+per domini durant la sessió. Overpass és un servei públic que limita la taxa
+(§5 de la fase 1); amb una consulta per domini n'hi ha prou, però si es fes
+servir molt caldria preparar els parcs fora de línia, com els topònims.
+
+**Al mapa**, una capa `symbol` (no es drapeja, §13.1): les marques queden dretes
+sobre el relleu. El verd és el de qui apaga, lluny del taronja del foc. Les
+icones es dibuixen en un llenç en carregar l'estil; tres dibuixos no valen un
+*sprite*.
+
+**El que encara no fan**: no s'usen per a res més que mirar. Que una brigada
+surti del parc més proper o que l'helicòpter carregui al punt d'aigua més
+proper és la 12.20 i la 12.22.
+
+Comprovat: set proves noves de la lectura de les tres fonts —la consulta que es
+fa, què es descarta, les respostes que no són el que s'esperava—, les 91 proves
+de simulació i les 33 d'Angular, i la compilació sense avisos. Les consultes
+reals s'han provat des de la línia d'ordres (entorn de Palma: dos parcs a OSM i
+tres aeròdroms a ENAIRE —Palma, Son Bonet i Binissalem—; entorn de Lousã: 130
+punts d'aigua aeris o mixtos a l'ICNF). **Al
+navegador no s'ha mirat**: ho prova Pere.
+
 ---
 
 ## 12. Decisions pendents
@@ -2390,7 +2449,9 @@ compilació sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
     propi.
   - **Depèn de la 12.19** (rendiment i arribada) i de la 12.23 (d'on surten
     les brigades i on carreguen aigua els helicòpters).
-- **12.23. Parcs de bombers i punts d'aigua al mapa.** Demanat per Pere el
+- **12.23. Parcs de bombers i punts d'aigua al mapa.** Feta en part la nit del
+  16/11/2026 a la §11.41, a la branca `senyals-mapa`: el que falta és la 12.24.
+  Demanat per Pere el
   16/11/2026: dues marques verdes, una per als parcs i estructures de bombers i
   una per als punts d'aigua registrats oficialment per als mitjans aeris. No
   són decoració: el parc diu d'on surt una brigada i quant triga a arribar
@@ -2410,6 +2471,13 @@ compilació sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
   són les bases aèries de mitjans contra incendis que publiquen el ministeri i
   les comunitats, i els aeròdroms de l'AIP d'ENAIRE; OpenStreetMap
   (`aeroway=aerodrome`), com a últim recurs i dient-ho.
+- **12.24. Punts d'aigua i bases aèries a Espanya.** Ve de la §11.41. L'ICNF
+  publica els de Portugal; a Espanya cada comunitat ho fa pel seu compte i a
+  Balears no s'ha trobat res obert a l'IDEIB. Cal decidir si es demana la capa
+  a l'IBANAT o a la Conselleria, si es fa servir la línia de costa com a punt de
+  càrrega dels helicòpters, o si es diu que a Espanya no n'hi ha. I el mateix
+  per a les bases de mitjans aeris (MITECO i comunitats), que no s'han trobat
+  com a dades. També falta confirmar les llicències de l'ICNF i d'ENAIRE.
 - ~~**12.17. El document de contramesures va endarrerit.**~~ Resolta el
   16/11/2026: el document ja descriu les §11.29 a §11.31 i diu què s'ha mirat
   al navegador i què no. El que es plantejava:
@@ -2656,3 +2724,6 @@ Les de la fase 2, que s'han afegit a la taula del §5 i als crèdits del §6:
 - **Meteorologia**: AEMET OpenData i IPMA (§11.18).
 - **Combustible**: IDEIB a Balears i ESA WorldCover 2021 a tot l'àmbit
   (§11.21). MFE25 i la cartografia portuguesa, localitzades i no integrades.
+- **Mitjans d'extinció** (§11.41): punts d'aigua de l'ICNF a Portugal,
+  aeròdroms d'ENAIRE a Espanya, i parcs de bombers —i els aeròdroms de
+  Portugal— d'OpenStreetMap, que no és oficial i així es diu.

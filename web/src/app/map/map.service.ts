@@ -31,11 +31,14 @@ import {
   LAYERS,
   MUNICIPALITIES_SOURCE,
   PLACES_SOURCE,
+  RESOURCES_SOURCE,
   PROVINCES_SOURCE,
   SLOPES_SOURCE,
 } from './map.style';
 import { FireParticles, type Emitters } from './fire-particles';
 import { addSpawnMarker, type SpawnMarker } from './spawn-marker';
+import { addResourceIcons } from './resource-icons';
+import type { Resource } from '../simulation/resources';
 
 /**
  * MapLibre picks its worker file name at runtime, which neither Vite nor esbuild
@@ -699,6 +702,26 @@ export class MapService {
     this.withStyle((map) => {
       const source = map.getSource(PLACES_SOURCE) as GeoJSONSource | undefined;
       source?.setData(data ?? { type: 'FeatureCollection', features: [] });
+    });
+  }
+
+  /**
+   * Draws the stations, water points and aerodromes of the domain (12.23), or
+   * takes them off. The glyphs are drawn here once per style, on a canvas:
+   * three small pictures are not worth a sprite sheet.
+   */
+  setResources(resources: readonly Resource[]): void {
+    this.withStyle((map) => {
+      addResourceIcons(map);
+      const source = map.getSource(RESOURCES_SOURCE) as GeoJSONSource | undefined;
+      source?.setData({
+        type: 'FeatureCollection',
+        features: resources.map((r) => ({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [r.point[0], r.point[1]] },
+          properties: { kind: r.kind, name: r.name, source: r.source },
+        })),
+      });
     });
   }
 

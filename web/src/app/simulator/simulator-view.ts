@@ -18,6 +18,7 @@ import { CountermeasureDisplay } from '../map/countermeasure-display';
 import { SpottingDisplay, spotPoint } from '../map/spotting-display';
 import { MapService } from '../map/map.service';
 import { PlacesService } from '../map/places.service';
+import { ResourcesService } from '../map/resources.service';
 import {
   AIRCRAFT,
   COUNTERMEASURE_CATALOG,
@@ -255,6 +256,7 @@ export class SimulatorView {
   private readonly municipalities = inject(MunicipalitiesService);
   private readonly provinces = inject(ProvincesService);
   private readonly places = inject(PlacesService);
+  protected readonly suppression = inject(ResourcesService);
   private readonly terrain = inject(TerrainService);
   protected readonly fuels = inject(FuelService);
   protected readonly runError = signal<string | null>(null);
@@ -465,6 +467,8 @@ export class SimulatorView {
   protected readonly relief = signal(true);
   protected readonly contours = signal(true);
   protected readonly labels = signal(true);
+  /** Stations, water points and aerodromes (12.23). */
+  protected readonly resources = signal(true);
 
   /**
    * Off by default: it covers the photograph, and the photograph is how the
@@ -1264,6 +1268,13 @@ export class SimulatorView {
       // not what this screen is about.
       if (this.labels()) this.places.load(this.province(), domainAround(point));
       else this.places.release();
+    });
+
+    // Where suppression comes from (12.23), inside the domain only.
+    effect(() => {
+      const point = this.ignition();
+      if (point && this.resources()) void this.suppression.load(domainAround(point));
+      else this.suppression.release();
     });
 
     // The elevation under the square, read here as the form reads it. In a tab

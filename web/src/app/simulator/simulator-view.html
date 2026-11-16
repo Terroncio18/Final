@@ -843,6 +843,17 @@
               Topònims
             </label>
             <label>
+              <input
+                type="checkbox"
+                [checked]="resources()"
+                (change)="resources.set(!resources())"
+              />
+              Parcs, punts d'aigua i aeròdroms
+            </label>
+            @if (resources() && suppression.failed().length) {
+              <p class="layer-error">Sense resposta: {{ suppression.failed().join(', ') }}</p>
+            }
+            <label>
               <input type="checkbox" [checked]="slopes()" (change)="slopes.set(!slopes())" />
               Pendents
             </label>
