@@ -2365,6 +2365,42 @@ compilació sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
   serveix per prendre decisions d'emergència. Com a demostració en un TFG, en
   canvi, una entrada de posicions que avui alimenten els agents simulats i
   demà podria alimentar un GPS seria un bon final de capítol.
+- **12.22. Brigades que decideixen les coses petites.** Plantejat per Pere
+  el 16/11/2026, i en una **branca a part**, perquè pot no donar temps: l'usuari
+  dona l'ordre —obre una línia d'aquí a aquí, apaga aquestes restes— i cada
+  brigada la porta a terme amb les decisions que prendria gent amb
+  experiència. La proposta:
+  - **Regles, no un model de llenguatge.** Les decisions d'una brigada a peu
+    de foc són les del protocol de seguretat —vigia, comunicacions, rutes
+    d'escapament, zones segures—: retirar-se quan les flames passen del que les
+    eines aguanten (§11.40) o el foc s'acosta massa, tornar quan és segur,
+    començar la línia per l'extrem amb menys risc, evitar pendents on no es pot
+    treballar. Una màquina d'estats o un arbre de comportament per agent, amb
+    llavor, de manera que el mateix escenari doni la mateixa simulació
+    (§11.19, §11.30).
+  - **El foc i les brigades es condicionen l'un a l'altre**: el que construeixen
+    canvia el foc, i el foc les fa retirar. El càlcul d'avui és d'una sola
+    passada per a tot l'horitzó (§11.19); amb agents caldria avançar a trams
+    —calcular el foc, moure els agents un tram, tornar a calcular amb el que
+    han fet— o iterar fins que no canviï. Amb el càlcul a menys d'un segon
+    (§11.36), és assumible.
+  - **Repartiment com a les contramesures**: Codex el comportament dels agents
+    i l'acoblament amb el foc; Claude el mapa i les ordres. Primer el
+    contracte —què és una ordre, què és l'estat d'un agent—, en un commit
+    propi.
+  - **Depèn de la 12.19** (rendiment i arribada) i de la 12.23 (d'on surten
+    les brigades i on carreguen aigua els helicòpters).
+- **12.23. Parcs de bombers i punts d'aigua al mapa.** Demanat per Pere el
+  16/11/2026: dues marques verdes, una per als parcs i estructures de bombers i
+  una per als punts d'aigua registrats oficialment per als mitjans aeris. No
+  són decoració: el parc diu d'on surt una brigada i quant triga a arribar
+  (12.19), i el punt d'aigua quant triga un helicòpter entre passades (avui
+  l'interval és un número que s'escriu, §11.31). **Cal trobar les fonts
+  oficials** i dir-ho si no n'hi ha: els punts d'aigua els publica cada
+  comunitat autònoma pel seu compte —a Balears, l'IDEIB— i a Portugal l'ICNF
+  ho fa per a tot el país; per als parcs, si no hi ha capa oficial,
+  OpenStreetMap té `amenity=fire_station`, que és completa però no oficial i
+  així s'hauria de dir.
 - ~~**12.17. El document de contramesures va endarrerit.**~~ Resolta el
   16/11/2026: el document ja descriu les §11.29 a §11.31 i diu què s'ha mirat
   al navegador i què no. El que es plantejava:
