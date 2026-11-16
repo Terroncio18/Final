@@ -112,7 +112,7 @@ export const PLACES_URL = 'data/places';
  * stations (and Portugal's aerodromes) from OpenStreetMap, under the ODbL.
  */
 export const RESOURCES_ATTRIBUTION =
-  "Mitjans: punts d'aigua © GVA (CC BY), REDIAM (CC BY 4.0) i ICNF; aeròdroms © ENAIRE; parcs de bombers © " +
+  "Mitjans: punts d'aigua © GVA (CC BY), REDIAM (CC BY 4.0) i ICNF; llacs © IGN (CC BY 4.0); aeròdroms © ENAIRE; parcs de bombers © " +
   '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">' +
   'OpenStreetMap</a> contributors, ODbL';
 

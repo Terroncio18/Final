@@ -70,7 +70,9 @@ interval = 2 × distància(descàrrega, càrrega) ÷ velocitat de creuer + temps
 L'helicòpter carrega a un punt d'aigua del mapa, al mar o en un llac oficial;
 l'amfibi, al mar, en un embassament o en un llac; l'avió de retardant, en un
 aeròdrom del mapa. El mar és el terreny a cota 0 o per sota, com el llegeix el
-model; els llacs, la capa de masses d'aigua de l'IDEIB (Balears). No es comprova
+model; els llacs, les «Aguas estancadas» de l'IGN per a tot Espanya (§11.46).
+Els punts d'aigua i els llacs amb nom de fins a 30 km fora del domini es trien
+d'una llista (§11.45). No es comprova
 la mida de la làmina d'aigua. El fitxer porta `loadPoint` i `loadMin`, i el
 lector comprova que `passIntervalMin` en sigui el resultat.
 

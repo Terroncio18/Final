@@ -1877,6 +1877,10 @@ ho permeten es descriuen amb **el que es fa** i el model en treu l'efecte.
   referència amb font citada al codi: **Bell 412** amb dipòsit ventral,
   1.350 L; **Canadair CL-415**, 6.137 L; **Air Tractor AT-802F**, 3.104 L. No
   és la capacitat de tots els aparells, sinó d'un de concret i nomenat.
+
+  > **Revisat el 16/11/2026** (§11.44): l'amfibi de referència és ara el
+  > **DHC-515**, 7.000 L, i l'interval entre passades d'un mitjà aeri ja no
+  > s'escriu: surt d'on carrega.
 - **L'aigua mulla el combustible mort fi.** Els litres es reparteixen sobre la
   petjada, se'n reté un 30 % i aquesta aigua s'afegeix a la humitat de
   1 h, que s'asseca amb una constant d'una hora. Amb la nova humitat **es
@@ -2580,6 +2584,38 @@ noves de la pantalla; les 134 proves de simulació i les 37 d'Angular, i la
 compilació sense avisos. La preparació real s'ha executat: 4.569 + 2.120 +
 7.976 punts. **Al navegador no s'ha mirat**: ho prova Pere.
 
+### 11.46. Llacs i embassaments de tot Espanya, de l'IGN, per la nostra API
+
+Fet el 16/11/2026, a petició de Pere («acaba el que necessitis»), a la branca
+`llacs-api`. Fins ara només hi havia llacs oficials a Balears (IDEIB, §11.44), i
+a la resta d'Espanya un helicòpter només podia carregar al mar o en un punt
+d'aigua de la GVA o de REDIAM (§11.45).
+
+- **La font**: la hidrografia INSPIRE de l'IGN, «Aguas estancadas»
+  (`hy-p:StandingWater`) del WFS de l'IDEE, que cobreix tot Espanya. Llicència
+  CC BY 4.0, «© Instituto Geográfico Nacional». Substitueix la capa de l'IDEIB:
+  porta també els embassaments de Balears (el de Cúber hi surt amb nom).
+- **Per la nostra API**, com els punts d'aigua: `GET /api/lakes?bbox=…` demana a
+  l'IDEE el domini més 30 km, en llegeix el GML —que va en ordre latitud,
+  longitud— i el torna en GeoJSON net: el nom si en té, els anells i un punt de
+  dins del llac. Es guarda en memòria 24 hores per domini. Al voltant d'un
+  domini en surten de 150 a 400, en mig segon o dos. Ho va fer Codex, amb 12
+  proves sobre una resposta real.
+- **A la pantalla**: un clic dins d'un llac del domini hi carrega, com fins ara,
+  i els llacs **amb nom** de fora del domini surten a la llista dels llocs de
+  càrrega propers (§11.45). Els que no tenen nom —basses petites, sobretot— no
+  s'hi llisten.
+- **Amagar les marques ja no les treu de la tria**: la casella del menú de capes
+  només amaga el dibuix.
+
+El que no fa: no es mira la mida del llac per a l'amfibi (12.26), i l'IGN no
+cobreix Portugal, on serveixen els punts de l'ICNF de tipus embassament o llac.
+
+Comprovat: les 12 proves dels llacs, les 11 dels punts d'aigua i les 6 dels
+combustibles a l'API; la ruta en directe contra l'IDEE (Sóller i Benagéber); les
+134 proves de simulació i les 37 d'Angular, i la compilació sense avisos. **Al
+navegador no s'ha mirat**: ho prova Pere.
+
 ---
 
 ## 12. Decisions pendents
@@ -2599,11 +2635,11 @@ compilació sense avisos. La preparació real s'ha executat: 4.569 + 2.120 +
   prendre decisions d'emergència.
 - **12.26. El que falta dels llocs de càrrega.** Ve de la §11.44. (a) La mida
   mínima de la làmina d'aigua per a l'amfibi: no s'ha trobat publicada (Viking
-  dona 410 m de carrera per al CL-415EAF, una modificació). (b) Llacs i
-  embassaments oficials fora de Balears: a la península, el MITECO o les
-  confederacions hidrogràfiques. (c) Un lloc de càrrega fora del domini de 30 km
-  —una base aèria, un embassament proper— no es pot triar. (d) Amb les marques
-  amagades no es poden triar.
+  dona 410 m de carrera per al CL-415EAF, una modificació). Queda oberta. Les
+  (b), (c) i (d) es van resoldre el mateix dia a les §11.45 i §11.46: llacs i
+  embassaments de tot Espanya (IGN), llocs de fora del domini fins a 30 km en
+  una llista, i les marques amagades ja no es treuen de la tria. Llacs de
+  Portugal: només els punts de l'ICNF de tipus embassament o llac.
 - **12.25. Rendiments que falten i preguntes de les brigades.** Ve de la §11.42.
   (a) Els rendiments del tallafoc, la tala i l'extinció de restes són
   provisionals: cal una font —les taules de bulldòzer del NWCG per als
@@ -2972,6 +3008,8 @@ Les de la fase 2, que s'han afegit a la taula del §5 i als crèdits del §6:
 - **Combustible**: IDEIB a Balears i ESA WorldCover 2021 a tot l'àmbit
   (§11.21). MFE25 i la cartografia portuguesa, localitzades i no integrades.
 - **Punts d'aigua oficials** (§11.45): GVA, REDIAM i ICNF, preparats i servits
+  per la nostra API.
+- **Llacs i embassaments** (§11.46): hidrografia de l'IGN, «Aguas estancadas»,
   per la nostra API.
 - **Mitjans d'extinció** (§11.41): punts d'aigua de l'ICNF a Portugal,
   aeròdroms d'ENAIRE a Espanya, i parcs de bombers —i els aeròdroms de
