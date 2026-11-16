@@ -2454,9 +2454,16 @@ del cursor, i només amb un foc calculat:
   d'aigua d'Espanya, avui (12.24)—, l'aeronau només es dibuixa damunt de la
   descàrrega, durant un minut a cada passada.
 
-Al mapa, en groc d'armilla per distingir-los del verd dels llocs d'on surten: una
-persona, un helicòpter, un avió. És una capa `symbol` que es refà a cada minut
-del cursor.
+Al mapa, en groc d'armilla per distingir-los del verd dels llocs d'on surten. És
+una capa `symbol` que es refà a cada minut del cursor.
+
+> **Revisat el 16/11/2026**, a petició de Pere: que es vegi què és cada agent.
+> Codex va dibuixar sis siluetes de 32–34 px amb contorn fosc: **persona amb
+> casc** (línia de defensa i extinció de restes), **bulldòzer** (tallafoc i
+> tala), **autobomba** (línia d'aigua), **helicòpter**, **hidroavió** (amfibi) i
+> **avió cisterna** (retardant). Només canvia el dibuix: la feina de la
+> maquinària és la de la brigada (§11.42), amb el mateix calendari. Les icones
+> no giren amb el rumb.
 
 Comprovat: cinc proves noves —el lloc de càrrega més proper, el vol entre passades
 minut a minut, l'aeronau sense lloc de càrrega, la brigada que treballa, que
