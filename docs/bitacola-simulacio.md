@@ -2312,6 +2312,59 @@ compilació sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
   model —combustible estimat, foc de superfície, retenció i assecat de les
   descàrregues, brases experimentals— i que el simulador no serveix per
   prendre decisions d'emergència.
+- **12.19. Les brigades no són instantànies: arribada, efectius i
+  rendiment.** Plantejat per Pere el 16/11/2026. Avui una mesura terrestre
+  apareix sencera al minut del desplegament (§11.28), i la pregunta clau d'un
+  incendi —s'acaba la línia abans que hi arribi el cap?— no es pot fer. La
+  proposta:
+  - un **temps d'arribada** per mesura, des que es decideix fins que s'hi
+    treballa;
+  - el **nombre d'efectius**, i un **rendiment per efectiu** —metres de línia
+    per hora per a tallafocs, línies de defensa, desbrossament i línies
+    d'aigua; hectàrees per hora per a l'extinció de restes (§11.40)—, de
+    manera que 100 efectius facin el que fan 100 efectius;
+  - cada cel·la de la franja s'activa quan la brigada hi arriba, des del primer
+    vèrtex i en l'ordre del dibuix: inici + arribada + recorregut ÷ rendiment.
+    El model ja admet un minut d'activació per cel·la (§11.28): seria només
+    que fos diferent per a cada una, sense cost de càlcul;
+  - la regla de seguretat de la §11.40: si el front arriba a la brigada amb
+    flames de més d'1,2 m, la construcció s'atura i el tros que falta no es
+    fa.
+
+  Fora, per no complicar-ho: composició i fatiga de les brigades, relleus,
+  accessos, i un rendiment que depengui del combustible i de la pendent (les
+  taules existeixen; seria el pas següent). **Els valors per defecte han de
+  sortir d'una font** —el *Fireline Handbook* del NWCG o els manuals espanyols
+  de defensa contra incendis, amb taules per tipus de brigada i de
+  combustible—, i com la resta seran hipòtesis editables.
+- **12.20. Agents que fan visible qui treballa.** Plantejat per Pere el
+  16/11/2026: veure al mapa les persones o grups, la maquinària, els avions i
+  els helicòpters de cada mesura. El primer pas no necessita IA: si la 12.19
+  diu on és el cap de la línia a cada minut, la brigada es pot dibuixar allà,
+  avançant; i un helicòpter, anant i tornant entre el punt d'aigua i la
+  descàrrega a cada passada. Són agents que segueixen el que el model ja ha
+  calculat, i no hi afegeixen res. Que decideixin pel seu compte —on anar, quan
+  retirar-se, a quin punt d'aigua— ja seria simulació d'agents de debò, i
+  canviaria el foc: és un altre treball.
+- **12.21. Fer-lo servir de debò per coordinar unitats reals.** Una
+  curiositat de Pere, el 16/11/2026, que es deixa escrita com a horitzó i no
+  com a feina: que els agents de la 12.20 fossin, algun dia, persones i
+  vehicles reals amb la seva posició GPS. La idea existeix al sector —eines
+  de comportament del foc en ús operatiu i sistemes de localització de
+  vehicles als centres de coordinació—, però el que faria falta és molt més
+  que aquest treball:
+  - un **model validat** contra incendis reals, amb capçades i amb brases
+    calibrades (§11.19, §11.30), i no hipòtesis editables (12.16);
+  - **dades en temps real**: perímetre observat, meteorologia actualitzada i
+    correcció del càlcul quan el foc real se separa del simulat;
+  - **fiabilitat i responsabilitat**: una eina que ajuda a decidir on
+    envia gent a un incendi s'ha de poder auditar, ha de funcionar sense
+    connexió i ha de passar per qui hi té competència.
+
+  Fins llavors segueix valent el que diu el manual (12.18): el simulador no
+  serveix per prendre decisions d'emergència. Com a demostració en un TFG, en
+  canvi, una entrada de posicions que avui alimenten els agents simulats i
+  demà podria alimentar un GPS seria un bon final de capítol.
 - ~~**12.17. El document de contramesures va endarrerit.**~~ Resolta el
   16/11/2026: el document ja descriu les §11.29 a §11.31 i diu què s'ha mirat
   al navegador i què no. El que es plantejava:
