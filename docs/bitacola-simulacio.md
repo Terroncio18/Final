@@ -2151,6 +2151,43 @@ amb el mapa girat no hi havia res que digués on és el nord.
 Comprovat: les proves i la compilació sense avisos. **Al navegador no s'ha
 mirat**: ho prova Pere.
 
+### 11.38. Decidir al passat esborra les mesures posteriors, amb avís
+
+Decidit el 16/11/2026, a petició de Pere. Si una mesura no ha funcionat, s'ha de
+poder tornar enrere i provar-ne una altra sense que en quedi rastre. La primera
+idea —esborrar una mesura en portar el cursor abans del seu desplegament— es va
+descartar perquè moure el cursor és sobretot mirar: arrossegar la línia de temps
+per comparar, tornar a reproduir des del minut 0 o carregar un escenari haurien
+esborrat mesures sense voler-ho.
+
+El que es fa és el «desfer» d'un editor: **mirar el passat no esborra res;
+decidir-hi alguna cosa nova, sí.**
+
+- **Amb un foc calculat i el cursor abans d'alguna mesura, triar una eina de
+  contramesura avisa abans**: «Si modifiques l'escenari, les N mesures
+  posteriors que estaven guardades s'eliminaran», amb «Continuar» i
+  «Cancel·lar».
+- **Les mesures no s'esborren en acceptar, sinó en afegir la nova.** Si es
+  deixa l'eina sense dibuixar res —Escape, una altra eina, moure el cursor,
+  reproduir—, no es perd res. En afegir-la, la nota ho diu: «S'han eliminat N
+  mesures posteriors».
+- **Posterior vol dir desplegada després del minut del cursor**; les del mateix
+  minut es queden. Les d'abans ja estaven bloquejades (§11.28).
+- **El recàlcul és el de sempre** (§11.28): el foc d'abans del cursor no canvia,
+  el de després es torna a calcular sense les mesures esborrades. Si el càlcul
+  falla, tornen totes.
+- **Abans de calcular no hi ha avís**: un pla encara no és un passat, i un
+  escenari carregat pot portar mesures programades per a més tard.
+
+El que no fa: editar o suprimir una mesura programada no esborra les altres,
+perquè és tocar aquella mesura i prou. I **els canvis de vent posteriors no
+s'esborren**: l'avís és de les contramesures, que és el que es va demanar.
+
+Comprovat: una prova nova del pla —sense acceptar no es perd res, acceptar i
+deixar l'eina tampoc, i acceptar i afegir n'esborra exactament les
+posteriors—, les 81 proves de simulació i les 29 d'Angular, i la compilació
+sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
+
 ---
 
 ## 12. Decisions pendents

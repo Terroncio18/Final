@@ -82,6 +82,16 @@ export class CountermeasurePlan {
   readonly selected = signal<string | null>(null);
   readonly note = signal<PlanNote | null>(null);
   readonly minute = signal(0);
+  /**
+   * The measures deployed after the cursor. A decision taken now, in the past,
+   * leaves them behind: they were decided on a fire that will no longer be
+   * the one computed (§11.38).
+   */
+  readonly later = computed(() =>
+    this.measures().filter((measure) => (measure.startMin ?? 0) > this.minute()),
+  );
+  /** Set when the user accepted that the next measure added drops `later`. */
+  readonly discarding = signal(false);
   readonly hasEditable = computed(() =>
     this.measures().some((m) => (m.startMin ?? 0) >= this.minute()),
   );
@@ -188,11 +198,15 @@ export class CountermeasurePlan {
     });
   });
 
-  /** Takes a tool, or puts it down if it was the one in the hand. */
-  begin(kind: CountermeasureKind): void {
+  /**
+   * Takes a tool, or puts it down if it was the one in the hand. With
+   * `discard`, the next measure added takes the later ones off the plan.
+   */
+  begin(kind: CountermeasureKind, discard = false): void {
     const same = this.kind() === kind;
     this.draft.set([]);
     this.kind.set(same ? null : kind);
+    this.discarding.set(!same && discard);
     this.note.set(null);
   }
 
@@ -200,6 +214,7 @@ export class CountermeasurePlan {
   cancel(): void {
     this.draft.set([]);
     this.kind.set(null);
+    this.discarding.set(false);
   }
 
   /**
@@ -376,9 +391,20 @@ export class CountermeasurePlan {
       ...(kind === 'clearing' ? { fuelRemaining: 0.2 } : {}),
       ...(this.minute() > 0 ? { startMin: this.minute() } : {}),
     };
-    const ordinal = this.measures().filter((other) => other.kind === kind).length + 1;
-    const done = this.commit([...this.measures(), measure], `Afegit: ${entry.label} ${ordinal}.`);
-    if (done) this.selected.set(measure.id);
+    const later = this.discarding() ? this.later() : [];
+    const kept = this.measures().filter((other) => !later.includes(other));
+    const ordinal = kept.filter((other) => other.kind === kind).length + 1;
+    const dropped =
+      later.length === 1
+        ? ' S’ha eliminat 1 mesura posterior.'
+        : later.length
+          ? ` S’han eliminat ${later.length} mesures posteriors.`
+          : '';
+    const done = this.commit([...kept, measure], `Afegit: ${entry.label} ${ordinal}.${dropped}`);
+    if (done) {
+      this.selected.set(measure.id);
+      this.discarding.set(false);
+    }
     return done;
   }
 

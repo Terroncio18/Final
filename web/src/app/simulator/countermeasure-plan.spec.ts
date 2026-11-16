@@ -29,26 +29,37 @@ function drawn(kind = line.kind, points: readonly Point[] = [a, b]): Countermeas
 
 describe('the countermeasure plan', () => {
   it('uses physical liquid inputs, enforces aircraft capacity and schedules repeated passes', () => {
-    const plan=new CountermeasurePlan();
-    plan.minute.set(60);plan.begin('helicopter');plan.click(a,bounds);
-    const id=plan.measures()[0].id;
-    expect(plan.rows()[0]).toMatchObject({liquid:true,capacityL:1350,strengthEditable:false,durationEditable:false});
-    expect(plan.setLiquid(id,'litresPerPass',1351)).toBe(false);
-    expect(plan.setLiquid(id,'litresPerPass',1000)).toBe(true);
-    expect(plan.setLiquid(id,'passes',3)).toBe(true);
-    expect(plan.setLiquid(id,'passIntervalMin',12)).toBe(true);
+    const plan = new CountermeasurePlan();
+    plan.minute.set(60);
+    plan.begin('helicopter');
+    plan.click(a, bounds);
+    const id = plan.measures()[0].id;
+    expect(plan.rows()[0]).toMatchObject({
+      liquid: true,
+      capacityL: 1350,
+      strengthEditable: false,
+      durationEditable: false,
+    });
+    expect(plan.setLiquid(id, 'litresPerPass', 1351)).toBe(false);
+    expect(plan.setLiquid(id, 'litresPerPass', 1000)).toBe(true);
+    expect(plan.setLiquid(id, 'passes', 3)).toBe(true);
+    expect(plan.setLiquid(id, 'passIntervalMin', 12)).toBe(true);
     expect(plan.rows()[0].totalLitres).toBe(3000);
-    plan.minute.set(71);expect(plan.rows()[0].status).toContain('1/3');
-    plan.minute.set(72);expect(plan.rows()[0].status).toContain('2/3');
-    plan.minute.set(84);expect(plan.rows()[0].status).toContain('3/3');
+    plan.minute.set(71);
+    expect(plan.rows()[0].status).toContain('1/3');
+    plan.minute.set(72);
+    expect(plan.rows()[0].status).toContain('2/3');
+    plan.minute.set(84);
+    expect(plan.rows()[0].status).toContain('3/3');
   });
 
   it('leaves residual fuel after clearing and refuses total removal', () => {
-    const plan=drawn('clearing');const id=plan.measures()[0].id;
+    const plan = drawn('clearing');
+    const id = plan.measures()[0].id;
     expect(plan.measures()[0].fuelRemaining).toBe(0.2);
-    expect(plan.setRemaining(id,0)).toBe(false);
-    expect(plan.setRemaining(id,15)).toBe(true);
-    expect(plan.rows()[0]).toMatchObject({remainingPercent:15,strengthEditable:false});
+    expect(plan.setRemaining(id, 0)).toBe(false);
+    expect(plan.setRemaining(id, 15)).toBe(true);
+    expect(plan.rows()[0]).toMatchObject({ remainingPercent: 15, strengthEditable: false });
   });
   it('timestamps points and completed lines at the paused simulation cursor', () => {
     const plan = new CountermeasurePlan();
@@ -61,6 +72,44 @@ describe('the countermeasure plan', () => {
     plan.finish();
     expect(plan.measures().map((m) => m.startMin)).toEqual([135.5, 135.5]);
     expect(plan.rows()[0].deployment).toBe('T + 02:15:30');
+  });
+
+  it('drops the later measures with the next one added, only once agreed', () => {
+    const plan = new CountermeasurePlan();
+    plan.begin(point.kind);
+    plan.click(a, bounds);
+    plan.minute.set(100);
+    plan.click(b, bounds);
+    plan.minute.set(200);
+    plan.click(c, bounds);
+    const [first, second] = plan.measures();
+
+    // Back at minute 50: two measures are later than the cursor.
+    plan.minute.set(50);
+    expect(plan.later().map((m) => m.startMin)).toEqual([100, 200]);
+
+    // Without agreeing, a new measure leaves them alone.
+    plan.begin(line.kind);
+    plan.begin(point.kind);
+    plan.click(a, bounds);
+    expect(plan.measures()).toHaveLength(4);
+    plan.remove(plan.measures()[3].id);
+
+    // Agreed and then put down: nothing is dropped.
+    plan.cancel();
+    plan.begin(point.kind, true);
+    plan.cancel();
+    expect(plan.discarding()).toBe(false);
+
+    // Agreed: the next measure takes them off, says so, and disarms.
+    plan.begin(point.kind, true);
+    plan.click(b, bounds);
+    expect(plan.measures().map((m) => m.startMin)).toEqual([undefined, 50]);
+    expect(plan.measures()[0]).toEqual(first);
+    expect(plan.measures()).not.toContainEqual(second);
+    expect(plan.note()?.text).toMatch(/S’han eliminat 2 mesures posteriors/);
+    expect(plan.discarding()).toBe(false);
+    expect(plan.later()).toEqual([]);
   });
 
   it('protects past deployments and only clears current or future ones', () => {
@@ -228,7 +277,19 @@ describe('the countermeasure plan', () => {
 
   it('still edits the duration of a loaded legacy measure', () => {
     const plan = new CountermeasurePlan();
-    plan.replace([{id:'legacy',kind:temporary.kind,points:[a,b],widthM:30,strength:0.7,durationMin:30}],bounds);
+    plan.replace(
+      [
+        {
+          id: 'legacy',
+          kind: temporary.kind,
+          points: [a, b],
+          widthM: 30,
+          strength: 0.7,
+          durationMin: 30,
+        },
+      ],
+      bounds,
+    );
     const id = plan.measures()[0].id;
     expect(plan.setDuration(id, 90)).toBe(true);
     expect(plan.measures()[0].durationMin).toBe(90);
@@ -261,7 +322,19 @@ describe('the countermeasure plan', () => {
 
   it('retains legacy strength semantics without converting saved scenarios silently', () => {
     const plan = new CountermeasurePlan();
-    plan.replace([{id:'legacy',kind:temporary.kind,points:[a,b],widthM:30,strength:0.7,durationMin:30}],bounds);
+    plan.replace(
+      [
+        {
+          id: 'legacy',
+          kind: temporary.kind,
+          points: [a, b],
+          widthM: 30,
+          strength: 0.7,
+          durationMin: 30,
+        },
+      ],
+      bounds,
+    );
     const id = plan.measures()[0].id;
     expect(plan.setStrength(id, 45)).toBe(true);
     expect(plan.measures()[0].strength).toBe(0.45);

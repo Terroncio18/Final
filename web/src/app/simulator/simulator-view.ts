@@ -1627,8 +1627,10 @@ export class SimulatorView {
 
   protected setMinutes(event: Event): void {
     if (this.computing()) return;
-    // A pending wind edit belongs to the old cursor, never to a later seek.
+    // A pending wind edit belongs to the old cursor, never to a later seek;
+    // and so does the warning about the measures after it.
     this.windDraft.set(null);
+    this.pastWarning.set(null);
     // Dragging the clock is taking it over: the playback stops.
     this.playing.set(false);
     this.minutes.set(Number((event.target as HTMLInputElement).value));
@@ -1775,6 +1777,7 @@ export class SimulatorView {
     if (!this.result() || this.computing() || this.windDraft()) return;
     this.plan.cancel();
     this.tool.set(null);
+    this.pastWarning.set(null);
     // Pressing play at the end starts over, which is what the button means there.
     if (!this.playing() && this.minutes() >= this.horizon.minutes) this.minutes.set(0);
     this.planStale.set(false);
@@ -1811,12 +1814,36 @@ export class SimulatorView {
     }
   }
 
+  /**
+   * A new measure asked for in the past, waiting for the user to accept that
+   * the measures deployed after the cursor will be taken off (§11.38).
+   */
+  protected readonly pastWarning = signal<{ kind: CountermeasureKind; count: number } | null>(null);
+
   protected pickMeasure(kind: CountermeasureKind): void {
     if (this.computing()) return;
     this.windDraft.set(null);
     this.playing.set(false);
     this.plan.minute.set(this.result() ? this.minutes() : 0);
-    this.plan.begin(kind);
+    // Only with a fire computed: before it, the plan is a plan, not a past.
+    const later = this.result() ? this.plan.later().length : 0;
+    if (later && this.plan.kind() !== kind) {
+      this.pastWarning.set({ kind, count: later });
+      return;
+    }
+    this.pastWarning.set(null);
+    this.plan.begin(kind, this.plan.discarding());
+  }
+
+  protected confirmPastMeasure(): void {
+    const warning = this.pastWarning();
+    if (!warning) return;
+    this.pastWarning.set(null);
+    this.plan.begin(warning.kind, true);
+  }
+
+  protected cancelPastMeasure(): void {
+    this.pastWarning.set(null);
   }
 
   protected finishMeasure(): void {
@@ -1831,6 +1858,7 @@ export class SimulatorView {
   protected cancelTool(): void {
     this.plan.cancel();
     this.tool.set(null);
+    this.pastWarning.set(null);
   }
 
   protected removeMeasure(id: string): void {

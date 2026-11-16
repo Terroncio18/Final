@@ -531,6 +531,25 @@
           </div>
         }
 
+        @if (pastWarning(); as warning) {
+          <div class="past-warning">
+            <p class="terrain-note measure-note failed" role="alert">
+              Si modifiques l'escenari,
+              {{
+                warning.count === 1
+                  ? 'la mesura posterior que estava guardada s’eliminarà.'
+                  : 'les ' +
+                    warning.count +
+                    ' mesures posteriors que estaven guardades s’eliminaran.'
+              }}
+            </p>
+            <div class="tools-row">
+              <button type="button" (click)="confirmPastMeasure()">Continuar</button>
+              <button type="button" (click)="cancelPastMeasure()">Cancel·lar</button>
+            </div>
+          </div>
+        }
+
         @if (plan.tool(); as active) {
           <div class="measure-drawing" [style.--measure]="active.color">
             <p class="tool-hint">
