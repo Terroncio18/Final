@@ -83,7 +83,11 @@ dd {
 }
 
 .simulate {
+  display: block;
+  box-sizing: border-box;
   width: 100%;
+  text-align: center;
+  text-decoration: none;
   margin-top: 22px;
   padding: 9px 14px;
   font: inherit;

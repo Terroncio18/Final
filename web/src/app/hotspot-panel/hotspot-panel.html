@@ -30,6 +30,19 @@
     <dd>{{ coordinates() }}</dd>
   </dl>
 
-  <button type="button" class="simulate" disabled>Crear-hi una simulació</button>
-  <p class="note">Caldrà el municipi de la detecció, que encara no hi és.</p>
+  @if (simulation(); as simulation) {
+    <a
+      class="simulate"
+      [routerLink]="simulation.link"
+      [queryParams]="simulation.query"
+      target="_blank"
+      rel="noopener"
+      >Crear-hi una simulació</a
+    >
+  } @else {
+    <button type="button" class="simulate" disabled>Crear-hi una simulació</button>
+    @if (simulationStatus(); as status) {
+      <p class="note">{{ status }}</p>
+    }
+  }
 </aside>

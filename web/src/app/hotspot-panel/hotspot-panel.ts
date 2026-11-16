@@ -1,6 +1,9 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import type { Hotspot } from '../map/hotspot';
+import { formatPoint, formatPoints } from '../simulation/point';
+import { PointLocator, type Place } from '../simulation/point-locator';
 
 /** FIRMS names the platforms by their satellite code; nobody else does. */
 const PLATFORMS: Record<string, string> = {
@@ -38,12 +41,63 @@ const HIGH_MW = 50;
  */
 @Component({
   selector: 'app-hotspot-panel',
+  imports: [RouterLink],
   templateUrl: './hotspot-panel.html',
   styleUrl: './hotspot-panel.css',
 })
 export class HotspotPanel {
   readonly hotspot = input.required<Hotspot>();
   readonly closed = output<void>();
+
+  private readonly locator = inject(PointLocator);
+  /** Where the detection is, by the codes the simulator is addressed by (§11.53). */
+  private readonly place = signal<Place | null | 'pending' | 'failed'>('pending');
+
+  constructor() {
+    effect(() => {
+      const { lon, lat } = this.hotspot();
+      this.place.set('pending');
+      this.locator
+        .locate([lon, lat])
+        .then((place) => {
+          // A slow answer for a detection no longer selected changes nothing.
+          if (this.hotspot().lon === lon && this.hotspot().lat === lat) this.place.set(place);
+        })
+        .catch((error: unknown) => {
+          console.error('[hotspot-panel]', error);
+          this.place.set('failed');
+        });
+    });
+  }
+
+  /**
+   * The simulator, centred on the detection and with the fire starting there:
+   * the same address the form builds (§2.26), plus the ignition (§11.16).
+   */
+  protected readonly simulation = computed(() => {
+    const place = this.place();
+    if (!place || place === 'pending' || place === 'failed') return null;
+    const { lon, lat } = this.hotspot();
+    return {
+      link: [
+        '/simulador',
+        place.region,
+        place.province,
+        place.municipality,
+        formatPoint([lon, lat]),
+      ],
+      query: { ignicions: formatPoints([[lon, lat]]) },
+    };
+  });
+
+  /** Why the button is not there yet, or cannot be. */
+  protected readonly simulationStatus = computed(() => {
+    const place = this.place();
+    if (place === 'pending') return 'Buscant el municipi…';
+    if (place === 'failed') return 'No s’ha pogut llegir on és la detecció.';
+    if (place === null) return 'La detecció no cau dins de cap municipi.';
+    return null;
+  });
 
   /**
    * Shown in UTC, which is how FIRMS reports it. Translating to the reader's
