@@ -647,7 +647,10 @@ export function buildStyle(): StyleSpecification {
           'icon-image': ['concat', 'agent-', ['get', 'kind']],
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.85, 13, 1.05],
+          // Keep silhouettes legible at the domain view and upright on relief.
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.94, 13, 1],
+          'icon-pitch-alignment': 'viewport',
+          'icon-rotation-alignment': 'viewport',
         },
       },
     ],

@@ -17,7 +17,7 @@ import type { Resource, ResourceKind } from './resources';
  * the crew's schedule and stop (12.19), the passes of a discharge (§11.31) —
  * and the loading places on the map (12.23). They change nothing in the fire.
  */
-export type AgentKind = 'crew' | 'helicopter' | 'plane';
+export type AgentKind = 'crew' | 'bulldozer' | 'fire-engine' | 'helicopter' | 'scooper' | 'tanker';
 
 export interface Agent {
   readonly id: string;
@@ -119,7 +119,14 @@ export function agentsAt(
       if (minute < workStart) continue;
       const head = crewHead(measure, minute, stopped);
       if (head.done || (stopped !== undefined && minute >= stopped)) continue;
-      agents.push({ id: measure.id, kind: 'crew', point: head.point });
+      // Machinery shares the crew schedule; only its appearance changes.
+      const kind: AgentKind =
+        measure.kind === 'firebreak' || measure.kind === 'clearing'
+          ? 'bulldozer'
+          : measure.kind === 'water-line'
+            ? 'fire-engine'
+            : 'crew';
+      agents.push({ id: measure.id, kind, point: head.point });
       continue;
     }
     const loadsAt = LOADS_AT[measure.kind];
@@ -130,7 +137,12 @@ export function agentsAt(
     if (point)
       agents.push({
         id: measure.id,
-        kind: measure.kind === 'helicopter' ? 'helicopter' : 'plane',
+        kind:
+          measure.kind === 'helicopter'
+            ? 'helicopter'
+            : measure.kind === 'amphibious'
+              ? 'scooper'
+              : 'tanker',
         point,
         ...(load ? { route: [load, dropPoint(measure)] as const } : {}),
       });
