@@ -24,10 +24,12 @@ import {
 import { nearestObservation } from './weather.js';
 import { registerFuelRoutes } from './fuel-routes.js';
 import { registerWaterRoutes } from './water-routes.js';
+import { registerLakesRoutes } from './lakes-routes.js';
 
 const app = Fastify({ logger: { transport: undefined } });
 registerFuelRoutes(app);
 registerWaterRoutes(app);
+registerLakesRoutes(app);
 
 interface CacheEntry {
   readonly body: HotspotCollection;
