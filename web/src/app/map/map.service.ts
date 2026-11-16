@@ -32,6 +32,7 @@ import {
   MUNICIPALITIES_SOURCE,
   PLACES_SOURCE,
   RESOURCES_SOURCE,
+  AGENTS_SOURCE,
   PROVINCES_SOURCE,
   SLOPES_SOURCE,
 } from './map.style';
@@ -39,6 +40,7 @@ import { FireParticles, type Emitters } from './fire-particles';
 import { addSpawnMarker, type SpawnMarker } from './spawn-marker';
 import { addResourceIcons } from './resource-icons';
 import type { Resource } from '../simulation/resources';
+import type { Agent } from '../simulation/agents';
 
 /**
  * MapLibre picks its worker file name at runtime, which neither Vite nor esbuild
@@ -721,6 +723,42 @@ export class MapService {
           geometry: { type: 'Point', coordinates: [r.point[0], r.point[1]] },
           properties: { kind: r.kind, name: r.name, source: r.source },
         })),
+      });
+    });
+  }
+
+  /**
+   * Draws who is working at the cursor's minute (12.20): crews and aircraft,
+   * and the route of each aircraft. Called on every minute the cursor moves;
+   * a handful of points is a cheap `setData`.
+   */
+  setAgents(agents: readonly Agent[]): void {
+    this.withStyle((map) => {
+      addResourceIcons(map);
+      const source = map.getSource(AGENTS_SOURCE) as GeoJSONSource | undefined;
+      source?.setData({
+        type: 'FeatureCollection',
+        features: [
+          ...agents.flatMap((a) =>
+            a.route
+              ? [
+                  {
+                    type: 'Feature' as const,
+                    geometry: {
+                      type: 'LineString' as const,
+                      coordinates: a.route.map((p) => [p[0], p[1]]),
+                    },
+                    properties: { kind: a.kind },
+                  },
+                ]
+              : [],
+          ),
+          ...agents.map((a) => ({
+            type: 'Feature' as const,
+            geometry: { type: 'Point' as const, coordinates: [a.point[0], a.point[1]] },
+            properties: { kind: a.kind },
+          })),
+        ],
       });
     });
   }

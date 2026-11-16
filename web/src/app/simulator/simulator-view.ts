@@ -34,6 +34,7 @@ import {
   type Countermeasure,
 } from '../simulation/countermeasures';
 import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from '../simulation/domain';
+import { agentsAt } from '../simulation/agents';
 import { FireSurface } from '../simulation/fire-surface';
 import { FORECASTS, FORECAST_COLOURS, forecastOffsets } from '../simulation/fire-display';
 import { frontEmitters, frontIntensity } from '../simulation/fire-emitters';
@@ -1228,6 +1229,21 @@ export class SimulatorView {
     this.plan.guard = (measure) => this.mopUpGuard(measure);
     // Where each crew stopped for safety, as the model computed it (12.19).
     effect(() => this.plan.crewStops.set(this.result()?.crewStops ?? new Map()));
+    // Who is working at the cursor (12.20): only over a computed fire, and
+    // only from what the model computed; nothing here touches the fire.
+    effect(() => {
+      const result = this.result();
+      this.maps.setAgents(
+        result
+          ? agentsAt(
+              this.plan.measures(),
+              this.minutes(),
+              result.crewStops ?? new Map(),
+              this.suppression.resources(),
+            )
+          : [],
+      );
+    });
 
     const chrome = inject(Chrome);
     chrome.visible.set(false);

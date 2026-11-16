@@ -48,6 +48,8 @@ export const LAYERS = {
   domainMask: 'domain-mask',
   domainLine: 'domain-line',
   resources: 'resources',
+  agentRoutes: 'agent-routes',
+  agents: 'agents',
 } as const;
 
 export const DEM_SOURCE = 'terrain-dem';
@@ -56,6 +58,7 @@ export const PROVINCES_SOURCE = 'provinces';
 export const MUNICIPALITIES_SOURCE = 'municipalities';
 export const PLACES_SOURCE = 'places';
 export const RESOURCES_SOURCE = 'resources';
+export const AGENTS_SOURCE = 'agents';
 export const CONTOURS_SOURCE = 'contours';
 export const DOMAIN_SOURCE = 'domain';
 
@@ -325,6 +328,7 @@ export function buildStyle(): StyleSpecification {
         data: NO_POINT,
         attribution: RESOURCES_ATTRIBUTION,
       },
+      [AGENTS_SOURCE]: { type: 'geojson', data: NO_POINT },
       [CONTOURS_SOURCE]: {
         type: 'vector',
         tiles: [contourTiles()],
@@ -615,6 +619,35 @@ export function buildStyle(): StyleSpecification {
           'text-color': '#bfe8c9',
           'text-halo-color': 'rgba(8, 12, 16, 0.85)',
           'text-halo-width': 1.1,
+        },
+      },
+      {
+        // Where each aircraft flies between (12.20): a faint dashed line from
+        // where it loads to where it drops. A line is draped (§13.1), so it
+        // lies on the ground under the flight, like a shadow of the route.
+        id: LAYERS.agentRoutes,
+        type: 'line',
+        source: AGENTS_SOURCE,
+        filter: ['==', ['geometry-type'], 'LineString'],
+        paint: {
+          'line-color': '#f2c94c',
+          'line-width': 1.2,
+          'line-opacity': 0.55,
+          'line-dasharray': [2, 3],
+        },
+      },
+      {
+        // Who is working (12.20): a crew at the head of its line, an aircraft
+        // on its way. Over everything, because they move.
+        id: LAYERS.agents,
+        type: 'symbol',
+        source: AGENTS_SOURCE,
+        filter: ['==', ['geometry-type'], 'Point'],
+        layout: {
+          'icon-image': ['concat', 'agent-', ['get', 'kind']],
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.85, 13, 1.05],
         },
       },
     ],
