@@ -82,6 +82,48 @@ la de les flames: la velocitat real del front i la calor de la cel·la on entra.
 Si el front és més intens, la mesura es rebutja i la línia es queda a mig
 dibuixar.
 
+### Brigades: arribada, efectius i rendiment
+
+Des de la versió 6 (§11.42 de la bitàcola), les mesures que fa una brigada —línia
+de defensa, tallafoc, tala i desbrossament, línia d'aigua i extinció de restes—
+poden portar tres camps més, tots tres o cap: `arrivalMin` (minuts des de la
+decisió fins que la brigada treballa al lloc), `crewSize` (efectius) i
+`ratePerPerson` (m/h de línia; ha/h per a l'extinció de restes). Sense ells, la
+mesura apareix sencera al minut del desplegament, com abans.
+
+Cada cel·la es fa quan la brigada hi arriba, des del primer vèrtex i en l'ordre
+del dibuix:
+
+```
+inici de la feina = startMin + arrivalMin
+línia:   minut(c) = inici + 60 · recorregut(c) / (efectius · rendiment)
+restes:  minut(c) = inici + 60 · (recorregut(c) · amplada / 10.000) / (efectius · rendiment)
+```
+
+`recorregut(c)` és la distància en metres, sobre la polilínia, fins a la
+projecció del centre de la cel·la. La barrera, la retirada de càrrega o
+l'extinció d'aquella cel·la comencen al seu minut; les passades d'una línia
+d'aigua, a partir del seu minut.
+
+**Parada de seguretat.** Si el foc arriba a una cel·la encara no feta mentre la
+brigada treballa, amb flames de més d'1,2 m (`MOP_UP_MAX_FLAME_M`, llegides com a
+l'extinció de restes), la brigada s'atura en aquell minut i el tros que falta no
+es fa. El resultat ho porta a `crewStops`, i la llista ho diu.
+
+**Valors per defecte** (`CREW_DEFAULTS`), editables al modal:
+
+| Mesura | Efectius | Rendiment per efectiu | Font |
+| --- | --- | --- | --- |
+| Línia de defensa | 20 | 40,2 m/h | Ortega, Rodríguez y Silva i Molina (2023), IJWF 32:1503–1514, doi:10.1071/WF22087: matoll, atac directe, 0,67 m/min |
+| Línia d'aigua | 4 | 80,5 m/h | NWCG, *Fire Line Production Rate Tables* (2021): atac inicial amb autobomba, model 5, 4 persones, 16 cadenes/h. La taula avisa que no és per a feina sostinguda |
+| Tallafoc | 20 | 40,2 m/h | **Provisional**: el de la línia manual; un tallafoc de 60 m és feina de maquinària |
+| Tala i desbrossament | 20 | 40,2 m/h | **Provisional**, igual |
+| Extinció de restes | 20 | 0,05 ha/h | **Provisional**: no s'ha trobat cap taula de rendiment de liquidació |
+
+Els 20 efectius són la brigada de referència de les taules del NWCG. Arribada
+per defecte, 0 min. Fora d'aquest model: composició i fatiga, relleus, accessos
+i un rendiment que depengui del combustible i de la pendent.
+
 ### Barreres i contrafoc
 
 Les barreres ho són del **foc de superfície**. Si les brases estan activades,
@@ -136,17 +178,18 @@ tractament actiu quan arriba el foc a cada cèl·lula.
 
 ## Fitxers i validació
 
-Els escenaris nous són **versió 5** (la 5 afegeix l'extinció de restes). Al fitxer de text, amb JSON dins de la línia:
+Els escenaris nous són **versió 6** (la 5 afegeix l'extinció de restes; la 6, les brigades). Al fitxer de text, amb JSON dins de la línia:
 
 - `contramesures = [...]`, amb `startMin` per a cada desplegament posterior a
   T=0 i, si és física, `litresPerPass`, `passes` i `passIntervalMin`, o
-  `fuelRemaining`;
+  `fuelRemaining`; i, per a les de brigada, `arrivalMin`, `crewSize` i
+  `ratePerPerson`;
 - `canvis_vent = [...]`, amb `startMin`, `speedKmh` i `fromDeg`;
 - `brases = {"enabled": …, "seed": …}`.
 
-Els fitxers de les versions 1 a 4 continuen obrint-se: cada clau que hi falta
+Els fitxers de les versions 1 a 5 continuen obrint-se: cada clau que hi falta
 pren el valor per defecte de la pantalla, l'avís diu quines, i el botó «Desar
-actualitzat» els torna a escriure en la versió 4 amb totes les claus. Desar
+actualitzat» els torna a escriure en la versió actual amb totes les claus. Desar
 escriu sempre totes les claus, també les buides. L'absència de `startMin`
 significa T=0. Un pla, un vent o unes brases mal formats es rebutgen sencers
 amb un missatge: perdre una barrera silenciosament canviaria la pregunta

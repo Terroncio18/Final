@@ -25,6 +25,10 @@ import {
   liquidCapacity,
   liquidKind,
   MOP_UP_MAX_FLAME_M,
+  CREW_DEFAULTS,
+  CREW_LIMITS,
+  crewKind,
+  type CrewKind,
   type CountermeasureKind,
   type Countermeasure,
 } from '../simulation/countermeasures';
@@ -73,6 +77,7 @@ import {
   defaultSettings,
   lastPass,
   WIDTH_LIMITS,
+  workStart,
   type ToolSettings,
 } from './countermeasure-plan';
 import { Icon, iconOr } from './icon';
@@ -238,6 +243,33 @@ function heatOf(result: SpreadResult): (cell: number, minute: number) => number 
 /** Two lists holding the same items, in the same order. */
 function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
   return a.length === b.length && a.every((item, i) => item === b[i]);
+}
+
+/**
+ * Where a crew's default production comes from (12.19), for the modal: the
+ * published source as a link, or nothing where the value is a placeholder.
+ */
+const CREW_CITATIONS: Partial<Record<CrewKind, { cite: string; url: string }>> = {
+  'defense-line': {
+    cite: 'Ortega et al. 2023',
+    url: 'https://doi.org/10.1071/WF22087',
+  },
+  'water-line': {
+    cite: 'NWCG 2021',
+    url: 'https://www.frames.gov/documents/behaveplus/publications/NWCG_2021_FireLineProductionRates.pdf',
+  },
+};
+
+function crewView(kind: CrewKind) {
+  const defaults = CREW_DEFAULTS[kind];
+  const citation = defaults.placeholder ? undefined : CREW_CITATIONS[kind];
+  return {
+    unit: defaults.unit,
+    min: CREW_LIMITS[defaults.unit].min,
+    max: CREW_LIMITS[defaults.unit].max,
+    cite: citation?.cite ?? '',
+    url: citation?.url ?? '',
+  };
 }
 
 @Component({
@@ -1172,7 +1204,8 @@ export class SimulatorView {
     const result = this.result(),
       centre = this.ignition();
     if (!result || !centre) return 'L’extinció de restes necessita un foc calculat.';
-    const minute = measure.startMin ?? 0;
+    // A crew works from when it gets there (12.19), not from the decision.
+    const minute = workStart(measure) ?? measure.startMin ?? 0;
     const cells = new Set(countermeasureCells(centre, measure));
     if (![...cells].some((cell) => result.arrival[cell] <= minute))
       return 'Aquí encara no ha cremat res: no hi ha restes a extingir.';
@@ -1189,6 +1222,8 @@ export class SimulatorView {
 
   constructor() {
     this.plan.guard = (measure) => this.mopUpGuard(measure);
+    // Where each crew stopped for safety, as the model computed it (12.19).
+    effect(() => this.plan.crewStops.set(this.result()?.crewStops ?? new Map()));
 
     const chrome = inject(Chrome);
     chrome.visible.set(false);
@@ -1902,6 +1937,7 @@ export class SimulatorView {
       widthLabel: entry.geometry === 'point' ? 'Diàmetre' : 'Amplada',
       liquid: liquidKind(config.kind),
       removal: config.kind === 'clearing',
+      crew: crewKind(config.kind) ? crewView(config.kind) : null,
       capacity: liquidCapacity(config.kind),
       aircraft,
     };

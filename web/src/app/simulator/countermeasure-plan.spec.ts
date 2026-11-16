@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { COUNTERMEASURE_CATALOG } from '../simulation/countermeasures';
+import { COUNTERMEASURE_CATALOG, CREW_DEFAULTS } from '../simulation/countermeasures';
 import { domainAround } from '../simulation/domain';
 import type { Point } from '../simulation/point';
 import {
@@ -11,6 +11,7 @@ import {
   lengthM,
   MAX_VERTICES,
   WIDTH_LIMITS,
+  workStart,
 } from './countermeasure-plan';
 
 const centre: Point = [2.71009, 39.76552];
@@ -481,5 +482,51 @@ describe('lengthM', () => {
       ]),
     ).toBeCloseTo(1113.2, 0);
     expect(lengthM([a])).toBe(0);
+  });
+
+  it('gives a ground measure the default crew, and the list follows its work (12.19)', () => {
+    expect(defaultSettings('defense-line')).toMatchObject({
+      arrivalMin: CREW_DEFAULTS['defense-line'].arrivalMin,
+      crewSize: CREW_DEFAULTS['defense-line'].crewSize,
+      ratePerPerson: CREW_DEFAULTS['defense-line'].ratePerPerson,
+    });
+    expect(defaultSettings('helicopter').crewSize).toBeUndefined();
+    expect(defaultSettings('backfire').crewSize).toBeUndefined();
+
+    const plan = new CountermeasurePlan();
+    // 1 person at 60 m/h, arriving after 10 min: about a kilometre of line.
+    plan.begin('defense-line', false, {
+      ...defaultSettings('defense-line'),
+      arrivalMin: 10,
+      crewSize: 1,
+      ratePerPerson: 60,
+    });
+    plan.click(a, bounds);
+    plan.click(b, bounds);
+    plan.finish();
+    const measure = plan.measures()[0];
+    expect(measure).toMatchObject({ arrivalMin: 10, crewSize: 1, ratePerPerson: 60 });
+    expect(workStart(measure)).toBe(10);
+    expect(plan.rows()[0].crewText).toBe('1 efectius × 60 m/h · arribada 10 min');
+
+    plan.minute.set(5);
+    expect(plan.rows()[0].status).toBe('En camí');
+    plan.minute.set(10 + 60 * (lengthM([a, b]) / 2 / 60));
+    expect(plan.rows()[0].status).toMatch(/^En construcció · (49|50|51) %$/);
+    plan.crewStops.set(new Map([[measure.id, 20]]));
+    expect(plan.rows()[0].status).toMatch(/^Aturada per seguretat · \d+ %$/);
+    plan.crewStops.set(new Map());
+    plan.minute.set(10 + 60 * (lengthM([a, b]) / 60) + 1);
+    expect(plan.rows()[0].status).toBe('Feta');
+  });
+
+  it('refuses a crew the model would refuse', () => {
+    expect(
+      checkSettings('defense-line', { ...defaultSettings('defense-line'), crewSize: 0 }),
+    ).not.toBeNull();
+    expect(
+      checkSettings('defense-line', { ...defaultSettings('defense-line'), crewSize: 2.5 }),
+    ).not.toBeNull();
+    expect(checkSettings('mop-up', defaultSettings('mop-up'))).toBeNull();
   });
 });

@@ -9,6 +9,9 @@ import {
   DURATION_LIMITS,
   MAX_VERTICES,
   parseCountermeasures,
+  CREW_DEFAULTS,
+  crewHead,
+  crewKind,
   type Countermeasure,
   type CountermeasureKind,
 } from '../simulation/countermeasures';
@@ -50,9 +53,13 @@ export interface ToolSettings {
   readonly passes?: number;
   readonly passIntervalMin?: number;
   readonly fuelRemaining?: number;
+  /** The crew of a ground measure (12.19): arrival, people and production each. */
+  readonly arrivalMin?: number;
+  readonly crewSize?: number;
+  readonly ratePerPerson?: number;
 }
 
-/** A tool's starting values: the catalogue's size, a full load, one pass. */
+/** A tool's starting values: the catalogue's size, a full load, one pass, the default crew. */
 export function defaultSettings(kind: CountermeasureKind): ToolSettings {
   return {
     widthM: catalogEntry(kind).widthM,
@@ -64,7 +71,20 @@ export function defaultSettings(kind: CountermeasureKind): ToolSettings {
         }
       : {}),
     ...(kind === 'clearing' ? { fuelRemaining: 0.2 } : {}),
+    ...(crewKind(kind)
+      ? {
+          arrivalMin: CREW_DEFAULTS[kind].arrivalMin,
+          crewSize: CREW_DEFAULTS[kind].crewSize,
+          ratePerPerson: CREW_DEFAULTS[kind].ratePerPerson,
+        }
+      : {}),
   };
+}
+
+/** When the crew of a measure starts working on site, or null if it has none. */
+export function workStart(measure: Countermeasure): number | null {
+  if (measure.crewSize === undefined) return null;
+  return (measure.startMin ?? 0) + (measure.arrivalMin ?? 0);
 }
 
 /**
@@ -102,6 +122,13 @@ function measureFrom(
         }
       : {}),
     ...(kind === 'clearing' ? { fuelRemaining: settings.fuelRemaining } : {}),
+    ...(crewKind(kind) && settings.crewSize !== undefined
+      ? {
+          arrivalMin: settings.arrivalMin,
+          crewSize: settings.crewSize,
+          ratePerPerson: settings.ratePerPerson,
+        }
+      : {}),
     ...(minute > 0 ? { startMin: minute } : {}),
   };
 }
@@ -164,6 +191,11 @@ export class CountermeasurePlan {
   readonly selected = signal<string | null>(null);
   readonly note = signal<PlanNote | null>(null);
   readonly minute = signal(0);
+  /**
+   * The minute each crew stopped for safety (12.19), by measure id: the
+   * model's answer, set by whoever holds the result.
+   */
+  readonly crewStops = signal<ReadonlyMap<string, number>>(new Map());
   /**
    * The measures deployed after the cursor. A decision taken now, in the past,
    * leaves them behind: they were decided on a fire that will no longer be
@@ -236,6 +268,21 @@ export class CountermeasurePlan {
           )
         : 0;
       const expired = measure.durationMin > 0 && this.minute() >= start + measure.durationMin;
+      const crew = measure.crewSize !== undefined;
+      const working = workStart(measure) ?? start;
+      const stopped = this.crewStops().get(measure.id);
+      const head = crew ? crewHead(measure, this.minute(), stopped) : null;
+      const built =
+        head && metres > 0 ? Math.min(100, Math.round((head.builtM / metres) * 100)) : 0;
+      const crewStatus = !head
+        ? null
+        : stopped !== undefined && this.minute() >= stopped
+          ? `Aturada per seguretat · ${built} %`
+          : this.minute() < working
+            ? 'En camí'
+            : head.done
+              ? 'Feta'
+              : `En construcció · ${built} %`;
       return {
         id: measure.id,
         locked: start < this.minute(),
@@ -248,14 +295,18 @@ export class CountermeasurePlan {
           .toString()
           .padStart(2, '0')}`,
         finished: (lastPass(measure) ?? Infinity) < this.minute(),
+        crew,
+        built,
         status:
           start > this.minute()
             ? 'Programada'
-            : liquid
-              ? `${completed}/${measure.passes} passades · humectació`
-              : expired
-                ? 'Caducada'
-                : 'Desplegada',
+            : crewStatus
+              ? crewStatus
+              : liquid
+                ? `${completed}/${measure.passes} passades · humectació`
+                : expired
+                  ? 'Caducada'
+                  : 'Desplegada',
         name: `${entry.label} ${ordinal}`,
         colour: entry.color,
         icon: entry.icon,
@@ -274,6 +325,11 @@ export class CountermeasurePlan {
         remainingPercent: Math.round((measure.fuelRemaining ?? 1) * 100),
         removal,
         totalLitres: (measure.litresPerPass ?? 0) * (measure.passes ?? 1),
+        crewText: crew
+          ? `${whole.format(measure.crewSize!)} efectius × ${one.format(measure.ratePerPerson!)} ${
+              measure.kind === 'mop-up' ? 'ha/h' : 'm/h'
+            } · arribada ${whole.format(measure.arrivalMin!)} min`
+          : '',
         effect: liquid
           ? `${whole.format(measure.litresPerPass!)} L × ${measure.passes} · cada ${measure.passIntervalMin} min`
           : removal

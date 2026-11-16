@@ -2295,6 +2295,82 @@ tallafoc deixaria passar, i la lectura d'intensitat del front— i dues del pla
 línia es conserva—; les 84 proves de simulació i les 33 d'Angular, i la
 compilació sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
 
+### 11.42. Les brigades arriben, són tantes i fan tants metres per hora
+
+Fet la nit del 16/11/2026, sense Pere, a la branca `brigades` (12.19). La
+numeració deixa la §11.41 per als parcs i punts d'aigua de la branca
+`senyals-mapa`, que es va fer la mateixa nit.
+
+**Com es va fer.** Com les contramesures (§11.27): primer el contracte, en un
+commit propi (`a692131`) —els tres camps nous, els valors per defecte amb font i
+la fórmula de cada cel·la—, i després Codex el model a `brigades-model` i Claude
+la pantalla a `brigades`. La coordinació va viure fora del repositori, a
+`COORDINACIO_NIT/`. El *sandbox* de Codex no el deixava escriure les metadades
+de git del worktree, i el seu commit (`358d111`) el va fer Claude després de
+revisar-ne el diff.
+
+**Tres camps, tots tres o cap**: `arrivalMin` (minuts des de la decisió fins que
+la brigada treballa al lloc), `crewSize` (efectius) i `ratePerPerson` (metres de
+línia per hora i efectiu; hectàrees per hora a l'extinció de restes). Només per a
+les mesures que fa una brigada: línia de defensa, tallafoc, tala, línia d'aigua
+i extinció de restes. **El contrafoc i els mitjans aeris segueixen
+instantanis**. Sense els camps, una mesura és la de sempre: els escenaris antics
+donen exactament el mateix foc (Codex ho va comprovar byte a byte en quinze).
+
+**Cada cel·la es fa quan la brigada hi arriba**, des del primer vèrtex i en
+l'ordre del dibuix: inici + arribada + recorregut ÷ (efectius × rendiment). A
+l'extinció de restes, el recorregut es converteix en àrea amb l'amplada. Cent
+efectius fan la línia en la meitat de temps que cinquanta: és lineal, sense
+fatiga ni relleus.
+
+**La parada de seguretat** (§11.40): si el foc arriba a una cel·la encara no
+feta mentre la brigada hi treballa, amb flames de més d'1,2 m, la brigada
+s'atura en aquell minut i el que falta no es fa. Amb flames més baixes segueix:
+és atac directe. Com que una parada treu barreres que el càlcul ja havia comptat,
+el model **torna a calcular** amb la parada fixada, fins que no n'apareix cap de
+nova; el foc d'abans de cada parada no canvia. Amb poques brigades són pocs
+recàlculs.
+
+**Els rendiments per defecte, i d'on surten**:
+
+- **Línia de defensa: 40,2 m/h per efectiu** —0,67 m/min—, d'Ortega, Rodríguez y
+  Silva i Molina (2023), mesurat en incendis reals d'Andalusia, Castella-la
+  Manxa i el País Valencià, en matoll i atac directe. És la font més propera al
+  domini que s'ha trobat.
+- **Línia d'aigua: 80,5 m/h per efectiu**, de les taules del NWCG (2021):
+  autobomba amb quatre persones en matoll, 16 cadenes per hora. La taula avisa
+  que és d'atac inicial i no de feina sostinguda.
+- **Tallafoc, tala i extinció de restes: provisionals.** Un tallafoc de 60 m és
+  feina de maquinària i la taula de la línia manual no hi val; de la liquidació
+  no s'ha trobat cap taula (Ortega et al. ho exclouen explícitament). Es fan
+  servir 40,2 m/h i 0,05 ha/h, i el modal diu «Rendiment provisional, sense font
+  publicada». Queda a la 12.25.
+- **20 efectius**, la brigada de referència de les taules del NWCG, i **arribada
+  0**, fins que la 12.22 la tregui del parc més proper (§11.41).
+
+Una diferència que convé tenir present: el NWCG, per a brigades de vint en
+feina sostinguda, dona 471 peus per hora en matoll, uns 7 m/h per efectiu. És
+cinc vegades menys que Ortega et al. Mesuren coses diferents —línies d'uns 0,5 m
+en atac directe als incendis espanyols, contra línies sostingudes als Estats
+Units—, i per això el valor és editable.
+
+**A la pantalla.** El modal de les eines de brigada (§11.39) porta tres camps
+més: arribada, efectius i rendiment, amb la font enllaçada o la marca de
+provisional. La llista hi afegeix una línia —«20 efectius × 40,2 m/h · arribada
+0 min»— i l'estat segueix la feina: «En camí», «En construcció · 45 %», «Feta» o
+«Aturada per seguretat · 45 %». L'extinció de restes es comprova al minut en què
+la brigada comença, no al de la decisió.
+
+El que no fa: el rendiment no depèn del combustible ni de la pendent —les taules
+hi són, i seria el pas següent—, no hi ha accessos, i una brigada aturada no torna.
+
+Comprovat: les proves de Codex —validació, calendari, cap de la feina, línia
+lenta que el foc travessa i ràpida que el conté, parades, reproducció exacta amb
+les parades fixades, escenaris de la 6 i de la 5— i dues del pla —la brigada per
+defecte i els estats de la llista—; les 107 proves de simulació i les 35
+d'Angular, i la compilació sense avisos. **Al navegador no s'ha mirat**: ho
+prova Pere.
+
 ---
 
 ## 12. Decisions pendents
@@ -2312,8 +2388,19 @@ compilació sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
   model —combustible estimat, foc de superfície, retenció i assecat de les
   descàrregues, brases experimentals— i que el simulador no serveix per
   prendre decisions d'emergència.
+- **12.25. Rendiments que falten i preguntes de les brigades.** Ve de la §11.42.
+  (a) Els rendiments del tallafoc, la tala i l'extinció de restes són
+  provisionals: cal una font —les taules de bulldòzer del NWCG per als
+  tallafocs?— o dir que no n'hi ha. (b) Quin rendiment de línia manual es vol
+  per defecte: Ortega et al. (40,2 m/h) o el NWCG sostingut (7 m/h). (c) El
+  contrafoc el fan brigades: ha de tenir també arribada i rendiment? (d) Quan una
+  brigada d'una línia d'aigua s'atura, les passades futures sobre les cel·les ja
+  fetes es mantenen (lectura literal del contracte); s'haurien de cancel·lar?
+  (e) Cada parada repeteix el càlcul sencer i la barra de progrés torna a
+  començar: si es fa servir amb moltes brigades, caldria mirar-ne el temps.
 - **12.19. Les brigades no són instantànies: arribada, efectius i
-  rendiment.** Plantejat per Pere el 16/11/2026. Avui una mesura terrestre
+  rendiment.** Feta la nit del 16/11/2026 a la §11.42, a la branca `brigades`;
+  el que en queda és la 12.25. Plantejat per Pere el 16/11/2026. Avui una mesura terrestre
   apareix sencera al minut del desplegament (§11.28), i la pregunta clau d'un
   incendi —s'acaba la línia abans que hi arribi el cap?— no es pot fer. La
   proposta:

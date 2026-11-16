@@ -598,6 +598,9 @@
                     <span>
                       <strong>{{ row.name }}</strong>
                       <small>{{ row.shape }} · {{ row.effect }}</small>
+                      @if (row.crew) {
+                        <small>{{ row.crewText }}</small>
+                      }
                       <small>{{ row.deployment }} · {{ row.status }}</small>
                     </span>
                   </button>
@@ -1347,7 +1350,51 @@
             />
           </label>
         }
+        @if (config.crew; as crew) {
+          <label>
+            <span>Arribada (min)</span>
+            <input
+              type="number"
+              min="0"
+              max="720"
+              step="1"
+              [value]="shown(config.settings.arrivalMin)"
+              (change)="setSetting('arrivalMin', $event)"
+            />
+          </label>
+          <label>
+            <span>Efectius</span>
+            <input
+              type="number"
+              min="1"
+              max="500"
+              step="1"
+              [value]="shown(config.settings.crewSize)"
+              (change)="setSetting('crewSize', $event)"
+            />
+          </label>
+          <label>
+            <span>Rendiment per efectiu ({{ crew.unit }})</span>
+            <input
+              type="number"
+              [min]="crew.min"
+              [max]="crew.max"
+              step="any"
+              [value]="shown(config.settings.ratePerPerson)"
+              (change)="setSetting('ratePerPerson', $event)"
+            />
+          </label>
+        }
       </div>
+      @if (config.crew; as crew) {
+        @if (crew.url) {
+          <a [href]="crew.url" target="_blank" rel="noopener noreferrer"
+            >Rendiment: {{ crew.cite }}</a
+          >
+        } @else {
+          <small class="crew-source">Rendiment provisional, sense font publicada</small>
+        }
+      }
       @if (config.error) {
         <p class="terrain-note measure-note failed" role="alert">{{ config.error }}</p>
       }
