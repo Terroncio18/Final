@@ -2526,6 +2526,25 @@ un error per comunicar a MapLibre: la comprovació `type === 'image'` deixa fora
 
 **Al navegador no s'ha mirat**: ho prova Pere.
 
+> Comprovat per Pere el mateix dia: el foc ja no es talla.
+
+### 13.7. Les vores entre tessel·les del relleu es veuen, i es deixen
+
+Vist el 16/11/2026, després de la §13.6: amb el relleu inclinat i de prop,
+es veu una línia on canvien la nitidesa i el to de la imatge de satèl·lit.
+És la vora entre dues tessel·les del terreny carregades a **nivells de zoom
+diferents**: MapLibre, amb la càmera inclinada, carrega les tessel·les
+llunyanes amb menys detall, i per defecte en deixa conviure fins a nou nivells
+a la pantalla. Esri World Imagery fa servir imatges de dates i fonts diferents
+segons el zoom, de manera que el to també salta; i el relleu ombrejat, calculat
+del DEM de cada nivell, també.
+
+No és del foc ni de la §13.6, i no s'arregla del tot: de lluny el detall ha de
+baixar. Es podria reduir amb `map.setSourceTileLodParams()`, que limita quants
+nivells hi ha alhora a la pantalla, a canvi de carregar més tessel·les o de
+perdre detall a prop de la càmera. **Es deixa com està**, per decisió de Pere:
+no val la pena si costa rendiment.
+
 ---
 
 ## 14. Fonts de dades
