@@ -2401,6 +2401,15 @@ compilació sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
   ho fa per a tot el país; per als parcs, si no hi ha capa oficial,
   OpenStreetMap té `amenity=fire_station`, que és completa però no oficial i
   així s'hauria de dir.
+
+  Afegit el mateix dia, també per Pere: **els aeròdroms**, per als avions de
+  retardant. Cada mitjà aeri carrega en un lloc diferent, i això és el que
+  marca el temps entre passades: l'helicòpter en un punt d'aigua, l'avió
+  amfibi en una làmina d'aigua prou gran on pugui fer la carrega en vol, i l'avió de retardant
+  —l'AT-802F de la §11.31— a la base, on hi ha el producte. Les fonts a mirar
+  són les bases aèries de mitjans contra incendis que publiquen el ministeri i
+  les comunitats, i els aeròdroms de l'AIP d'ENAIRE; OpenStreetMap
+  (`aeroway=aerodrome`), com a últim recurs i dient-ho.
 - ~~**12.17. El document de contramesures va endarrerit.**~~ Resolta el
   16/11/2026: el document ja descriu les §11.29 a §11.31 i diu què s'ha mirat
   al navegador i què no. El que es plantejava:
