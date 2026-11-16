@@ -40,6 +40,78 @@ export function catalogEntry(kind: CountermeasureKind) {
   return COUNTERMEASURE_CATALOG.find((entry) => entry.kind === kind)!;
 }
 
+/**
+ * What is chosen for a tool before it is used (§11.39): the size, and for a
+ * discharge or a clearing what it puts down or leaves.
+ */
+export interface ToolSettings {
+  readonly widthM: number;
+  readonly litresPerPass?: number;
+  readonly passes?: number;
+  readonly passIntervalMin?: number;
+  readonly fuelRemaining?: number;
+}
+
+/** A tool's starting values: the catalogue's size, a full load, one pass. */
+export function defaultSettings(kind: CountermeasureKind): ToolSettings {
+  return {
+    widthM: catalogEntry(kind).widthM,
+    ...(liquidKind(kind)
+      ? {
+          litresPerPass: kind === 'water-line' ? 1000 : liquidCapacity(kind),
+          passes: 1,
+          passIntervalMin: 10,
+        }
+      : {}),
+    ...(kind === 'clearing' ? { fuelRemaining: 0.2 } : {}),
+  };
+}
+
+/** The measure a tool with these settings would leave, wherever it is put. */
+function measureFrom(
+  kind: CountermeasureKind,
+  settings: ToolSettings,
+  id: string,
+  points: readonly Point[],
+  minute: number,
+): Countermeasure {
+  const physical = liquidKind(kind) || kind === 'clearing';
+  const entry = catalogEntry(kind);
+  return {
+    id,
+    kind,
+    points: [...points],
+    widthM: settings.widthM,
+    strength: physical ? 0 : entry.strength,
+    durationMin: physical ? 0 : entry.durationMin,
+    ...(liquidKind(kind)
+      ? {
+          litresPerPass: settings.litresPerPass,
+          passes: settings.passes,
+          passIntervalMin: settings.passIntervalMin,
+        }
+      : {}),
+    ...(kind === 'clearing' ? { fuelRemaining: settings.fuelRemaining } : {}),
+    ...(minute > 0 ? { startMin: minute } : {}),
+  };
+}
+
+/**
+ * Why these settings cannot make a measure, or null. The model's own
+ * validation, on a measure of the right shape put anywhere.
+ */
+export function checkSettings(kind: CountermeasureKind, settings: ToolSettings): string | null {
+  const points: Point[] =
+    catalogEntry(kind).geometry === 'point'
+      ? [[0, 0]]
+      : [
+          [0, 0],
+          [0.01, 0],
+        ];
+  const checked = parseCountermeasures([measureFrom(kind, settings, 'probe', points, 0)]);
+  return typeof checked === 'string' ? checked : null;
+}
+
 function inside(point: Point, [west, south, east, north]: Bounds): boolean {
   return point[0] >= west && point[0] <= east && point[1] >= south && point[1] <= north;
 }
@@ -103,9 +175,14 @@ export class CountermeasurePlan {
 
   private nextId = 1;
 
+  /** The values the tool in the hand was set to; the defaults if none. */
+  readonly settings = signal<ToolSettings | null>(null);
+
   readonly tool = computed(() => {
     const kind = this.kind();
-    return kind ? catalogEntry(kind) : null;
+    if (!kind) return null;
+    const settings = this.settings() ?? defaultSettings(kind);
+    return { ...catalogEntry(kind), widthM: settings.widthM };
   });
 
   /** A line needs two points to be one. */
@@ -202,10 +279,11 @@ export class CountermeasurePlan {
    * Takes a tool, or puts it down if it was the one in the hand. With
    * `discard`, the next measure added takes the later ones off the plan.
    */
-  begin(kind: CountermeasureKind, discard = false): void {
-    const same = this.kind() === kind;
+  begin(kind: CountermeasureKind, discard = false, settings?: ToolSettings): void {
+    const same = this.kind() === kind && !settings;
     this.draft.set([]);
     this.kind.set(same ? null : kind);
+    this.settings.set(same ? null : (settings ?? null));
     this.discarding.set(!same && discard);
     this.note.set(null);
   }
@@ -214,6 +292,7 @@ export class CountermeasurePlan {
   cancel(): void {
     this.draft.set([]);
     this.kind.set(null);
+    this.settings.set(null);
     this.discarding.set(false);
   }
 
@@ -232,8 +311,9 @@ export class CountermeasurePlan {
       return;
     }
     const here: Point = [point[0], point[1]];
+    // One measure per tool taken: once it is down, the tool is put away.
     if (tool.geometry === 'point') {
-      this.add(tool.kind, [here]);
+      if (this.add(tool.kind, [here])) this.cancel();
       return;
     }
     const last = this.draft().at(-1);
@@ -250,8 +330,15 @@ export class CountermeasurePlan {
     this.note.set(null);
   }
 
-  /** Takes the last vertex back. */
+  /**
+   * Takes the last vertex back; with none left, the measure is given up and
+   * the tool put down. It is what the right button does (§11.39).
+   */
   undo(): void {
+    if (this.draft().length <= 1) {
+      this.cancel();
+      return;
+    }
     this.draft.update((points) => points.slice(0, -1));
   }
 
@@ -263,7 +350,7 @@ export class CountermeasurePlan {
       this.note.set({ text: 'Una línia necessita almenys dos punts.', failed: true });
       return;
     }
-    if (this.add(kind, this.draft())) this.draft.set([]);
+    if (this.add(kind, this.draft())) this.cancel();
   }
 
   remove(id: string): void {
@@ -374,23 +461,13 @@ export class CountermeasurePlan {
 
   private add(kind: CountermeasureKind, points: readonly Point[]): boolean {
     const entry = catalogEntry(kind);
-    const measure: Countermeasure = {
-      id: `m${this.nextId++}`,
+    const measure = measureFrom(
       kind,
-      points: [...points],
-      widthM: entry.widthM,
-      strength: liquidKind(kind) || kind === 'clearing' ? 0 : entry.strength,
-      durationMin: liquidKind(kind) || kind === 'clearing' ? 0 : entry.durationMin,
-      ...(liquidKind(kind)
-        ? {
-            litresPerPass: kind === 'water-line' ? 1000 : liquidCapacity(kind),
-            passes: 1,
-            passIntervalMin: 10,
-          }
-        : {}),
-      ...(kind === 'clearing' ? { fuelRemaining: 0.2 } : {}),
-      ...(this.minute() > 0 ? { startMin: this.minute() } : {}),
-    };
+      this.settings() ?? defaultSettings(kind),
+      `m${this.nextId++}`,
+      points,
+      this.minute(),
+    );
     const later = this.discarding() ? this.later() : [];
     const kept = this.measures().filter((other) => !later.includes(other));
     const ordinal = kept.filter((other) => other.kind === kind).length + 1;

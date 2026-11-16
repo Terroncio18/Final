@@ -555,39 +555,14 @@
             <p class="tool-hint">
               <strong>{{ active.label }}.</strong>
               @if (active.geometry === 'point') {
-                Fes clic al terreny, dins del domini, per deixar-hi la descàrrega.
+                Clic esquerre: aplicar · clic dret: cancel·lar.
               } @else {
-                Fes clic per posar cada vèrtex i prem «Finalitzar» per tancar la línia.
+                Clic esquerre: vèrtex · clic dret: treure l’últim.
               }
             </p>
             <div class="tools-row">
-              @if (active.geometry === 'line') {
-                <button
-                  type="button"
-                  [disabled]="!plan.canFinish() || computing()"
-                  (click)="finishMeasure()"
-                >
-                  Finalitzar
-                </button>
-                <button
-                  type="button"
-                  [disabled]="!plan.draft().length"
-                  (click)="undoMeasurePoint()"
-                >
-                  <app-icon name="reset" /> Desfer punt
-                </button>
-              }
               <button type="button" (click)="cancelTool()">Cancel·lar (Esc)</button>
             </div>
-            @if (active.geometry === 'line') {
-              <p class="terrain-note" role="status">
-                @if (plan.draft().length === 1) {
-                  1 vèrtex posat: en cal un altre.
-                } @else {
-                  {{ plan.draft().length }} vèrtexs posats.
-                }
-              </p>
-            }
           </div>
         }
 
@@ -637,107 +612,6 @@
                     ×
                   </button>
                 </div>
-                @if (row.widthEditable || row.durationEditable) {
-                  <div class="measure-fields">
-                    @if (row.widthEditable) {
-                      <label>
-                        <span>{{ row.widthLabel }} (m)</span>
-                        <input
-                          type="number"
-                          inputmode="numeric"
-                          step="1"
-                          [min]="widthLimits.min"
-                          [max]="widthLimits.max"
-                          [value]="row.widthM"
-                          [disabled]="computing() || row.locked"
-                          (change)="setMeasureNumber(row.id, 'width', $event)"
-                        />
-                      </label>
-                    }
-                    @if (row.liquid) {
-                      <label
-                        ><span>Litres per passada</span>
-                        <input
-                          type="number"
-                          min="1"
-                          [max]="row.capacityL"
-                          step="1"
-                          [value]="row.litresPerPass"
-                          [disabled]="computing() || row.locked"
-                          (change)="setMeasureNumber(row.id, 'litresPerPass', $event)"
-                        />
-                      </label>
-                      <label
-                        ><span>Passades</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="20"
-                          step="1"
-                          [value]="row.passes"
-                          [disabled]="computing() || row.locked"
-                          (change)="setMeasureNumber(row.id, 'passes', $event)"
-                        />
-                      </label>
-                      <label
-                        ><span>Temps entre passades (min)</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="120"
-                          step="1"
-                          [value]="row.passIntervalMin"
-                          [disabled]="computing() || row.locked"
-                          (change)="setMeasureNumber(row.id, 'passIntervalMin', $event)"
-                        />
-                      </label>
-                    }
-                    @if (row.removal) {
-                      <label
-                        ><span>Combustible restant (%)</span>
-                        <input
-                          type="number"
-                          min="5"
-                          max="100"
-                          step="1"
-                          [value]="row.remainingPercent"
-                          [disabled]="computing() || row.locked"
-                          (change)="setMeasureNumber(row.id, 'remaining', $event)"
-                        />
-                      </label>
-                    }
-                    @if (row.durationEditable) {
-                      <label>
-                        <span>Durada (min)</span>
-                        <input
-                          type="number"
-                          inputmode="numeric"
-                          step="1"
-                          [min]="durationLimits.min"
-                          [max]="durationLimits.max"
-                          [value]="row.durationMin"
-                          [disabled]="computing() || row.locked"
-                          (change)="setMeasureNumber(row.id, 'duration', $event)"
-                        />
-                      </label>
-                    }
-                    @if (row.strengthEditable) {
-                      <label>
-                        <span>Reducció (%)</span>
-                        <input
-                          type="number"
-                          inputmode="decimal"
-                          min="0"
-                          max="95"
-                          step="1"
-                          [value]="row.strengthPercent"
-                          [disabled]="computing() || row.locked"
-                          (change)="setMeasureNumber(row.id, 'strength', $event)"
-                        />
-                      </label>
-                    }
-                  </div>
-                }
                 @if (row.liquid) {
                   <p class="terrain-note">Total: {{ row.totalLitres }} L</p>
                   @if (row.aircraft; as aircraft) {
@@ -995,6 +869,25 @@
             </div>
           }
         </div>
+
+        <!-- A line is closed here, under the drawing (§11.39). -->
+        @if (plan.tool(); as active) {
+          @if (active.geometry === 'line') {
+            <div class="map-apply" [style.--measure]="active.color">
+              <span
+                >{{ plan.draft().length }}
+                {{ plan.draft().length === 1 ? 'vèrtex' : 'vèrtexs' }}</span
+              >
+              <button
+                type="button"
+                [disabled]="!plan.canFinish() || computing()"
+                (click)="finishMeasure()"
+              >
+                Aplicar
+              </button>
+            </div>
+          }
+        }
 
         <!-- Which way the view faces (§11.37). It only says so: turning the
              view is done on the map itself. -->
@@ -1353,4 +1246,93 @@
       <strong>IgnisLab <span>TFG UOC</span></strong>
     </div>
   </footer>
+  <!-- A countermeasure is set up before it is used, here and not in the list
+       (§11.39). -->
+  @if (configView(); as config) {
+    <div class="modal-backdrop" (click)="cancelSettings()"></div>
+    <div
+      class="tool-modal"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="config.label"
+      [style.--measure]="config.colour"
+    >
+      <h3><span class="measure-dot"></span>{{ config.label }}</h3>
+      @if (config.aircraft; as aircraft) {
+        <a [href]="aircraft.source" target="_blank" rel="noopener noreferrer"
+          >{{ aircraft.name }} · capacitat {{ aircraft.capacityL }} L</a
+        >
+      }
+      <div class="measure-fields">
+        <label>
+          <span>{{ config.widthLabel }} (m)</span>
+          <input
+            type="number"
+            inputmode="numeric"
+            step="1"
+            [min]="widthLimits.min"
+            [max]="widthLimits.max"
+            [value]="shown(config.settings.widthM)"
+            (change)="setSetting('widthM', $event)"
+          />
+        </label>
+        @if (config.liquid) {
+          <label>
+            <span>Litres per passada</span>
+            <input
+              type="number"
+              min="1"
+              [max]="config.capacity"
+              step="1"
+              [value]="shown(config.settings.litresPerPass)"
+              (change)="setSetting('litresPerPass', $event)"
+            />
+          </label>
+          <label>
+            <span>Passades</span>
+            <input
+              type="number"
+              min="1"
+              max="20"
+              step="1"
+              [value]="shown(config.settings.passes)"
+              (change)="setSetting('passes', $event)"
+            />
+          </label>
+          <label>
+            <span>Temps entre passades (min)</span>
+            <input
+              type="number"
+              min="1"
+              max="120"
+              step="1"
+              [value]="shown(config.settings.passIntervalMin)"
+              (change)="setSetting('passIntervalMin', $event)"
+            />
+          </label>
+        }
+        @if (config.removal) {
+          <label>
+            <span>Combustible restant (%)</span>
+            <input
+              type="number"
+              min="5"
+              max="100"
+              step="1"
+              [value]="shown(config.settings.fuelRemaining, true)"
+              (change)="setSetting('fuelRemaining', $event)"
+            />
+          </label>
+        }
+      </div>
+      @if (config.error) {
+        <p class="terrain-note measure-note failed" role="alert">{{ config.error }}</p>
+      }
+      <div class="tools-row tool-modal-actions">
+        <button type="button" (click)="resetSettings()"><app-icon name="reset" /> Restablir</button>
+        <button type="button" (click)="cancelSettings()">Cancel·lar</button>
+        <button type="button" class="primary" (click)="applySettings()">Aplicar</button>
+      </div>
+    </div>
+  }
 </div>

@@ -112,3 +112,106 @@
 .measure-clear {
   margin-top: 6px;
 }
+
+/* ---- The tool's modal (§11.39) ---- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: #05090dad;
+}
+
+.tool-modal {
+  position: fixed;
+  z-index: 41;
+  top: 50%;
+  left: 50%;
+  width: min(360px, calc(100vw - 32px));
+  padding: 18px;
+  transform: translate(-50%, -50%);
+  background: var(--panel);
+  border: 1px solid #3a4652;
+  border-top: 3px solid var(--measure);
+  border-radius: 6px;
+  box-shadow: 0 18px 50px #000a;
+}
+
+.tool-modal h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.tool-modal a {
+  font-size: 10px;
+  color: #9fb2c0;
+}
+
+.tool-modal .measure-fields {
+  flex-direction: column;
+  gap: 9px;
+  margin: 14px 0 0;
+}
+
+.tool-modal .measure-fields label {
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.tool-modal .measure-fields input {
+  width: 90px;
+  padding: 5px 7px;
+}
+
+.tool-modal-actions {
+  margin-top: 16px;
+}
+
+.tool-modal-actions button {
+  width: auto;
+  flex: 1;
+  justify-content: center;
+}
+
+/* ---- Closing a line, on the map under the drawing (§11.39) ---- */
+
+.map-apply {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 6px 6px 14px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #c1cbd0;
+  background: #14212cf0;
+  border: 1px solid #53637080;
+  border-left: 3px solid var(--measure);
+  border-radius: 5px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px #0003;
+}
+
+.map-apply button {
+  padding: 7px 16px;
+  font: inherit;
+  font-weight: 650;
+  color: #231b16;
+  background: var(--orange);
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.map-apply button:disabled {
+  cursor: not-allowed;
+  filter: saturate(0.35) brightness(0.8);
+}

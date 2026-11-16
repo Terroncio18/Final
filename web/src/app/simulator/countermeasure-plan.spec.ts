@@ -3,7 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { COUNTERMEASURE_CATALOG } from '../simulation/countermeasures';
 import { domainAround } from '../simulation/domain';
 import type { Point } from '../simulation/point';
-import { CountermeasurePlan, lengthM, MAX_VERTICES, WIDTH_LIMITS } from './countermeasure-plan';
+import {
+  checkSettings,
+  CountermeasurePlan,
+  defaultSettings,
+  lengthM,
+  MAX_VERTICES,
+  WIDTH_LIMITS,
+} from './countermeasure-plan';
 
 const centre: Point = [2.71009, 39.76552];
 const bounds = domainAround(centre);
@@ -79,8 +86,10 @@ describe('the countermeasure plan', () => {
     plan.begin(point.kind);
     plan.click(a, bounds);
     plan.minute.set(100);
+    plan.begin(point.kind);
     plan.click(b, bounds);
     plan.minute.set(200);
+    plan.begin(point.kind);
     plan.click(c, bounds);
     const [first, second] = plan.measures();
 
@@ -110,6 +119,38 @@ describe('the countermeasure plan', () => {
     expect(plan.note()?.text).toMatch(/S’han eliminat 2 mesures posteriors/);
     expect(plan.discarding()).toBe(false);
     expect(plan.later()).toEqual([]);
+  });
+
+  it('puts down a measure with the values chosen for the tool, and checks them first', () => {
+    const plan = new CountermeasurePlan();
+    const chosen = { ...defaultSettings('helicopter'), widthM: 120, litresPerPass: 900, passes: 3 };
+    expect(checkSettings('helicopter', chosen)).toBeNull();
+    expect(checkSettings('helicopter', { ...chosen, litresPerPass: 5000 })).toMatch(/Descàrrega/);
+    expect(checkSettings('firebreak', { widthM: 10 })).toMatch(/amplada/);
+    plan.begin('helicopter', false, chosen);
+    expect(plan.tool()?.widthM).toBe(120);
+    plan.click(a, bounds);
+    expect(plan.measures()[0]).toMatchObject({ widthM: 120, litresPerPass: 900, passes: 3 });
+    // Without values chosen, the catalogue's.
+    plan.begin('clearing');
+    plan.click(a, bounds);
+    plan.click(b, bounds);
+    plan.finish();
+    expect(plan.measures()[1]).toMatchObject(defaultSettings('clearing'));
+  });
+
+  it('takes vertices back one at a time, and gives the line up with none left', () => {
+    const plan = new CountermeasurePlan();
+    plan.begin(line.kind);
+    plan.click(a, bounds);
+    plan.click(b, bounds);
+    plan.undo();
+    expect(plan.draft()).toEqual([a]);
+    expect(plan.kind()).toBe(line.kind);
+    plan.undo();
+    expect(plan.draft()).toEqual([]);
+    expect(plan.kind()).toBeNull();
+    expect(plan.measures()).toEqual([]);
   });
 
   it('protects past deployments and only clears current or future ones', () => {
@@ -163,9 +204,9 @@ describe('the countermeasure plan', () => {
       strength: line.strength,
       durationMin: line.durationMin,
     });
-    // The line is closed and the tool stays in the hand for the next one.
+    // The line is closed and the tool put away: one measure per tool taken.
     expect(plan.draft()).toEqual([]);
-    expect(plan.kind()).toBe(line.kind);
+    expect(plan.kind()).toBeNull();
     expect(plan.note()?.failed).toBe(false);
   });
 
@@ -208,9 +249,12 @@ describe('the countermeasure plan', () => {
     const plan = new CountermeasurePlan();
     plan.begin(point.kind);
     plan.click(a, bounds);
-    plan.click(b, bounds);
-    expect(plan.measures().map((measure) => measure.points)).toEqual([[a], [b]]);
+    expect(plan.measures().map((measure) => measure.points)).toEqual([[a]]);
     expect(plan.draft()).toEqual([]);
+    // Placed, and the tool is put away: a second click places nothing.
+    expect(plan.kind()).toBeNull();
+    plan.click(b, bounds);
+    expect(plan.measures()).toHaveLength(1);
   });
 
   it('refuses a click outside the domain aloud and does not move the draft', () => {
@@ -300,6 +344,7 @@ describe('the countermeasure plan', () => {
 
   it('removes one, or all, and drops a selection that no longer exists', () => {
     const plan = drawn();
+    plan.begin(line.kind);
     plan.click(b, bounds);
     plan.click(c, bounds);
     plan.finish();
@@ -314,6 +359,7 @@ describe('the countermeasure plan', () => {
 
   it('names the rows by kind and order', () => {
     const plan = drawn();
+    plan.begin(line.kind);
     plan.click(b, bounds);
     plan.click(c, bounds);
     plan.finish();

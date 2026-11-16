@@ -19,7 +19,10 @@ import { SpottingDisplay, spotPoint } from '../map/spotting-display';
 import { MapService } from '../map/map.service';
 import { PlacesService } from '../map/places.service';
 import {
+  AIRCRAFT,
   COUNTERMEASURE_CATALOG,
+  liquidCapacity,
+  liquidKind,
   type CountermeasureKind,
   type Countermeasure,
 } from '../simulation/countermeasures';
@@ -63,9 +66,11 @@ import { TerrainService } from '../simulation/terrain.service';
 import { FuelService } from '../simulation/fuel.service';
 import {
   catalogEntry,
+  checkSettings,
   CountermeasurePlan,
-  DURATION_LIMITS,
+  defaultSettings,
   WIDTH_LIMITS,
+  type ToolSettings,
 } from './countermeasure-plan';
 import { Icon, iconOr } from './icon';
 import { WeatherService } from './weather.service';
@@ -270,7 +275,6 @@ export class SimulatorView {
    */
   protected readonly plan = new CountermeasurePlan();
   protected readonly widthLimits = WIDTH_LIMITS;
-  protected readonly durationLimits = DURATION_LIMITS;
   private readonly measureDisplay = new CountermeasureDisplay();
   private readonly spottingDisplay = new SpottingDisplay();
   protected readonly spottingEnabled = signal(SCENARIO_DEFAULTS.spotting.enabled);
@@ -1332,6 +1336,22 @@ export class SimulatorView {
       if (map && centre) this.spottingDisplay.set(map, centre, this.visibleSpots());
     });
 
+    // The right button, with a countermeasure in the hand (§11.39): a
+    // discharge is given up; a line loses its last vertex, and is given up
+    // once it has none.
+    let rightClicks = untracked(this.maps.rightClicks);
+    effect(() => {
+      const clicks = this.maps.rightClicks();
+      untracked(() => {
+        if (clicks === rightClicks) return;
+        rightClicks = clicks;
+        const tool = this.plan.tool();
+        if (!tool || this.computing()) return;
+        if (tool.geometry === 'point') this.cancelTool();
+        else this.plan.undo();
+      });
+    });
+
     // The line in progress, with the segment that follows the pointer.
     effect(() => {
       if (!this.maps.ready()) return;
@@ -1820,26 +1840,116 @@ export class SimulatorView {
    */
   protected readonly pastWarning = signal<{ kind: CountermeasureKind; count: number } | null>(null);
 
+  /**
+   * The tool being set up in the modal, before it is used (§11.39): its
+   * values as typed, and why they were refused if they were.
+   */
+  protected readonly configuring = signal<{
+    kind: CountermeasureKind;
+    discard: boolean;
+    settings: ToolSettings;
+    error: string | null;
+  } | null>(null);
+  /** The values each tool was last applied with, for the next time it is taken. */
+  private readonly lastSettings = new Map<CountermeasureKind, ToolSettings>();
+
+  /** What the modal shows for the tool being set up. */
+  protected readonly configView = computed(() => {
+    const config = this.configuring();
+    if (!config) return null;
+    const entry = catalogEntry(config.kind);
+    const aircraft =
+      config.kind in AIRCRAFT ? AIRCRAFT[config.kind as keyof typeof AIRCRAFT] : null;
+    return {
+      ...config,
+      label: entry.label,
+      colour: entry.color,
+      widthLabel: entry.geometry === 'point' ? 'Diàmetre' : 'Amplada',
+      liquid: liquidKind(config.kind),
+      removal: config.kind === 'clearing',
+      capacity: liquidCapacity(config.kind),
+      aircraft,
+    };
+  });
+
   protected pickMeasure(kind: CountermeasureKind): void {
     if (this.computing()) return;
     this.windDraft.set(null);
     this.playing.set(false);
     this.plan.minute.set(this.result() ? this.minutes() : 0);
+    // The same tool again puts it down.
+    if (this.plan.kind() === kind || this.configuring()?.kind === kind) {
+      this.cancelTool();
+      return;
+    }
     // Only with a fire computed: before it, the plan is a plan, not a past.
     const later = this.result() ? this.plan.later().length : 0;
-    if (later && this.plan.kind() !== kind) {
+    if (later) {
+      this.plan.cancel();
+      this.configuring.set(null);
       this.pastWarning.set({ kind, count: later });
       return;
     }
     this.pastWarning.set(null);
-    this.plan.begin(kind, this.plan.discarding());
+    this.openSettings(kind, false);
   }
 
   protected confirmPastMeasure(): void {
     const warning = this.pastWarning();
     if (!warning) return;
     this.pastWarning.set(null);
-    this.plan.begin(warning.kind, true);
+    this.openSettings(warning.kind, true);
+  }
+
+  /** Opens the modal with the values the tool was last used with. */
+  private openSettings(kind: CountermeasureKind, discard: boolean): void {
+    this.plan.cancel();
+    this.configuring.set({
+      kind,
+      discard,
+      settings: this.lastSettings.get(kind) ?? defaultSettings(kind),
+      error: null,
+    });
+  }
+
+  /** A field of the modal. A percentage is kept as the fraction it stands for. */
+  protected setSetting(field: keyof ToolSettings, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const typed = input.value.trim() === '' ? NaN : Number(input.value.replace(',', '.'));
+    const value = field === 'fuelRemaining' ? typed / 100 : typed;
+    this.configuring.update((config) =>
+      config ? { ...config, settings: { ...config.settings, [field]: value }, error: null } : null,
+    );
+  }
+
+  /** What a field shows: nothing for an empty one, the percentage for a fraction. */
+  protected shown(value: number | undefined, percent = false): number | '' {
+    if (value === undefined || Number.isNaN(value)) return '';
+    return percent ? Math.round(value * 100) : value;
+  }
+
+  protected resetSettings(): void {
+    this.configuring.update((config) =>
+      config ? { ...config, settings: defaultSettings(config.kind), error: null } : null,
+    );
+  }
+
+  protected cancelSettings(): void {
+    this.configuring.set(null);
+  }
+
+  /** Checks the values and, if the model takes them, puts the tool in the hand. */
+  protected applySettings(): void {
+    const config = this.configuring();
+    if (!config) return;
+    const error = checkSettings(config.kind, config.settings);
+    if (error) {
+      this.configuring.set({ ...config, error });
+      return;
+    }
+    this.lastSettings.set(config.kind, config.settings);
+    this.configuring.set(null);
+    this.plan.begin(config.kind, config.discard, config.settings);
   }
 
   protected cancelPastMeasure(): void {
@@ -1850,15 +1960,12 @@ export class SimulatorView {
     this.editPlan(() => this.plan.finish());
   }
 
-  protected undoMeasurePoint(): void {
-    this.plan.undo();
-  }
-
   /** Escape, or the button: the tool in the hand is put down, whichever it is. */
   protected cancelTool(): void {
     this.plan.cancel();
     this.tool.set(null);
     this.pastWarning.set(null);
+    this.configuring.set(null);
   }
 
   protected removeMeasure(id: string): void {
@@ -1867,49 +1974,6 @@ export class SimulatorView {
 
   protected clearMeasures(): void {
     this.editPlan(() => this.plan.clear());
-  }
-
-  /**
-   * A width or a duration typed into the list.
-   *
-   * On `change` and not on every keystroke: «120» goes through «1» and «12»,
-   * and each of those would be a refused value and a result thrown away. A
-   * value the plan refuses is put back as it was, with the reason beside it.
-   */
-  protected setMeasureNumber(
-    id: string,
-    which:
-      | 'width'
-      | 'duration'
-      | 'strength'
-      | 'litresPerPass'
-      | 'passes'
-      | 'passIntervalMin'
-      | 'remaining',
-    event: Event,
-  ): void {
-    const input = event.target as HTMLInputElement;
-    const value = input.value.trim() === '' ? NaN : Number(input.value.replace(',', '.'));
-    this.editPlan(() => {
-      if (which === 'width') this.plan.setWidth(id, value);
-      else if (which === 'duration') this.plan.setDuration(id, value);
-      else if (which === 'strength') this.plan.setStrength(id, value);
-      else if (which === 'remaining') this.plan.setRemaining(id, value);
-      else this.plan.setLiquid(id, which, value);
-    });
-    const row = this.plan.rows().find((item) => item.id === id);
-    if (row)
-      input.value = String(
-        which === 'width'
-          ? row.widthM
-          : which === 'duration'
-            ? row.durationMin
-            : which === 'strength'
-              ? row.strengthPercent
-              : which === 'remaining'
-                ? row.remainingPercent
-                : row[which],
-      );
   }
 
   protected setSpottingSeed(event: Event): void {

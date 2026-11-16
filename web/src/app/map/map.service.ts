@@ -225,6 +225,13 @@ export class MapService {
    */
   readonly pointer = signal<[number, number] | null>(null);
 
+  /**
+   * Counts the right clicks on the canvas while picking: a tool's «undo» or
+   * «cancel» (§11.39). A right-button drag turns the relief instead, and does
+   * not count.
+   */
+  readonly rightClicks = signal(0);
+
   /** Whether the style has loaded once, which is when the layers start existing. */
   private styled = false;
 
@@ -312,6 +319,26 @@ export class MapService {
       }
       const feature = this.featureAt(event);
       this.select(feature ? toHotspot(feature) : null);
+    });
+
+    // The right button both turns the relief and, while picking, undoes. A
+    // press and release in the same place is a click; anything that moved
+    // was a turn. Judged on release, which every platform fires, and not on
+    // `contextmenu`, which some fire on the press, before any movement.
+    let rightDown: { x: number; y: number } | null = null;
+    map.on('mousedown', (event) => {
+      if (event.originalEvent.button === 2) rightDown = event.point;
+    });
+    map.on('mouseup', (event) => {
+      if (event.originalEvent.button !== 2 || !rightDown) return;
+      const moved = Math.hypot(event.point.x - rightDown.x, event.point.y - rightDown.y);
+      rightDown = null;
+      if (this.picking && moved <= 4) this.rightClicks.update((count) => count + 1);
+    });
+    // While picking, the right button belongs to the tool, not to the
+    // browser's own menu.
+    map.getCanvasContainer().addEventListener('contextmenu', (event) => {
+      if (this.picking) event.preventDefault();
     });
 
     // Without this the marks read as decoration. Only written when it changes:

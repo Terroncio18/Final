@@ -272,6 +272,15 @@ export class CountermeasureDisplay {
         : null;
       if (disc) features.push(disc);
     } else {
+      // Before the first vertex, the brush: a disc as wide as the strip, under
+      // the pointer, so the tool shows the ground it will take (§11.39).
+      if (draft.pointer && !draft.points.length) {
+        const brush = shape([draft.pointer], draft.widthM, true, {
+          part: 'disc',
+          colour: draft.colour,
+        });
+        if (brush) features.push(brush);
+      }
       const path =
         draft.pointer && draft.points.length ? [...draft.points, draft.pointer] : draft.points;
       const band = shape(path, draft.widthM, false, { part: 'band', colour: draft.colour });

@@ -2188,6 +2188,57 @@ deixar l'eina tampoc, i acceptar i afegir n'esborra exactament les
 posteriors—, les 81 proves de simulació i les 29 d'Angular, i la compilació
 sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
 
+### 11.39. Una contramesura es configura en un modal i es posa amb el ratolí
+
+Decidit el 16/11/2026, a petició de Pere. Cada mesura de la llista portava els
+seus camps —amplada, litres, passades, interval, combustible restant,
+reducció, durada—, i amb unes quantes mesures la columna esquerra era sobretot
+caselles. **Els valors es trien una sola vegada, en prendre l'eina, i la llista
+només els mostra.**
+
+- **Prendre una eina obre un modal** amb els camps d'aquella mesura: amplada o
+  diàmetre, i per a les descàrregues litres per passada, passades i interval
+  —amb l'aparell de referència i la seva capacitat—, o el combustible restant
+  per a la tala. Tres botons: **Restablir** (els valors del catàleg),
+  **Cancel·lar** i **Aplicar**. Aplicar passa els valors per la mateixa
+  validació del model (`checkSettings`, sobre `parseCountermeasures`) i, si no
+  els accepta, el modal diu per què i no es tanca.
+- **El modal recorda els darrers valors de cada eina** durant la sessió, de
+  manera que tres descàrregues iguals no demanen tres vegades el mateix.
+- **Amb l'eina a la mà, el ratolí porta l'àrea**: el disc de la descàrrega amb
+  el seu diàmetre, o per a una línia un disc de la seva amplada fins al primer
+  vèrtex i després la franja fins al punter.
+- **Descàrregues**: clic esquerre l'aplica on és el punter; clic dret la
+  cancel·la.
+- **Línies**: clic esquerre afegeix un vèrtex; clic dret treu l'últim, i quan
+  no en queda cap la mesura es cancel·la. Es tanquen amb **Aplicar**, un botó
+  al centre de la part de baix del mapa, que diu quants vèrtexs hi ha i només
+  s'activa amb dos.
+- **Una mesura per eina presa.** Aplicada la mesura, l'eina es deixa. Abans es
+  quedava a la mà per a la següent; amb un modal pel mig, cada mesura passa per
+  ell.
+- **El clic dret i el gir del relleu** fan servir el mateix botó (§11.3). Un
+  clic és prémer i deixar anar al mateix lloc —menys de 4 píxels—, i qualsevol
+  cosa que s'hagi mogut era un gir. Es jutja en deixar anar el botó i no amb
+  `contextmenu`, que alguns sistemes disparen en prémer, abans de cap
+  moviment. Mentre hi ha una eina a la mà, el menú del navegador no surt.
+- **L'avís de la §11.38 va abans del modal**: primer es diu què es perdrà, i
+  després es configura.
+
+El que es perd: **una mesura ja posada no es pot editar.** Per canviar-la, se
+suprimeix —si encara no ha actuat— i se'n posa una altra. Els mètodes del pla
+que editaven una mesura (`setWidth`, `setLiquid`…) es queden, amb les seves
+proves, però la pantalla ja no els fa servir. Les mesures d'escenaris antics
+amb reducció i durada es mostren igual i tampoc no s'editen.
+
+Comprovat: dues proves noves del pla —els valors triats arriben a la mesura i
+es validen abans, i el clic dret treu vèrtexs fins a cancel·lar— i les que
+suposaven que l'eina es quedava a la mà, adaptades; les 81 proves de simulació
+i les 31 d'Angular, i la compilació sense avisos. **Al navegador no s'ha
+mirat**: ho prova Pere. En particular, que MapLibre faci arribar el `mousedown`
+i el `mouseup` del botó dret amb el gir del relleu activat no s'ha pogut
+comprovar sense navegador.
+
 ---
 
 ## 12. Decisions pendents
