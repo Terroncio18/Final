@@ -554,23 +554,12 @@
           <div class="measure-drawing" [style.--measure]="active.color">
             <p class="tool-hint">
               <strong>{{ active.label }}.</strong>
-              @if (plan.loading()) {
-                Clic esquerre: {{ loadHint() }} · clic dret: tornar.
-              } @else if (active.geometry === 'point') {
+              @if (active.geometry === 'point') {
                 Clic esquerre: aplicar · clic dret: cancel·lar.
               } @else {
                 Clic esquerre: vèrtex · clic dret: treure l’últim.
               }
             </p>
-            @if (loadOptions().length) {
-              <div class="load-options">
-                @for (option of loadOptions(); track option.point) {
-                  <button type="button" (click)="chooseLoad(option.point)">
-                    {{ option.name }} · {{ option.distance }}
-                  </button>
-                }
-              </div>
-            }
             <div class="tools-row">
               <button type="button" (click)="cancelTool()">Cancel·lar (Esc)</button>
             </div>
@@ -856,17 +845,6 @@
               <input type="checkbox" [checked]="labels()" (change)="labels.set(!labels())" />
               Topònims
             </label>
-            <label>
-              <input
-                type="checkbox"
-                [checked]="resources()"
-                (change)="resources.set(!resources())"
-              />
-              Parcs, punts d'aigua i aeròdroms
-            </label>
-            @if (resources() && suppression.failed().length) {
-              <p class="layer-error">Sense resposta: {{ suppression.failed().join(', ') }}</p>
-            }
             <label>
               <input type="checkbox" [checked]="slopes()" (change)="slopes.set(!slopes())" />
               Pendents
@@ -1311,16 +1289,6 @@
           >{{ aircraft.name }} · capacitat {{ aircraft.capacityL }} L</a
         >
       }
-      @if (config.flight; as flight) {
-        <a [href]="flight.source" target="_blank" rel="noopener noreferrer"
-          >Creuer {{ flight.cruiseKt }} kt{{
-            flight.fixedLoad === null ? '' : ' · càrrega ' + flight.fixedLoadText
-          }}</a
-        >
-        @if (flight.fixedLoad === null) {
-          <small class="crew-source">Temps de càrrega sense font oficial</small>
-        }
-      }
       <div class="measure-fields">
         <label>
           <span>{{ config.widthLabel }} (m)</span>
@@ -1357,33 +1325,17 @@
               (change)="setSetting('passes', $event)"
             />
           </label>
-          @if (config.flight; as flight) {
-            @if (flight.fixedLoad === null) {
-              <label>
-                <span>Temps de càrrega (min)</span>
-                <input
-                  type="number"
-                  min="0"
-                  [max]="flight.maxLoad"
-                  step="any"
-                  [value]="shown(config.settings.loadMin)"
-                  (change)="setSetting('loadMin', $event)"
-                />
-              </label>
-            }
-          } @else {
-            <label>
-              <span>Temps entre passades (min)</span>
-              <input
-                type="number"
-                min="1"
-                max="120"
-                step="1"
-                [value]="shown(config.settings.passIntervalMin)"
-                (change)="setSetting('passIntervalMin', $event)"
-              />
-            </label>
-          }
+          <label>
+            <span>Temps entre passades (min)</span>
+            <input
+              type="number"
+              min="1"
+              max="120"
+              step="1"
+              [value]="shown(config.settings.passIntervalMin)"
+              (change)="setSetting('passIntervalMin', $event)"
+            />
+          </label>
         }
         @if (config.removal) {
           <label>

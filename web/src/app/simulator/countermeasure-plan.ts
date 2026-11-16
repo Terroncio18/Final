@@ -11,10 +11,6 @@ import {
   parseCountermeasures,
   CREW_DEFAULTS,
   crewHead,
-  aircraftKind,
-  dropPoint,
-  passInterval,
-  type AircraftKind,
   crewKind,
   type Countermeasure,
   type CountermeasureKind,
@@ -57,8 +53,6 @@ export interface ToolSettings {
   readonly passes?: number;
   readonly passIntervalMin?: number;
   readonly fuelRemaining?: number;
-  /** Minutes an aircraft takes to load (§11.44); the helicopter's has no default. */
-  readonly loadMin?: number;
   /** The crew of a ground measure (12.19): arrival, people and production each. */
   readonly arrivalMin?: number;
   readonly crewSize?: number;
@@ -73,13 +67,8 @@ export function defaultSettings(kind: CountermeasureKind): ToolSettings {
       ? {
           litresPerPass: kind === 'water-line' ? 1000 : liquidCapacity(kind),
           passes: 1,
-          // An aircraft's interval comes from its load point (§11.44); this one
-          // is only used where no load point can be chosen (no picker).
           passIntervalMin: 10,
         }
-      : {}),
-    ...(aircraftKind(kind) && AIRCRAFT[kind].loadMin !== null
-      ? { loadMin: AIRCRAFT[kind].loadMin }
       : {}),
     ...(kind === 'clearing' ? { fuelRemaining: 0.2 } : {}),
     ...(crewKind(kind)
@@ -115,9 +104,7 @@ function measureFrom(
   id: string,
   points: readonly Point[],
   minute: number,
-  loadPoint?: Point,
 ): Countermeasure {
-  const loading = loadPoint !== undefined && aircraftKind(kind);
   const physical = liquidKind(kind) || kind === 'clearing';
   const entry = catalogEntry(kind);
   return {
@@ -131,13 +118,8 @@ function measureFrom(
       ? {
           litresPerPass: settings.litresPerPass,
           passes: settings.passes,
-          passIntervalMin: loading
-            ? passInterval(kind, dropPoint({ points }), loadPoint, settings.loadMin ?? NaN)
-            : settings.passIntervalMin,
+          passIntervalMin: settings.passIntervalMin,
         }
-      : {}),
-    ...(loading
-      ? { loadPoint: [loadPoint[0], loadPoint[1]] as Point, loadMin: settings.loadMin }
       : {}),
     ...(kind === 'clearing' ? { fuelRemaining: settings.fuelRemaining } : {}),
     ...(crewKind(kind) && settings.crewSize !== undefined
@@ -163,13 +145,7 @@ export function checkSettings(kind: CountermeasureKind, settings: ToolSettings):
           [0, 0],
           [0.01, 0],
         ];
-  if (aircraftKind(kind) && !Number.isFinite(settings.loadMin ?? NaN))
-    return 'Escriu el temps de càrrega.';
-  // An aircraft is checked as if it loaded where it drops; the real load
-  // point comes after, and moves only the interval.
-  const checked = parseCountermeasures([
-    measureFrom(kind, settings, 'probe', points, 0, aircraftKind(kind) ? points[0] : undefined),
-  ]);
+  const checked = parseCountermeasures([measureFrom(kind, settings, 'probe', points, 0)]);
   return typeof checked === 'string' ? checked : null;
 }
 
@@ -212,17 +188,6 @@ export class CountermeasurePlan {
   readonly kind = signal<CountermeasureKind | null>(null);
   /** The vertices clicked so far of a line not yet finished. */
   readonly draft = signal<readonly Point[]>([]);
-  /**
-   * The drop of an aircraft already placed, waiting for where it loads
-   * (§11.44). Null when no load point is being chosen.
-   */
-  readonly loading = signal<readonly Point[] | null>(null);
-  /**
-   * Whoever knows the map says where an aircraft may load: the point it
-   * snaps to (a water point, an aerodrome) or why not there. Without one —in
-   * tests— a discharge is added as before, with its typed interval.
-   */
-  loadPicker: ((kind: AircraftKind, point: Point) => Point | string) | null = null;
   readonly selected = signal<string | null>(null);
   readonly note = signal<PlanNote | null>(null);
   readonly minute = signal(0);
@@ -273,7 +238,7 @@ export class CountermeasurePlan {
   readonly finishedRows = computed(() => this.rows().filter((row) => row.finished));
 
   /** A line needs two points to be one. */
-  readonly canFinish = computed(() => this.draft().length >= 2 && !this.loading());
+  readonly canFinish = computed(() => this.draft().length >= 2);
 
   /** Each measure in the words the list uses. */
   readonly rows = computed(() => {
@@ -366,7 +331,7 @@ export class CountermeasurePlan {
             } · arribada ${whole.format(measure.arrivalMin!)} min`
           : '',
         effect: liquid
-          ? `${whole.format(measure.litresPerPass!)} L × ${measure.passes} · cada ${one.format(measure.passIntervalMin!)} min`
+          ? `${whole.format(measure.litresPerPass!)} L × ${measure.passes} · cada ${measure.passIntervalMin} min`
           : removal
             ? `${Math.round(measure.fuelRemaining! * 100)} % de combustible restant`
             : backfire
@@ -394,7 +359,6 @@ export class CountermeasurePlan {
   begin(kind: CountermeasureKind, discard = false, settings?: ToolSettings): void {
     const same = this.kind() === kind && !settings;
     this.draft.set([]);
-    this.loading.set(null);
     this.kind.set(same ? null : kind);
     this.settings.set(same ? null : (settings ?? null));
     this.discarding.set(!same && discard);
@@ -404,7 +368,6 @@ export class CountermeasurePlan {
   /** Escape: the line being drawn is thrown away and the tool put down. */
   cancel(): void {
     this.draft.set([]);
-    this.loading.set(null);
     this.kind.set(null);
     this.settings.set(null);
     this.discarding.set(false);
@@ -425,23 +388,8 @@ export class CountermeasurePlan {
       return;
     }
     const here: Point = [point[0], point[1]];
-    const drop = this.loading();
-    if (drop && aircraftKind(tool.kind)) {
-      const load = this.loadPicker?.(tool.kind, here) ?? here;
-      if (typeof load === 'string') {
-        this.note.set({ text: load, failed: true });
-        return;
-      }
-      this.chooseLoad(load);
-      return;
-    }
     // One measure per tool taken: once it is down, the tool is put away.
     if (tool.geometry === 'point') {
-      if (aircraftKind(tool.kind) && this.loadPicker) {
-        this.loading.set([here]);
-        this.note.set(null);
-        return;
-      }
       if (this.add(tool.kind, [here])) this.cancel();
       return;
     }
@@ -460,27 +408,10 @@ export class CountermeasurePlan {
   }
 
   /**
-   * Where the aircraft whose drop is waiting loads, already checked: a click
-   * the picker accepted, or one of the official places outside the domain,
-   * which the map cannot show (§11.45).
-   */
-  chooseLoad(load: Point): void {
-    const kind = this.kind(),
-      drop = this.loading();
-    if (!kind || !drop || !aircraftKind(kind)) return;
-    if (this.add(kind, drop, [load[0], load[1]])) this.cancel();
-  }
-
-  /**
    * Takes the last vertex back; with none left, the measure is given up and
    * the tool put down. It is what the right button does (§11.39).
    */
   undo(): void {
-    // Choosing where it loads: back to placing the drop, the line kept.
-    if (this.loading()) {
-      this.loading.set(null);
-      return;
-    }
     if (this.draft().length <= 1) {
       this.cancel();
       return;
@@ -494,11 +425,6 @@ export class CountermeasurePlan {
     if (!kind) return;
     if (!this.canFinish()) {
       this.note.set({ text: 'Una línia necessita almenys dos punts.', failed: true });
-      return;
-    }
-    if (aircraftKind(kind) && this.loadPicker) {
-      this.loading.set(this.draft());
-      this.note.set(null);
       return;
     }
     if (this.add(kind, this.draft())) this.cancel();
@@ -610,7 +536,7 @@ export class CountermeasurePlan {
     });
   }
 
-  private add(kind: CountermeasureKind, points: readonly Point[], loadPoint?: Point): boolean {
+  private add(kind: CountermeasureKind, points: readonly Point[]): boolean {
     const entry = catalogEntry(kind);
     const measure = measureFrom(
       kind,
@@ -618,14 +544,7 @@ export class CountermeasurePlan {
       `m${this.nextId++}`,
       points,
       this.minute(),
-      loadPoint,
     );
-    // The derived interval may fall outside what the model takes: say why.
-    const checked = parseCountermeasures([measure]);
-    if (typeof checked === 'string') {
-      this.note.set({ text: checked, failed: true });
-      return false;
-    }
     const refused = this.guard?.(measure);
     if (refused) {
       this.note.set({ text: refused, failed: true });

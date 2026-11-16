@@ -18,7 +18,6 @@ import { CountermeasureDisplay } from '../map/countermeasure-display';
 import { SpottingDisplay, spotPoint } from '../map/spotting-display';
 import { MapService } from '../map/map.service';
 import { PlacesService } from '../map/places.service';
-import { ResourcesService } from '../map/resources.service';
 import {
   AIRCRAFT,
   COUNTERMEASURE_CATALOG,
@@ -26,11 +25,6 @@ import {
   liquidCapacity,
   liquidKind,
   MOP_UP_MAX_FLAME_M,
-  MAX_LOAD_MIN,
-  distanceM,
-  dropPoint,
-  aircraftKind,
-  type AircraftKind,
   CREW_DEFAULTS,
   CREW_LIMITS,
   crewKind,
@@ -40,7 +34,6 @@ import {
 } from '../simulation/countermeasures';
 import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from '../simulation/domain';
 import { agentsAt } from '../simulation/agents';
-import { inLake, inside, waterFor } from '../simulation/resources';
 import { FireSurface } from '../simulation/fire-surface';
 import { FORECASTS, FORECAST_COLOURS, forecastOffsets } from '../simulation/fire-display';
 import { frontEmitters, frontIntensity } from '../simulation/fire-emitters';
@@ -268,12 +261,6 @@ const CREW_CITATIONS: Partial<Record<CrewKind, { cite: string; url: string }>> =
   },
 };
 
-/** A load time as the sheet gives it: seconds under a minute. */
-function loadText(minutes: number | null): string {
-  if (minutes === null) return '';
-  return minutes < 1 ? `${Math.round(minutes * 60)} s` : `${minutes} min`;
-}
-
 function crewView(kind: CrewKind) {
   const defaults = CREW_DEFAULTS[kind];
   const citation = defaults.placeholder ? undefined : CREW_CITATIONS[kind];
@@ -301,7 +288,6 @@ export class SimulatorView {
   private readonly municipalities = inject(MunicipalitiesService);
   private readonly provinces = inject(ProvincesService);
   private readonly places = inject(PlacesService);
-  protected readonly suppression = inject(ResourcesService);
   private readonly terrain = inject(TerrainService);
   protected readonly fuels = inject(FuelService);
   protected readonly runError = signal<string | null>(null);
@@ -512,8 +498,6 @@ export class SimulatorView {
   protected readonly relief = signal(true);
   protected readonly contours = signal(true);
   protected readonly labels = signal(true);
-  /** Stations, water points and aerodromes (12.23). */
-  protected readonly resources = signal(true);
 
   /**
    * Off by default: it covers the photograph, and the photograph is how the
@@ -1237,93 +1221,8 @@ export class SimulatorView {
     return null;
   }
 
-  /** What the next click chooses while an aircraft's drop waits for its load point. */
-  protected readonly loadHint = computed(() => {
-    const kind = this.plan.kind();
-    if (!kind || !aircraftKind(kind)) return '';
-    if (AIRCRAFT[kind].loadsAt === 'aerodrome') return 'aeròdrom on carrega';
-    return kind === 'amphibious'
-      ? 'on carrega aigua (mar, embassament o llac)'
-      : "on carrega aigua (mar, llac o punt d'aigua)";
-  });
-
-  /**
-   * Where an aircraft may load (§11.44), from official data only: an
-   * aerodrome on the map for retardant; for water, a water point on the map,
-   * the sea (ground at or below sea level, as the model reads it, §11.19) or
-   * an official lake. A click near a mark takes the mark.
-   */
-  private pickLoad(kind: AircraftKind, point: Point): Point | string {
-    const reach = 14 * (this.maps.metresPerPixel() ?? CELL_M);
-    const marks = this.suppression.resources();
-    const near = (keep: (r: (typeof marks)[number]) => boolean) => {
-      let best: Point | null = null,
-        bestM = reach;
-      for (const r of marks)
-        if (keep(r)) {
-          const m = distanceM(point, r.point);
-          if (m <= bestM) ((best = r.point), (bestM = m));
-        }
-      return best;
-    };
-    if (AIRCRAFT[kind].loadsAt === 'aerodrome')
-      return near((r) => r.kind === 'aerodrome') ?? 'Tria un aeròdrom del mapa.';
-    const scooper = kind === 'amphibious';
-    const mark = near((r) => waterFor(kind === 'amphibious' ? 'amphibious' : 'helicopter', r));
-    if (mark) return mark;
-    const centre = this.ignition(),
-      terrain = this.terrain.terrain();
-    const cell = centre ? cellOf(centre, point) : null;
-    if (terrain && cell !== null && terrain.elevation[cell] <= 0) return point;
-    if (inLake(point, this.suppression.lakes())) return point;
-    return scooper
-      ? 'Aquí no hi ha aigua oficial on pugui carregar: el mar, un embassament o un llac.'
-      : "Aquí no hi ha aigua oficial on pugui carregar: el mar, un llac o un punt d'aigua.";
-  }
-
-  /**
-   * The official loading places outside the domain, nearest first (§11.45):
-   * the map stops at the square, so these are chosen from a list.
-   */
-  protected readonly loadOptions = computed(() => {
-    const kind = this.plan.kind(),
-      drop = this.plan.loading(),
-      centre = this.ignition();
-    if (!kind || !drop || !centre || !aircraftKind(kind)) return [];
-    const bounds = domainAround(centre);
-    const from = dropPoint({ points: drop });
-    const km = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
-    return this.suppression
-      .resources()
-      .filter(
-        (r) =>
-          !inside(r.point, bounds) &&
-          (AIRCRAFT[kind].loadsAt === 'aerodrome'
-            ? r.kind === 'aerodrome'
-            : waterFor(kind === 'amphibious' ? 'amphibious' : 'helicopter', r)),
-      )
-      .map((r) => ({ point: r.point, name: r.name, metres: distanceM(from, r.point) }))
-      .concat(
-        // Named official lakes outside the square, at a point inside each.
-        AIRCRAFT[kind].loadsAt === 'water'
-          ? this.suppression
-              .lakes()
-              .filter((l) => l.name && !inside(l.point, bounds))
-              .map((l) => ({ point: l.point, name: l.name!, metres: distanceM(from, l.point) }))
-          : [],
-      )
-      .sort((a, b) => a.metres - b.metres)
-      .slice(0, 5)
-      .map((o) => ({ ...o, distance: `${km.format(o.metres / 1000)} km` }));
-  });
-
-  protected chooseLoad(point: Point): void {
-    this.editPlan(() => this.plan.chooseLoad(point));
-  }
-
   constructor() {
     this.plan.guard = (measure) => this.mopUpGuard(measure);
-    this.plan.loadPicker = (kind, point) => this.pickLoad(kind, point);
     // Where each crew stopped for safety, as the model computed it (12.19).
     effect(() => this.plan.crewStops.set(this.result()?.crewStops ?? new Map()));
     // Who is working at the cursor (12.20): only over a computed fire, and
@@ -1332,12 +1231,7 @@ export class SimulatorView {
       const result = this.result();
       this.maps.setAgents(
         result
-          ? agentsAt(
-              this.plan.measures(),
-              this.minutes(),
-              result.crewStops ?? new Map(),
-              this.suppression.resources(),
-            )
+          ? agentsAt(this.plan.measures(), this.minutes(), result.crewStops ?? new Map(), [])
           : [],
       );
     });
@@ -1417,16 +1311,6 @@ export class SimulatorView {
       if (this.labels()) this.places.load(this.province(), domainAround(point));
       else this.places.release();
     });
-
-    // Where suppression comes from (12.23). Loaded whenever there is a
-    // domain, since aircraft load there (§11.44); the layer menu only shows or
-    // hides the marks.
-    effect(() => {
-      const point = this.ignition();
-      if (point) void this.suppression.load(domainAround(point));
-      else this.suppression.release();
-    });
-    effect(() => this.suppression.setVisible(this.resources()));
 
     // The elevation under the square, read here as the form reads it. In a tab
     // of its own there is no read to inherit, and the tiles are the ones the
@@ -2063,15 +1947,6 @@ export class SimulatorView {
       colour: entry.color,
       widthLabel: entry.geometry === 'point' ? 'Diàmetre' : 'Amplada',
       liquid: liquidKind(config.kind),
-      flight: aircraftKind(config.kind)
-        ? {
-            cruiseKt: AIRCRAFT[config.kind].cruiseKt,
-            fixedLoad: AIRCRAFT[config.kind].loadMin,
-            fixedLoadText: loadText(AIRCRAFT[config.kind].loadMin),
-            maxLoad: MAX_LOAD_MIN,
-            source: AIRCRAFT[config.kind].speedSource,
-          }
-        : null,
       removal: config.kind === 'clearing',
       crew: crewKind(config.kind) ? crewView(config.kind) : null,
       capacity: liquidCapacity(config.kind),

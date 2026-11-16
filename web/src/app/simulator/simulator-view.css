@@ -1151,13 +1151,6 @@ input[type='range']::-webkit-slider-thumb {
   accent-color: #f79c65;
 }
 
-.layer-menu .layer-error {
-  max-width: 220px;
-  margin: -6px 0 0 23px;
-  font-size: 11px;
-  color: #e8a07a;
-}
-
 /* Under the time chip and not in the bottom corner. That corner is MapLibre's:
    the credits are a licence condition, they wrap to as many lines as the card
    is narrow, and a legend placed a fixed distance above them ends up on top of
@@ -1626,26 +1619,4 @@ select:focus-visible {
   margin-top: 8px;
   font-size: 11px;
   color: #9fb0bc;
-}
-
-/* The official loading places outside the domain, chosen from a list (§11.45). */
-.load-options {
-  display: grid;
-  gap: 4px;
-  margin: 8px 0 0;
-}
-
-.load-options button {
-  padding: 5px 8px;
-  font-size: 11px;
-  text-align: left;
-  color: #d8e2ea;
-  background: #1c2b35;
-  border: 1px solid #435661;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.load-options button:hover {
-  border-color: var(--measure, #8bdbea);
 }

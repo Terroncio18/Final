@@ -17,7 +17,6 @@ import {
   LABEL_FONT,
   PLACES_ATTRIBUTION,
   REGIONS_URL,
-  RESOURCES_ATTRIBUTION,
 } from './map.config';
 
 /** Layer ids the rest of the app refers to. Later layers are inserted above these. */
@@ -47,9 +46,6 @@ export const LAYERS = {
   domainFill: 'domain-fill',
   domainMask: 'domain-mask',
   domainLine: 'domain-line',
-  lakesFill: 'lakes-fill',
-  lakesLine: 'lakes-line',
-  resources: 'resources',
   agentRoutes: 'agent-routes',
   agents: 'agents',
 } as const;
@@ -59,8 +55,6 @@ export const REGIONS_SOURCE = 'regions';
 export const PROVINCES_SOURCE = 'provinces';
 export const MUNICIPALITIES_SOURCE = 'municipalities';
 export const PLACES_SOURCE = 'places';
-export const RESOURCES_SOURCE = 'resources';
-export const LAKES_SOURCE = 'lakes';
 export const AGENTS_SOURCE = 'agents';
 export const CONTOURS_SOURCE = 'contours';
 export const DOMAIN_SOURCE = 'domain';
@@ -325,12 +319,6 @@ export function buildStyle(): StyleSpecification {
         type: 'geojson',
         data: NO_POINT,
         attribution: PLACES_ATTRIBUTION,
-      },
-      [LAKES_SOURCE]: { type: 'geojson', data: NO_POINT },
-      [RESOURCES_SOURCE]: {
-        type: 'geojson',
-        data: NO_POINT,
-        attribution: RESOURCES_ATTRIBUTION,
       },
       [AGENTS_SOURCE]: { type: 'geojson', data: NO_POINT },
       [CONTOURS_SOURCE]: {
@@ -597,47 +585,6 @@ export function buildStyle(): StyleSpecification {
           'text-halo-color': 'rgba(8, 12, 16, 0.8)',
           'text-halo-width': 1.1,
           'text-opacity': 0.85,
-        },
-      },
-      {
-        // The official lakes and reservoirs of the domain (§11.48): where an
-        // aircraft may load. Draped, so the water lies on the relief; the named
-        // ones also get a water mark (resources).
-        id: LAYERS.lakesFill,
-        type: 'fill',
-        source: LAKES_SOURCE,
-        paint: { 'fill-color': '#5dbad7', 'fill-opacity': 0.35 },
-      },
-      {
-        id: LAYERS.lakesLine,
-        type: 'line',
-        source: LAKES_SOURCE,
-        paint: { 'line-color': '#9ad8ec', 'line-width': 1.2, 'line-opacity': 0.9 },
-      },
-      {
-        // Stations, water points and aerodromes (12.23): green marks that
-        // stand up on the relief like the names (§13.1), told apart by the
-        // glyph. Over the names, because they are what this screen acts on;
-        // the name of each only from close up.
-        id: LAYERS.resources,
-        type: 'symbol',
-        source: RESOURCES_SOURCE,
-        layout: {
-          'icon-image': ['concat', 'resource-', ['get', 'kind']],
-          'icon-allow-overlap': true,
-          'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.8, 13, 1],
-          'text-field': ['step', ['zoom'], '', 13, ['get', 'name']],
-          'text-font': [LABEL_FONT],
-          'text-size': 11,
-          'text-offset': [0, 1.4],
-          'text-anchor': 'top',
-          'text-optional': true,
-          'text-max-width': 9,
-        },
-        paint: {
-          'text-color': '#bfe8c9',
-          'text-halo-color': 'rgba(8, 12, 16, 0.85)',
-          'text-halo-width': 1.1,
         },
       },
       {
