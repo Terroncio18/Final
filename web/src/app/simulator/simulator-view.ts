@@ -21,15 +21,17 @@ import { PlacesService } from '../map/places.service';
 import {
   AIRCRAFT,
   COUNTERMEASURE_CATALOG,
+  countermeasureCells,
   liquidCapacity,
   liquidKind,
+  MOP_UP_MAX_FLAME_M,
   type CountermeasureKind,
   type Countermeasure,
 } from '../simulation/countermeasures';
 import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from '../simulation/domain';
 import { FireSurface } from '../simulation/fire-surface';
 import { FORECASTS, FORECAST_COLOURS, forecastOffsets } from '../simulation/fire-display';
-import { frontEmitters } from '../simulation/fire-emitters';
+import { frontEmitters, frontIntensity } from '../simulation/fire-emitters';
 import { spread, type SpreadResult } from '../simulation/fire-spread';
 import { parseWindChanges, spreadWinds, windAt, type WindChange } from '../simulation/wind';
 import { MunicipalitiesService } from '../simulation/municipalities.service';
@@ -69,6 +71,7 @@ import {
   checkSettings,
   CountermeasurePlan,
   defaultSettings,
+  lastPass,
   WIDTH_LIMITS,
   type ToolSettings,
 } from './countermeasure-plan';
@@ -226,6 +229,12 @@ function chartPaths(values: readonly number[], width = 300, height = 100) {
  * are real; the fuel is not yet, and the screen says so. The layout is the
  * FireCast prototype's, as §11.7 settled.
  */
+/** What each cell gives off as it burns: its fuel, treated at that minute (§11.35). */
+function heatOf(result: SpreadResult): (cell: number, minute: number) => number {
+  return (cell, minute) =>
+    result.fuelTreatments?.at(cell, minute)?.bed.heatPerArea ?? result.heat[cell];
+}
+
 /** Two lists holding the same items, in the same order. */
 function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
   return a.length === b.length && a.every((item, i) => item === b[i]);
@@ -296,15 +305,15 @@ export class SimulatorView {
    */
   private readonly shownMeasures = computed(
     () =>
-      this.plan
-        .measures()
-        .filter(
-          (measure) =>
-            !this.result() ||
-            ((measure.startMin ?? 0) <= this.minutes() &&
-              (!measure.durationMin ||
-                this.minutes() < (measure.startMin ?? 0) + measure.durationMin)),
-        ),
+      this.plan.measures().filter(
+        (measure) =>
+          !this.result() ||
+          ((measure.startMin ?? 0) <= this.minutes() &&
+            (!measure.durationMin ||
+              this.minutes() < (measure.startMin ?? 0) + measure.durationMin) &&
+            // A discharge is taken off the map once its last pass is made (§11.40).
+            !((lastPass(measure) ?? Infinity) < this.minutes())),
+      ),
     { equal: sameItems },
   );
   protected readonly spotRows = computed(() =>
@@ -1153,7 +1162,34 @@ export class SimulatorView {
     return { area: chartPaths(areas), rate: chartPaths(rates, 300, 64) };
   });
 
+  /**
+   * Mop-up is the crews', and a crew has two conditions (§11.40): there has
+   * to be something burned to put out, and the front there has to be within
+   * what hand tools can take.
+   */
+  private mopUpGuard(measure: Countermeasure): string | null {
+    if (measure.kind !== 'mop-up') return null;
+    const result = this.result(),
+      centre = this.ignition();
+    if (!result || !centre) return 'L’extinció de restes necessita un foc calculat.';
+    const minute = measure.startMin ?? 0;
+    const cells = new Set(countermeasureCells(centre, measure));
+    if (![...cells].some((cell) => result.arrival[cell] <= minute))
+      return 'Aquí encara no ha cremat res: no hi ha restes a extingir.';
+    const flame = flameLength(frontIntensity(result.arrival, minute, cells, heatOf(result)));
+    if (flame > MOP_UP_MAX_FLAME_M) {
+      const metres = (value: number) => value.toFixed(1).replace('.', ',');
+      return (
+        `Front massa intens per a les brigades: flames de ${Number.isFinite(flame) ? metres(flame) : 'més de 12'} m, ` +
+        `i el límit és ${metres(MOP_UP_MAX_FLAME_M)} m.`
+      );
+    }
+    return null;
+  }
+
   constructor() {
+    this.plan.guard = (measure) => this.mopUpGuard(measure);
+
     const chrome = inject(Chrome);
     chrome.visible.set(false);
 
@@ -1425,8 +1461,7 @@ export class SimulatorView {
       const bounds = domainAround(centre);
       // What each cell gives off as it burns: its fuel, as treated at that
       // minute if a countermeasure wetted it or took fuel out (§11.35).
-      const heatAt = (cell: number, minute: number) =>
-        result.fuelTreatments?.at(cell, minute)?.bed.heatPerArea ?? result.heat[cell];
+      const heatAt = heatOf(result);
       const reduced = matchMedia('(prefers-reduced-motion: reduce)');
       const scale = () => this.maps.metresPerPixel() ?? undefined;
       painter.paint(untracked(this.minutes), 0, untracked(this.visibleForecasts), scale());

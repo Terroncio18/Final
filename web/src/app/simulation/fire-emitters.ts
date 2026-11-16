@@ -27,6 +27,31 @@ export function flameStrength(lengthM: number): number {
 }
 
 /**
+ * The hottest the front is, at a minute, where it crosses some cells: Byram's
+ * intensity in kW/m, read as the flames are (§11.35), from the speed the front
+ * really crosses each cell at and the heat of the cell it enters. Zero where
+ * the front does not pass, or has stopped.
+ */
+export function frontIntensity(
+  arrival: Float32Array,
+  minute: number,
+  cells: ReadonlySet<number>,
+  heatAt: (cell: number, minute: number) => number,
+): number {
+  let hottest = 0;
+  for (const s of activeFront(arrival, GRID, minute)) {
+    const x = Math.min(GRID - 1, Math.floor((s.x0 + s.x1) / 2));
+    const y = Math.min(GRID - 1, Math.floor((s.y0 + s.y1) / 2));
+    if (!cells.has(s.ahead) && !cells.has(y * GRID + x)) continue;
+    const heat = s.ahead >= 0 ? heatAt(s.ahead, minute) : 0;
+    if (!(heat > 0)) continue;
+    const speed = s.pace > 0 ? CELL_M / s.pace : Infinity;
+    hottest = Math.max(hottest, byramIntensity(heat, speed));
+  }
+  return hottest;
+}
+
+/**
  * Evenly spaced along the flaming part of the continuous front, not clustered
  * at cell centres, each with the strength of its flame.
  *

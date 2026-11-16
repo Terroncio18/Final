@@ -9,7 +9,8 @@ export type CountermeasureKind =
   | 'backfire'
   | 'helicopter'
   | 'amphibious'
-  | 'retardant';
+  | 'retardant'
+  | 'mop-up';
 
 /** A timed intervention; absent startMin means T=0 for legacy scenarios. */
 export interface Countermeasure {
@@ -165,7 +166,27 @@ export const COUNTERMEASURE_CATALOG: readonly MeasureDefinition[] = [
     durationMin: 180,
     color: '#e487a0',
   },
+  {
+    kind: 'mop-up',
+    label: 'Extinció de restes',
+    note: 'Brigades · flames fins a 1,2 m',
+    icon: 'flame',
+    group: 'ground',
+    geometry: 'line',
+    widthM: 60,
+    strength: 0,
+    durationMin: 0,
+    color: '#8fc3dc',
+  },
 ];
+
+/**
+ * The longest flame a crew can put out with hand tools, in metres: the first
+ * band of the fire characteristics chart, 4 ft (Andrews & Rothermel 1982), the
+ * same cut the analysis column reads control difficulty by (§11.25). Where the
+ * front is hotter than this, mop-up cannot be used (§11.40).
+ */
+export const MOP_UP_MAX_FLAME_M = 1.2;
 
 export const MAX_COUNTERMEASURES = 100;
 export const WIDTH_LIMITS = { min: CELL_M, max: 3000 } as const;
@@ -366,6 +387,11 @@ export interface TreatmentWindow {
   readonly factor: number;
 }
 export interface CountermeasureField {
+  /**
+   * Cells whose fire is put out, and from which minute (mop-up, §11.40): no
+   * fire leaves them, nor enters them, after it.
+   */
+  readonly mopUp: ReadonlyMap<number, number>;
   readonly blocked: Uint8Array;
   readonly permanent: Float32Array;
   readonly temporary: ReadonlyMap<number, readonly TreatmentWindow[]>;
@@ -385,11 +411,18 @@ export function compileCountermeasures(
   const wet = new Map<number, TreatmentWindow[]>();
   const ignitions = new Set<number>();
   const timedIgnitions = new Map<number, number>();
+  const mopUp = new Map<number, number>();
   for (const measure of measures) {
     if (physicalMeasure(measure)) continue;
     const from = measure.startMin ?? 0;
     for (const cell of countermeasureCells(centre, measure)) {
-      const barrier = measure.kind === 'firebreak' || measure.kind === 'defense-line';
+      // Mop-up is a barrier from its minute on, like a late firebreak; what
+      // it adds is that the fire already in the cell goes out (fire-spread).
+      if (measure.kind === 'mop-up') mopUp.set(cell, Math.min(mopUp.get(cell) ?? Infinity, from));
+      const barrier =
+        measure.kind === 'firebreak' ||
+        measure.kind === 'defense-line' ||
+        measure.kind === 'mop-up';
       if (barrier && from === 0) blocked[cell] = 1;
       else if (measure.kind === 'clearing' && from === 0)
         permanent[cell] = Math.min(permanent[cell], 1 - measure.strength);
@@ -425,6 +458,7 @@ export function compileCountermeasures(
     wet.set(cell, schedule);
   }
   return {
+    mopUp,
     blocked,
     permanent,
     temporary: wet,

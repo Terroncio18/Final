@@ -35,6 +35,7 @@ escenaris que els porten, però una mesura no pot barrejar les dues coses.
 | Avió amfibi | Humecta el combustible mort fi | Canadair CL-415 · fins a 6.137 L per passada | Disc |
 | Retardant | Humectació equivalent, sense residu químic | Air Tractor AT-802F · fins a 3.104 L per passada | Franja |
 | Contrafoc | Ignicions al minut de desplegament | Amplada | Franja |
+| Extinció de restes | Apaga el foc de les cel·les; barrera des del desplegament | Amplada | Franja |
 
 Els aparells són configuracions de referència amb nom i font citada al codi
 (`AIRCRAFT` a `countermeasures.ts`), no la capacitat de tots els mitjans d'un
@@ -64,6 +65,22 @@ velocitat: permanent per a la tala, fins a la caducitat per a l'aigua, els
 mitjans aeris i el retardant. Reducció de 0 a 95 %, durada d'1 a 720 min. En
 les superposicions preval la reducció més forta: dues del 70 % no fan una del
 91 %. La caducitat és discreta, no una evaporació.
+
+### Extinció de restes
+
+Les brigades apaguen el que queda encès. Des del minut del desplegament, les
+cel·les de la franja no cremen ni deixen passar el foc, com un tallafoc tardà; i
+a més, el foc que ja havia sortit d'una d'aquestes cel·les però encara no havia
+arribat a la següent —perquè l'esperava combustible mullat, per exemple— també
+s'apaga. Un tallafoc posat al mateix lloc i al mateix minut el deixaria passar.
+
+Només es pot posar amb un foc calculat, sobre cel·les que ja hagin cremat, i
+on el front no faci flames de més d'**1,2 m** (`MOP_UP_MAX_FLAME_M`): el
+límit de l'atac directe amb eines manuals, la primera banda del *fire
+characteristics chart* (Andrews i Rothermel 1982). La intensitat es llegeix com
+la de les flames: la velocitat real del front i la calor de la cel·la on entra.
+Si el front és més intens, la mesura es rebutja i la línia es queda a mig
+dibuixar.
 
 ### Barreres i contrafoc
 
@@ -119,7 +136,7 @@ tractament actiu quan arriba el foc a cada cèl·lula.
 
 ## Fitxers i validació
 
-Els escenaris nous són **versió 4**. Al fitxer de text, amb JSON dins de la línia:
+Els escenaris nous són **versió 5** (la 5 afegeix l'extinció de restes). Al fitxer de text, amb JSON dins de la línia:
 
 - `contramesures = [...]`, amb `startMin` per a cada desplegament posterior a
   T=0 i, si és física, `litresPerPass`, `passes` i `passIntervalMin`, o
@@ -127,7 +144,7 @@ Els escenaris nous són **versió 4**. Al fitxer de text, amb JSON dins de la l�
 - `canvis_vent = [...]`, amb `startMin`, `speedKmh` i `fromDeg`;
 - `brases = {"enabled": …, "seed": …}`.
 
-Els fitxers de les versions 1 a 3 continuen obrint-se: cada clau que hi falta
+Els fitxers de les versions 1 a 4 continuen obrint-se: cada clau que hi falta
 pren el valor per defecte de la pantalla, l'avís diu quines, i el botó «Desar
 actualitzat» els torna a escriure en la versió 4 amb totes les claus. Desar
 escriu sempre totes les claus, també les buides. L'absència de `startMin`
@@ -159,7 +176,7 @@ Des de `web`: `npm test -- --watch=false` i `npm run build`.
 
 La suite pura s'executa amb Vitest i les proves Angular amb el seu builder: aquest
 últim no admet els mocks de mòduls relatius de les proves de propagació.
-Verificació actual (16/11/2026): **103 proves passen** (75 de simulació i 28
+Verificació actual (16/11/2026): **117 proves passen** (84 de simulació i 33
 Angular); build de producció sense avisos. El càlcul de distància a les ignicions
 usa una transformada euclidiana exacta quan hi ha més de 32 llavors; les
 estadístiques d'avanç només compten les ignicions ja desplegades a cada instant.

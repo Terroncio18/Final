@@ -302,6 +302,9 @@ export async function spread(
   // The same for the cells with a timed multiplier or a late barrier.
   const timed = treatments?.temporary.size ? new Uint8Array(count) : undefined;
   if (timed) for (const cell of treatments!.temporary.keys()) timed[cell] = 1;
+  // When each mopped-up cell's fire is put out (§11.40); Infinity elsewhere.
+  const mopped = treatments?.mopUp.size ? new Float32Array(count).fill(Infinity) : undefined;
+  if (mopped) for (const [cell, minute] of treatments!.mopUp) mopped[cell] = minute;
   const winds = input.windChanges ?? [];
   if (
     winds.length > 100 ||
@@ -645,6 +648,11 @@ export async function spread(
       }
       // Match the stored float precision so heap entries are not falsely stale.
       const reached = Math.fround(time + travel);
+      // Fire that left a cell before its mop-up but would only get across
+      // after it was put out on the way: the step half in the source cell is
+      // done, the rest was waiting —for wet fuel to dry, say— and the crew got
+      // there first. The barrier window alone would let it through.
+      if (mopped && time <= mopped[cell] && reached > mopped[cell]) continue;
       if (reached < arrival[next] && reached <= horizon) {
         arrival[next] = reached;
         heap.push(reached, next);

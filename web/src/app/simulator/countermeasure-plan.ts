@@ -67,6 +67,16 @@ export function defaultSettings(kind: CountermeasureKind): ToolSettings {
   };
 }
 
+/**
+ * When an aerial discharge has made its last pass, or null for a measure that
+ * is not one. Past it the measure has done all it will do, and the screen
+ * puts it away (§11.40); its water stays in the model until it dries.
+ */
+export function lastPass(measure: Countermeasure): number | null {
+  if (measure.litresPerPass === undefined) return null;
+  return (measure.startMin ?? 0) + ((measure.passes ?? 1) - 1) * (measure.passIntervalMin ?? 0);
+}
+
 /** The measure a tool with these settings would leave, wherever it is put. */
 function measureFrom(
   kind: CountermeasureKind,
@@ -164,6 +174,12 @@ export class CountermeasurePlan {
   );
   /** Set when the user accepted that the next measure added drops `later`. */
   readonly discarding = signal(false);
+  /**
+   * A last say on a measure about to be added, from whoever knows the fire:
+   * why it cannot go there, or null. Mop-up is refused on an intense front
+   * and where nothing has burned (§11.40).
+   */
+  guard: ((measure: Countermeasure) => string | null) | null = null;
   readonly hasEditable = computed(() =>
     this.measures().some((m) => (m.startMin ?? 0) >= this.minute()),
   );
@@ -184,6 +200,10 @@ export class CountermeasurePlan {
     const settings = this.settings() ?? defaultSettings(kind);
     return { ...catalogEntry(kind), widthM: settings.widthM };
   });
+
+  /** The measures still at work, and the discharges that are done (§11.40). */
+  readonly openRows = computed(() => this.rows().filter((row) => !row.finished));
+  readonly finishedRows = computed(() => this.rows().filter((row) => row.finished));
 
   /** A line needs two points to be one. */
   readonly canFinish = computed(() => this.draft().length >= 2);
@@ -227,6 +247,7 @@ export class CountermeasurePlan {
           .padStart(2, '0')}:${Math.floor((start * 60) % 60)
           .toString()
           .padStart(2, '0')}`,
+        finished: (lastPass(measure) ?? Infinity) < this.minute(),
         status:
           start > this.minute()
             ? 'Programada'
@@ -468,6 +489,11 @@ export class CountermeasurePlan {
       points,
       this.minute(),
     );
+    const refused = this.guard?.(measure);
+    if (refused) {
+      this.note.set({ text: refused, failed: true });
+      return false;
+    }
     const later = this.discarding() ? this.later() : [];
     const kept = this.measures().filter((other) => !later.includes(other));
     const ordinal = kept.filter((other) => other.kind === kind).length + 1;

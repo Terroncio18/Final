@@ -40,7 +40,7 @@ const LIMITS = {
 } as const;
 
 const HEADER = '# IgnisLab · escenari de simulació';
-const VERSION = '4';
+const VERSION = '5';
 
 /**
  * What a key the file does not carry stands for: the screen's own starting
@@ -190,6 +190,7 @@ export function readScenario(text: string): ScenarioRead | string {
     version !== '1' &&
     version !== '2' &&
     version !== '3' &&
+    version !== '4' &&
     version !== VERSION
   )
     return 'Versió d’escenari no compatible.';

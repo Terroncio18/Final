@@ -2239,6 +2239,62 @@ mirat**: ho prova Pere. En particular, que MapLibre faci arribar el `mousedown`
 i el `mouseup` del botó dret amb el gir del relleu activat no s'ha pogut
 comprovar sense navegador.
 
+### 11.40. Les descàrregues fetes s'aparten, i les brigades apaguen les restes
+
+Decidit el 16/11/2026, a petició de Pere. Dues coses que van juntes: un cop
+l'helicòpter ha fet les passades i el front s'ha aturat, el que ve després són
+les brigades.
+
+**Les descàrregues acabades s'aparten.** Una descàrrega està acabada quan el
+cursor ha passat la darrera passada (`lastPass`: inici més passades menys una
+per interval). Llavors surt del mapa i, a la llista, va a un grup plegat
+«Acabades (N)», amb el nom, l'efecte i l'hora i res més. **Continua al pla i al
+fitxer**, i el model en segueix comptant l'aigua fins que s'asseca (§11.36): el
+que s'aparta és la imatge, no la mesura. Esborrar-la canviaria el foc ja vist
+el pròxim cop que es recalculés (§11.38).
+
+**Una eina nova: extinció de restes.** Les brigades entren on el foc s'ha
+aturat i apaguen el que queda encès, perquè no torni a arrencar quan l'aigua
+s'assequi.
+
+- **Què fa al model.** Des del minut del desplegament, les cel·les de la franja
+  no cremen ni deixen passar el foc, com un tallafoc tardà (§11.28). I a més
+  —el que la fa diferent— **el foc que ja havia sortit d'una d'aquestes
+  cel·les però encara no havia arribat a la següent s'apaga.** Dijkstra parteix
+  cada pas en el tros dins la cel·la d'origen i el tros dins la de destinació;
+  quan la destinació espera —combustible mullat, una pujada lenta—, el tros
+  d'origen ja s'ha fet abans del desplegament i un tallafoc no el pot aturar. La
+  regla és: un pas que surt d'una cel·la apagada abans de l'hora i arribaria
+  després, no arriba. Comprovat amb la mateixa franja i el mateix minut: el foc
+  s'escapa d'un tallafoc i no d'una extinció de restes.
+- **Quan es pot fer servir.** Amb un foc calculat, sobre cel·les que ja hagin
+  cremat —sense res cremat, seria un tallafoc gratuït—, i on el front no faci
+  flames de més d'**1,2 m**: el límit de l'atac directe amb eines manuals, la
+  primera banda del *fire characteristics chart* (Andrews i Rothermel 1982), el
+  mateix tall que la columna d'anàlisi fa servir per a la dificultat de
+  control (§11.25). La intensitat es llegeix com la de les flames (§11.35): la
+  velocitat real del front a la franja i la calor de la cel·la on entra. Un
+  front aturat per l'aigua fa ben poca intensitat i es pot apagar; un cap de
+  foc en herba, no.
+- **Com es rebutja.** El pla demana l'última paraula a qui coneix el foc abans
+  d'afegir una mesura (`guard`), i la pantalla hi respon per a l'extinció de
+  restes. Si la refusa, la nota diu les flames que fa el front i el límit, i la
+  línia es queda dibuixada per poder-la moure o cancel·lar.
+- **Al fitxer** és un tipus de mesura nou, `mop-up`, i els escenaris passen a la
+  **versió 5**. Les versions 1 a 4 s'obren igual; una aplicació anterior que
+  obri un fitxer de la 5 dirà que la versió no és compatible, en lloc d'un
+  error estrany sobre un tipus desconegut.
+
+El que no fa: no té temps de feina ni nombre de persones —l'extinció és
+instantània a tota la franja, com la resta de desplegaments (§11.28)—, i no mira
+si la franja és accessible.
+
+Comprovat: tres proves noves del model —la compilació, que apaga el que un
+tallafoc deixaria passar, i la lectura d'intensitat del front— i dues del pla
+—quan una descàrrega queda acabada, i que una mesura refusada no entra i la
+línia es conserva—; les 84 proves de simulació i les 33 d'Angular, i la
+compilació sense avisos. **Al navegador no s'ha mirat**: ho prova Pere.
+
 ---
 
 ## 12. Decisions pendents

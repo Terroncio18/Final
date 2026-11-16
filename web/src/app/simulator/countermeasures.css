@@ -215,3 +215,19 @@
   cursor: not-allowed;
   filter: saturate(0.35) brightness(0.8);
 }
+
+/* ---- The discharges already made (§11.40) ---- */
+
+.measure-finished {
+  margin-top: 6px;
+}
+
+.measure-finished summary {
+  font-size: 10px;
+  color: #8e9ba8;
+  cursor: pointer;
+}
+
+.measure-finished .measure-list {
+  opacity: 0.7;
+}

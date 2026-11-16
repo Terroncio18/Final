@@ -7,6 +7,7 @@ import {
   checkSettings,
   CountermeasurePlan,
   defaultSettings,
+  lastPass,
   lengthM,
   MAX_VERTICES,
   WIDTH_LIMITS,
@@ -137,6 +138,36 @@ describe('the countermeasure plan', () => {
     plan.click(b, bounds);
     plan.finish();
     expect(plan.measures()[1]).toMatchObject(defaultSettings('clearing'));
+  });
+
+  it('puts a discharge away once its last pass is made, not before', () => {
+    const plan = new CountermeasurePlan();
+    plan.minute.set(60);
+    plan.begin('helicopter', false, { ...defaultSettings('helicopter'), passes: 3 });
+    plan.click(a, bounds);
+    const drop = plan.measures()[0];
+    expect(lastPass(drop)).toBe(80);
+    expect(lastPass(plan.measures()[0])).not.toBeNull();
+    plan.minute.set(80);
+    expect(plan.finishedRows()).toEqual([]);
+    plan.minute.set(81);
+    expect(plan.finishedRows().map((row) => row.id)).toEqual([drop.id]);
+    expect(plan.openRows()).toEqual([]);
+    // A line on the ground is never «done» in that sense.
+    expect(lastPass({ ...drop, kind: 'firebreak', litresPerPass: undefined })).toBeNull();
+  });
+
+  it('lets whoever knows the fire refuse a measure, and keeps the line to fix it', () => {
+    const plan = new CountermeasurePlan();
+    plan.guard = (measure) => (measure.kind === 'mop-up' ? 'Massa intens.' : null);
+    plan.begin('mop-up');
+    plan.click(a, bounds);
+    plan.click(b, bounds);
+    plan.finish();
+    expect(plan.measures()).toEqual([]);
+    expect(plan.note()).toEqual({ text: 'Massa intens.', failed: true });
+    expect(plan.draft()).toEqual([a, b]);
+    expect(plan.kind()).toBe('mop-up');
   });
 
   it('takes vertices back one at a time, and gives the line up with none left', () => {

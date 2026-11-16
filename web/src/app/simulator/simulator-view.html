@@ -584,7 +584,7 @@
 
         @if (plan.rows().length) {
           <ul class="measure-list">
-            @for (row of plan.rows(); track row.id) {
+            @for (row of plan.openRows(); track row.id) {
               <li [class.selected]="plan.selected() === row.id" [style.--measure]="row.colour">
                 <div class="measure-head">
                   <button
@@ -625,6 +625,29 @@
               </li>
             }
           </ul>
+          <!-- The discharges already made: out of the way, not out of the plan
+               (§11.40). -->
+          @if (plan.finishedRows().length) {
+            <details class="measure-finished">
+              <summary>Acabades ({{ plan.finishedRows().length }})</summary>
+              <ul class="measure-list">
+                @for (row of plan.finishedRows(); track row.id) {
+                  <li [style.--measure]="row.colour">
+                    <div class="measure-head">
+                      <span class="measure-name">
+                        <span class="measure-dot"></span>
+                        <span>
+                          <strong>{{ row.name }}</strong>
+                          <small>{{ row.effect }}</small>
+                          <small>{{ row.deployment }}</small>
+                        </span>
+                      </span>
+                    </div>
+                  </li>
+                }
+              </ul>
+            </details>
+          }
           <div class="tools-row measure-clear">
             <button
               type="button"
