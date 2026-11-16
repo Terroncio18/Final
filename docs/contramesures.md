@@ -219,8 +219,8 @@ Des de `web`: `npm test -- --watch=false` i `npm run build`.
 
 La suite pura s'executa amb Vitest i les proves Angular amb el seu builder: aquest
 últim no admet els mocks de mòduls relatius de les proves de propagació.
-Verificació actual (16/11/2026): **117 proves passen** (84 de simulació i 33
-Angular); build de producció sense avisos. El càlcul de distància a les ignicions
+Verificació actual (16/11/2026, branca `brigades`): **142 proves passen** (107 de
+simulació i 35 Angular); build de producció sense avisos. El càlcul de distància a les ignicions
 usa una transformada euclidiana exacta quan hi ha més de 32 llavors; les
 estadístiques d'avanç només compten les ignicions ja desplegades a cada instant.
 
