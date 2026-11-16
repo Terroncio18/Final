@@ -11,7 +11,6 @@ import {
 } from './countermeasures';
 import type { Point } from './point';
 import { formatScenario, parseScenario, type Scenario } from './scenario';
-import { inLake, parseLakes } from './resources';
 
 const drop: Point = [2.7, 39.7];
 /** About 8,6 km east. */
@@ -113,30 +112,5 @@ describe('load points (§11.44)', () => {
     const halfway = aircraftAt(m, 30 + leg / 2, load)!;
     expect(halfway[0]).toBeCloseTo((drop[0] + load[0]) / 2, 6);
     expect(aircraftAt(m, 30 - leg - 0.01, load)).toBeNull();
-  });
-
-  it('reads official lakes, holes included', () => {
-    const square = (x: number, y: number, s: number): Point[] => [
-      [x, y],
-      [x + s, y],
-      [x + s, y + s],
-      [x, y + s],
-      [x, y],
-    ];
-    const lakes = parseLakes({
-      lakes: [
-        {
-          name: 'Embalse de Benagéber',
-          point: [2.1, 39.1],
-          rings: [square(2, 39, 1), square(2.4, 39.4, 0.2)],
-        },
-        { name: null, point: [9, 9], rings: [] },
-        { name: 'x', point: ['a', 1], rings: [square(0, 0, 1)] },
-      ],
-    });
-    expect(lakes.map((l) => l.name)).toEqual(['Embalse de Benagéber']);
-    expect(inLake([2.1, 39.1], lakes)).toBe(true);
-    expect(inLake([2.5, 39.5], lakes)).toBe(false);
-    expect(inLake([3.5, 39.5], lakes)).toBe(false);
   });
 });

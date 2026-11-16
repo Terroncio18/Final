@@ -1230,9 +1230,7 @@ export class SimulatorView {
     effect(() => {
       const result = this.result();
       this.maps.setAgents(
-        result
-          ? agentsAt(this.plan.measures(), this.minutes(), result.crewStops ?? new Map(), [])
-          : [],
+        result ? agentsAt(this.plan.measures(), this.minutes(), result.crewStops ?? new Map()) : [],
       );
     });
 

@@ -1282,12 +1282,12 @@ Coses que han costat temps i convé no redescobrir.
 | AEMET OpenData | Meteorologia | Espanya | En ús (§11.18) |
 | IPMA | Meteorologia | Portugal | En ús (§11.18) |
 | OpenStreetMap (Overpass) | Topònims i cims | ES i PT | En ús (pantalla de simulació) |
-| ICNF — Pontos de água (`BDG/Pontos_agua`) | Punts d'aigua de la xarxa DFCI, classes «Aéreo» i «Misto» | Portugal continental | En ús, servit per la nostra API (fase 2 §11.45) |
-| GVA — PPIFDF, punts d'aigua (WFS `terramapas.icv.gva.es/0509_PlanificacionPPIFDF`) | Punts d'aigua, amb aptitud per a helicòpter i amfibi | País Valencià | En ús, servit per la nostra API (fase 2 §11.45) |
-| REDIAM — punts d'aigua per a l'extinció d'incendis (WMS `REDIAM_puntos_agua`) | Punts d'aigua del Pla INFOCA | Andalusia | En ús, servit per la nostra API (fase 2 §11.45) |
-| IGN — hidrografia INSPIRE, «Aguas estancadas» (WFS `servicios.idee.es/wfs-inspire/hidrografia`) | Llacs i embassaments | Espanya | En ús, servit per la nostra API (fase 2 §11.46) |
-| ENAIRE — base de dades aeronàutica (`Aero_SRV_VIGOR_V2`, capa 3) | Aeròdroms i aeròdroms amb heliport de l'AIP | Espanya | En ús (12.23, fase 2 §11.41) |
-| OpenStreetMap (Overpass, per la nostra API) | Parcs de bombers (`amenity=fire_station`); aeròdroms (`aeroway=aerodrome`) on ENAIRE no en té | ES i PT | En ús, **no oficial** (12.23, fase 2 §11.47) |
+| ICNF — Pontos de água (`BDG/Pontos_agua`) | Punts d'aigua de la xarxa DFCI, classes «Aéreo» i «Misto» | Portugal continental | Retirat el 16/11/2026 (fase 2 §11.49) |
+| GVA — PPIFDF, punts d'aigua (WFS `terramapas.icv.gva.es/0509_PlanificacionPPIFDF`) | Punts d'aigua, amb aptitud per a helicòpter i amfibi | País Valencià | Retirat el 16/11/2026 (fase 2 §11.49) |
+| REDIAM — punts d'aigua per a l'extinció d'incendis (WMS `REDIAM_puntos_agua`) | Punts d'aigua del Pla INFOCA | Andalusia | Retirat el 16/11/2026 (fase 2 §11.49) |
+| IGN — hidrografia INSPIRE, «Aguas estancadas» (WFS `servicios.idee.es/wfs-inspire/hidrografia`) | Llacs i embassaments | Espanya | Retirat el 16/11/2026 (fase 2 §11.49) |
+| ENAIRE — base de dades aeronàutica (`Aero_SRV_VIGOR_V2`, capa 3) | Aeròdroms i aeròdroms amb heliport de l'AIP | Espanya | Retirat el 16/11/2026 (fase 2 §11.49) |
+| OpenStreetMap (Overpass, per la nostra API) | Parcs de bombers (`amenity=fire_station`); aeròdroms (`aeroway=aerodrome`) on ENAIRE no en té | ES i PT | Retirat el 16/11/2026 (fase 2 §11.49) |
 
 **FIRMS.** L'API d'àrea és `/api/area/csv/[MAP_KEY]/[FONT]/[o,s,e,n]/[DIES]`, amb
 un màxim de cinc dies per consulta i 5.000 transaccions cada deu minuts per clau.

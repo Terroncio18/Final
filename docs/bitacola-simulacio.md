@@ -2681,8 +2681,14 @@ El que es queda, i per què:
 - **Les rutes de l'API** —`/api/water-points`, `/api/lakes`, `/api/osm`— i el
   mòdul `resources.ts` es queden al codi amb les seves proves, sense ningú que
   les cridi des de la pantalla. Si un dia tornen, hi són; si no, es poden treure.
+
+  > **Revisat el mateix dia**, a petició de Pere: les tres rutes, el script
+  > `water:prepare`, les seves proves i el mòdul `resources.ts` de la pantalla
+  > s'han tret. Si un dia tornen, són a la història de git (`3223a87` i
+  > anteriors) i a les §11.41, §11.45 a §11.47.
 - **Els agents** (§11.43): les brigades i la maquinària, igual. Les aeronaus ja
-  no tenen on anar a carregar: es dibuixen damunt la descàrrega a cada passada.
+  no tenen on anar a carregar: es dibuixen damunt la descàrrega a cada passada,
+  i només un fitxer de la versió 7 amb punt de càrrega en dibuixa la ruta.
 
 Les pendents 12.24 i 12.26, que eren d'aquestes marques, queden aparcades.
 

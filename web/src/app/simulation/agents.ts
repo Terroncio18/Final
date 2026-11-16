@@ -1,14 +1,5 @@
-import {
-  aircraftKind,
-  crewHead,
-  distanceM,
-  dropPoint,
-  legMin,
-  type Countermeasure,
-  type CountermeasureKind,
-} from './countermeasures';
+import { aircraftKind, crewHead, dropPoint, legMin, type Countermeasure } from './countermeasures';
 import type { Point } from './point';
-import type { Resource, ResourceKind } from './resources';
 
 /**
  * Who is working, where, at a minute (12.20): a crew at the head of its line,
@@ -25,29 +16,6 @@ export interface Agent {
   readonly point: Point;
   /** Where an aircraft is flying between, when it has somewhere to load. */
   readonly route?: readonly [Point, Point];
-}
-
-/** Where each aircraft loads: a helicopter or a scooper at water, a retardant plane at a base. */
-const LOADS_AT: Partial<Record<CountermeasureKind, ResourceKind>> = {
-  helicopter: 'water',
-  amphibious: 'water',
-  retardant: 'aerodrome',
-};
-
-/** The nearest resource of a kind to a point, or null if the map has none. */
-export function nearest(
-  point: Point,
-  kind: ResourceKind,
-  resources: readonly Resource[],
-): Point | null {
-  let best: Point | null = null,
-    bestM = Infinity;
-  for (const resource of resources) {
-    if (resource.kind !== kind) continue;
-    const m = distanceM(point, resource.point);
-    if (m < bestM) ((best = resource.point), (bestM = m));
-  }
-  return best;
 }
 
 const lerp = (a: Point, b: Point, t: number): Point => [
@@ -108,7 +76,6 @@ export function agentsAt(
   measures: readonly Countermeasure[],
   minute: number,
   stops: ReadonlyMap<string, number>,
-  resources: readonly Resource[],
 ): Agent[] {
   const agents: Agent[] = [];
   for (const measure of measures) {
@@ -129,10 +96,10 @@ export function agentsAt(
       agents.push({ id: measure.id, kind, point: head.point });
       continue;
     }
-    const loadsAt = LOADS_AT[measure.kind];
-    if (!loadsAt) continue;
-    // The point chosen with the measure; for older plans, the nearest on the map.
-    const load = measure.loadPoint ?? nearest(dropPoint(measure), loadsAt, resources);
+    if (!aircraftKind(measure.kind)) continue;
+    // Only version 7 files carry a load point (§11.44); without one the
+    // aircraft is drawn over the drop at each pass (§11.49).
+    const load = measure.loadPoint ?? null;
     const point = aircraftAt(measure, minute, load);
     if (point)
       agents.push({

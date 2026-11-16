@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { agentsAt, aircraftAt, nearest } from './agents';
+import { agentsAt, aircraftAt } from './agents';
 import type { Countermeasure } from './countermeasures';
 import type { Point } from './point';
-import type { Resource } from './resources';
 
 const drop: Point = [2.7, 39.7];
 const water: Point = [2.8, 39.7];
@@ -19,11 +18,6 @@ const helicopter: Countermeasure = {
   passes: 3,
   passIntervalMin: 20,
 };
-const resources: Resource[] = [
-  { kind: 'water', name: 'lluny', point: [3.2, 39.7], source: 'ICNF' },
-  { kind: 'water', name: 'a prop', point: water, source: 'ICNF' },
-  { kind: 'aerodrome', name: 'base', point: [2.6, 39.6], source: 'ENAIRE' },
-];
 const close = (a: Point | null, b: Point) => {
   expect(a).not.toBeNull();
   expect(a![0]).toBeCloseTo(b[0], 6);
@@ -31,11 +25,6 @@ const close = (a: Point | null, b: Point) => {
 };
 
 describe('agents', () => {
-  it('picks the nearest loading place of the right kind', () => {
-    expect(nearest(drop, 'water', resources)).toEqual(water);
-    expect(nearest(drop, 'station', resources)).toBeNull();
-  });
-
   it('flies an aircraft between its load and each pass, on the model schedule', () => {
     expect(aircraftAt(helicopter, 49, water)).toBeNull();
     close(aircraftAt(helicopter, 50, water), water);
@@ -70,28 +59,13 @@ describe('agents', () => {
       crewSize: 10,
       ratePerPerson: 10,
     };
-    expect(agentsAt([line], 5, new Map(), [])).toEqual([]);
-    const [crew] = agentsAt([line], 10 + 30, new Map(), []);
+    expect(agentsAt([line], 5, new Map())).toEqual([]);
+    const [crew] = agentsAt([line], 10 + 30, new Map());
     expect(crew.kind).toBe('crew');
     expect(crew.point[0]).toBeGreaterThan(2.7);
     expect(crew.point[0]).toBeLessThan(2.72);
-    expect(agentsAt([line], 40, new Map([['c', 30]]), [])).toEqual([]);
-    expect(agentsAt([line], 10_000, new Map(), [])).toEqual([]);
-  });
-
-  it('sends a helicopter to water and a retardant plane to an aerodrome', () => {
-    const plane: Countermeasure = {
-      ...helicopter,
-      id: 'r',
-      kind: 'retardant',
-      points: [drop, [2.71, 39.7]],
-      litresPerPass: 3000,
-    };
-    const agents = agentsAt([helicopter, plane], 60, new Map(), resources);
-    expect(agents.map((a) => [a.kind, a.route?.[0]])).toEqual([
-      ['helicopter', water],
-      ['tanker', [2.6, 39.6]],
-    ]);
+    expect(agentsAt([line], 40, new Map([['c', 30]]))).toEqual([]);
+    expect(agentsAt([line], 10_000, new Map())).toEqual([]);
   });
 
   it.each([
@@ -113,29 +87,28 @@ describe('agents', () => {
       crewSize: 10,
       ratePerPerson: kind === 'mop-up' ? 0.05 : 10,
     };
-    expect(agentsAt([measure], 9, new Map(), [])).toEqual([]);
-    expect(agentsAt([measure], 10, new Map(), [])).toEqual([
+    expect(agentsAt([measure], 9, new Map())).toEqual([]);
+    expect(agentsAt([measure], 10, new Map())).toEqual([
       { id: 'ground', kind: expected, point: drop },
     ]);
-    const [agent] = agentsAt([measure], 40, new Map(), []);
+    const [agent] = agentsAt([measure], 40, new Map());
     expect(agent.kind).toBe(expected);
     expect(agent.point[0]).toBeGreaterThan(drop[0]);
     expect(agent.point[0]).toBeLessThan(2.72);
-    expect(agentsAt([measure], 40, new Map([['ground', 30]]), [])).toEqual([]);
-    expect(agentsAt([measure], 10_000, new Map(), [])).toEqual([]);
+    expect(agentsAt([measure], 40, new Map([['ground', 30]]))).toEqual([]);
+    expect(agentsAt([measure], 10_000, new Map())).toEqual([]);
   });
 
   it.each([
-    ['helicopter', 'helicopter', water],
-    ['amphibious', 'scooper', water],
-    ['retardant', 'tanker', resources[2].point],
-  ] as const)('draws %s as %s while preserving its loading route', (kind, expected, load) => {
+    ['helicopter', 'helicopter'],
+    ['amphibious', 'scooper'],
+    ['retardant', 'tanker'],
+  ] as const)('draws %s as %s, with its route only when it has a load point', (kind, expected) => {
     const measure: Countermeasure = { ...helicopter, kind };
-    expect(agentsAt([measure], 60, new Map(), resources)).toEqual([
-      { id: measure.id, kind: expected, point: drop, route: [load, drop] },
-    ]);
-    expect(agentsAt([measure], 60, new Map(), [])).toEqual([
+    expect(agentsAt([measure], 60, new Map())).toEqual([
       { id: measure.id, kind: expected, point: drop },
     ]);
+    const loaded: Countermeasure = { ...measure, loadPoint: water, loadMin: 0 };
+    expect(agentsAt([loaded], 60, new Map())[0].route).toEqual([water, drop]);
   });
 });
