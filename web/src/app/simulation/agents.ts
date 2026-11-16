@@ -1,118 +1,132 @@
-import { aircraftKind, crewHead, dropPoint, legMin, type Countermeasure } from './countermeasures';
+import { aircraftKind, crewHead, dropPoint, type Countermeasure } from './countermeasures';
 import type { Point } from './point';
 
 /**
- * Who is working, where, at a minute (12.20): a crew at the head of its line,
- * an aircraft between where it loads and where it drops. Nothing here is
- * decided: every position follows from what the model already computed —
- * the crew's schedule and stop (12.19), the passes of a discharge (§11.31) —
- * and the loading places on the map (12.23). They change nothing in the fire.
+ * Who is working, where (12.20, §11.50): crews and machinery at the head of
+ * their line while they work, and the passes of the aircraft. Nothing here is
+ * decided: every position and every pass follows from what the model already
+ * computed —the crew's schedule and stop (12.19), the passes of a discharge
+ * (§11.31)— and none of it changes the fire.
  */
-export type AgentKind = 'crew' | 'bulldozer' | 'fire-engine' | 'helicopter' | 'scooper' | 'tanker';
+export type GroundKind = 'crew' | 'bulldozer' | 'fire-engine';
+export type AircraftFigure = 'helicopter' | 'scooper' | 'tanker';
+export type AgentKind = GroundKind | AircraftFigure;
 
-export interface Agent {
+export interface GroundAgent {
   readonly id: string;
-  readonly kind: AgentKind;
+  readonly kind: GroundKind;
   readonly point: Point;
-  /** Where an aircraft is flying between, when it has somewhere to load. */
-  readonly route?: readonly [Point, Point];
+  /** Where it faces: along its line, degrees clockwise from north. */
+  readonly heading: number;
 }
 
-const lerp = (a: Point, b: Point, t: number): Point => [
-  a[0] + (b[0] - a[0]) * t,
-  a[1] + (b[1] - a[1]) * t,
-];
+export interface Pass {
+  readonly id: string;
+  readonly kind: AircraftFigure;
+  readonly drop: Point;
+  /** Where it flies towards over the drop, degrees clockwise from north. */
+  readonly heading: number;
+  readonly liquid: 'water' | 'retardant';
+}
+
+/** Clockwise from north, flat-earth: a few kilometres can afford it. */
+export function bearing(a: Point, b: Point): number {
+  const east = (b[0] - a[0]) * Math.cos((((a[1] + b[1]) / 2) * Math.PI) / 180);
+  const north = b[1] - a[1];
+  return ((Math.atan2(east, north) * 180) / Math.PI + 360) % 360;
+}
+
+/** The direction of the segment of a line nearest a point on it. */
+function headingAlong(points: readonly Point[], at: Point): number {
+  let best = 0,
+    bestDistance = Infinity;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const [a, b] = [points[i], points[i + 1]];
+    const dx = b[0] - a[0],
+      dy = b[1] - a[1];
+    const t =
+      dx || dy
+        ? Math.max(
+            0,
+            Math.min(1, ((at[0] - a[0]) * dx + (at[1] - a[1]) * dy) / (dx * dx + dy * dy)),
+          )
+        : 0;
+    const distance = Math.hypot(at[0] - a[0] - t * dx, at[1] - a[1] - t * dy);
+    if (distance < bestDistance) ((bestDistance = distance), (best = i));
+  }
+  return points.length > 1 ? bearing(points[best], points[best + 1]) : 0;
+}
+
+/** Machinery shares the crew's schedule (§11.42); only its figure changes. */
+const groundKind = (measure: Countermeasure): GroundKind =>
+  measure.kind === 'firebreak' || measure.kind === 'clearing'
+    ? 'bulldozer'
+    : measure.kind === 'water-line'
+      ? 'fire-engine'
+      : 'crew';
 
 /**
- * Where an aircraft is at a minute, or null when it is not in the air.
- *
- * Pass k drops at start + k·interval. Between two passes it flies out to load
- * in the first half of the interval and back in the second; it comes in from
- * the loading point half an interval before the first pass and goes back
- * half an interval after the last. The interval is the model's (§11.31), not
- * a speed: the drawing follows the schedule, it does not question it. With
- * nowhere to load on the map, it is drawn over the drop at each pass only.
+ * The crews and machines at work at a minute: from when they start on site
+ * until their measure is done (§11.50), at the head of the work and facing
+ * along the line. A crew stopped for safety is gone (§11.42).
  */
-export function aircraftAt(
-  measure: Countermeasure,
-  minute: number,
-  load: Point | null,
-): Point | null {
-  if (measure.litresPerPass === undefined || !measure.passes || !measure.passIntervalMin)
-    return null;
-  const start = measure.startMin ?? 0,
-    interval = measure.passIntervalMin,
-    last = start + (measure.passes - 1) * interval,
-    drop = dropPoint(measure),
-    half = interval / 2;
-  if (!load) {
-    const k = Math.round((minute - start) / interval);
-    const pass = start + k * interval;
-    return k >= 0 && k < measure.passes && Math.abs(minute - pass) <= Math.min(1, half)
-      ? drop
-      : null;
-  }
-  // A chosen load point (§11.44): the interval is the flight at cruise speed
-  // and the load, so the aircraft flies at that speed and waits while loading.
-  if (measure.loadPoint && aircraftKind(measure.kind)) {
-    const leg = legMin(measure.kind, drop, load);
-    if (leg === 0 || minute < start - leg || minute > last + leg) return null;
-    if (minute <= start) return lerp(load, drop, (minute - (start - leg)) / leg);
-    if (minute >= last) return lerp(drop, load, (minute - last) / leg);
-    const since = (minute - start) % interval;
-    if (since <= leg) return lerp(drop, load, since / leg);
-    if (since >= interval - leg) return lerp(load, drop, (since - (interval - leg)) / leg);
-    return load;
-  }
-  if (minute < start - half || minute > last + half) return null;
-  if (minute <= start) return lerp(load, drop, (minute - (start - half)) / half);
-  if (minute >= last) return lerp(drop, load, (minute - last) / half);
-  const phase = ((minute - start) % interval) / interval;
-  return phase < 0.5 ? lerp(drop, load, phase * 2) : lerp(load, drop, (phase - 0.5) * 2);
-}
-
-/** Every agent at a minute. `stops` is the model's crewStops. */
-export function agentsAt(
+export function groundAgentsAt(
   measures: readonly Countermeasure[],
   minute: number,
   stops: ReadonlyMap<string, number>,
-): Agent[] {
-  const agents: Agent[] = [];
+): GroundAgent[] {
+  const agents: GroundAgent[] = [];
   for (const measure of measures) {
-    if (measure.crewSize !== undefined) {
-      const workStart = (measure.startMin ?? 0) + (measure.arrivalMin ?? 0);
-      const stopped = stops.get(measure.id);
-      // On site from when it starts working until it is done or has stopped.
-      if (minute < workStart) continue;
-      const head = crewHead(measure, minute, stopped);
-      if (head.done || (stopped !== undefined && minute >= stopped)) continue;
-      // Machinery shares the crew schedule; only its appearance changes.
-      const kind: AgentKind =
-        measure.kind === 'firebreak' || measure.kind === 'clearing'
-          ? 'bulldozer'
-          : measure.kind === 'water-line'
-            ? 'fire-engine'
-            : 'crew';
-      agents.push({ id: measure.id, kind, point: head.point });
-      continue;
-    }
-    if (!aircraftKind(measure.kind)) continue;
-    // Only version 7 files carry a load point (§11.44); without one the
-    // aircraft is drawn over the drop at each pass (§11.49).
-    const load = measure.loadPoint ?? null;
-    const point = aircraftAt(measure, minute, load);
-    if (point)
-      agents.push({
-        id: measure.id,
+    if (measure.crewSize === undefined) continue;
+    const workStart = (measure.startMin ?? 0) + (measure.arrivalMin ?? 0);
+    const stopped = stops.get(measure.id);
+    if (minute < workStart) continue;
+    const head = crewHead(measure, minute, stopped);
+    if (head.done || (stopped !== undefined && minute >= stopped)) continue;
+    agents.push({
+      id: measure.id,
+      kind: groundKind(measure),
+      point: head.point,
+      heading: headingAlong(measure.points, head.point),
+    });
+  }
+  return agents;
+}
+
+/**
+ * The aircraft passes whose minute falls in `(from, to]`: the ones the clock
+ * has just gone past. A line of retardant is flown along its drawing; a drop
+ * on a point, into the wind (`windFromDeg`), which is only a choice of how it
+ * looks.
+ */
+export function passesBetween(
+  measures: readonly Countermeasure[],
+  from: number,
+  to: number,
+  windFromDeg: number,
+): Pass[] {
+  const passes: Pass[] = [];
+  for (const measure of measures) {
+    if (!aircraftKind(measure.kind) || measure.litresPerPass === undefined) continue;
+    const start = measure.startMin ?? 0,
+      interval = measure.passIntervalMin ?? 0;
+    for (let k = 0; k < (measure.passes ?? 1); k++) {
+      const minute = start + k * interval;
+      if (minute <= from || minute > to) continue;
+      const points = measure.points;
+      passes.push({
+        id: `${measure.id}-${k}`,
         kind:
           measure.kind === 'helicopter'
             ? 'helicopter'
             : measure.kind === 'amphibious'
               ? 'scooper'
               : 'tanker',
-        point,
-        ...(load ? { route: [load, dropPoint(measure)] as const } : {}),
+        drop: dropPoint(measure),
+        heading: points.length > 1 ? bearing(points[0], points[points.length - 1]) : windFromDeg,
+        liquid: measure.kind === 'retardant' ? 'retardant' : 'water',
       });
+    }
   }
-  return agents;
+  return passes;
 }

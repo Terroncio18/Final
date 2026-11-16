@@ -31,14 +31,13 @@ import {
   LAYERS,
   MUNICIPALITIES_SOURCE,
   PLACES_SOURCE,
-  AGENTS_SOURCE,
   PROVINCES_SOURCE,
   SLOPES_SOURCE,
 } from './map.style';
 import { FireParticles, type Emitters } from './fire-particles';
 import { addSpawnMarker, type SpawnMarker } from './spawn-marker';
-import { addResourceIcons } from './resource-icons';
-import type { Agent } from '../simulation/agents';
+import type { Agents3D } from './agents-3d';
+import type { GroundAgent, Pass } from '../simulation/agents';
 
 /**
  * MapLibre picks its worker file name at runtime, which neither Vite nor esbuild
@@ -706,39 +705,53 @@ export class MapService {
   }
 
   /**
-   * Draws who is working at the cursor's minute (12.20): crews and aircraft,
-   * and the route of each aircraft. Called on every minute the cursor moves;
-   * a handful of points is a cheap `setData`.
+   * The 3D figures of who works on the fire (§11.50). The layer, and three.js
+   * with it, is loaded the first time anyone is at work: a screen that never
+   * puts a crew or an aircraft down does not pay for it.
    */
-  setAgents(agents: readonly Agent[]): void {
-    this.withStyle((map) => {
-      addResourceIcons(map);
-      const source = map.getSource(AGENTS_SOURCE) as GeoJSONSource | undefined;
-      source?.setData({
-        type: 'FeatureCollection',
-        features: [
-          ...agents.flatMap((a) =>
-            a.route
-              ? [
-                  {
-                    type: 'Feature' as const,
-                    geometry: {
-                      type: 'LineString' as const,
-                      coordinates: a.route.map((p) => [p[0], p[1]]),
-                    },
-                    properties: { kind: a.kind },
-                  },
-                ]
-              : [],
-          ),
-          ...agents.map((a) => ({
-            type: 'Feature' as const,
-            geometry: { type: 'Point' as const, coordinates: [a.point[0], a.point[1]] },
-            properties: { kind: a.kind },
-          })),
-        ],
-      });
+  private agents3d: Agents3D | null = null;
+  private agents3dModule: Promise<typeof import('./agents-3d')> | null = null;
+  /** The latest wishes, applied once the layer exists. */
+  private groundWanted: readonly GroundAgent[] = [];
+  private agentsMotion = true;
+
+  private withAgents(map: MapLibreMap, then: (layer: Agents3D) => void): void {
+    if (this.agents3d && map.getLayer(this.agents3d.id)) return then(this.agents3d);
+    this.agents3dModule ??= import('./agents-3d');
+    void this.agents3dModule.then(({ Agents3D }) => {
+      if (!this.agents3d || !map.getLayer(this.agents3d.id)) {
+        this.agents3d = new Agents3D(LAYERS.agents);
+        map.addLayer(this.agents3d);
+        this.agents3d.setMotion(this.agentsMotion);
+        this.agents3d.setGround(this.groundWanted);
+      }
+      then(this.agents3d);
     });
+  }
+
+  /** The crews and machines at work at the cursor's minute, as 3D figures. */
+  setGroundAgents(agents: readonly GroundAgent[]): void {
+    this.groundWanted = agents;
+    this.withStyle((map) => {
+      if (!agents.length && !this.agents3d) return;
+      this.withAgents(map, (layer) => layer.setGround(this.groundWanted));
+    });
+  }
+
+  /** An aircraft makes one pass, in real time. */
+  flyPass(pass: Pass): void {
+    if (!this.agentsMotion) return;
+    this.withStyle((map) => this.withAgents(map, (layer) => layer.fly(pass)));
+  }
+
+  /** Every pass in the air is put away. */
+  landPasses(): void {
+    this.agents3d?.land();
+  }
+
+  setAgentsMotion(on: boolean): void {
+    this.agentsMotion = on;
+    this.agents3d?.setMotion(on);
   }
 
   /** Draws the simulation domain, or takes it off. */

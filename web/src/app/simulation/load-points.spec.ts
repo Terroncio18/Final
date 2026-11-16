@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { aircraftAt } from './agents';
 import {
   AIRCRAFT,
   distanceM,
@@ -101,16 +100,5 @@ describe('load points (§11.44)', () => {
     };
     const planned: Scenario = { ...scenario, countermeasures: [scooper()] };
     expect(parseScenario(formatScenario(planned, new Date(0)))).toEqual(planned);
-  });
-
-  it('flies the aircraft at cruise speed and keeps it at the load while it loads', () => {
-    const m = scooper(load, 0.2);
-    const leg = legMin('amphibious', drop, load);
-    expect(aircraftAt(m, 30, load)).toEqual(drop);
-    const atLoad = aircraftAt(m, 30 + leg + 0.1, load)!;
-    expect(atLoad[0]).toBeCloseTo(load[0], 9);
-    const halfway = aircraftAt(m, 30 + leg / 2, load)!;
-    expect(halfway[0]).toBeCloseTo((drop[0] + load[0]) / 2, 6);
-    expect(aircraftAt(m, 30 - leg - 0.01, load)).toBeNull();
   });
 });

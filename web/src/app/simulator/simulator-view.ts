@@ -33,7 +33,7 @@ import {
   type Countermeasure,
 } from '../simulation/countermeasures';
 import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from '../simulation/domain';
-import { agentsAt } from '../simulation/agents';
+import { groundAgentsAt, passesBetween } from '../simulation/agents';
 import { FireSurface } from '../simulation/fire-surface';
 import { FORECASTS, FORECAST_COLOURS, forecastOffsets } from '../simulation/fire-display';
 import { frontEmitters, frontIntensity } from '../simulation/fire-emitters';
@@ -1225,13 +1225,46 @@ export class SimulatorView {
     this.plan.guard = (measure) => this.mopUpGuard(measure);
     // Where each crew stopped for safety, as the model computed it (12.19).
     effect(() => this.plan.crewStops.set(this.result()?.crewStops ?? new Map()));
-    // Who is working at the cursor (12.20): only over a computed fire, and
-    // only from what the model computed; nothing here touches the fire.
+    // Who is working at the cursor (12.20, §11.50): only over a computed fire,
+    // and only from what the model computed; nothing here touches the fire.
     effect(() => {
       const result = this.result();
-      this.maps.setAgents(
-        result ? agentsAt(this.plan.measures(), this.minutes(), result.crewStops ?? new Map()) : [],
+      this.maps.setGroundAgents(
+        result
+          ? groundAgentsAt(this.plan.measures(), this.minutes(), result.crewStops ?? new Map())
+          : [],
       );
+    });
+    // Aircraft passes, in real time: when playback goes past one. Dragging the
+    // cursor or jumping shows none; a new fire puts away those in the air.
+    this.maps.setAgentsMotion(!matchMedia('(prefers-reduced-motion: reduce)').matches);
+    let passClock = untracked(this.minutes);
+    effect(() => {
+      const minute = this.minutes(),
+        playing = this.playing(),
+        result = this.result();
+      const from = passClock;
+      passClock = minute;
+      if (!result) {
+        this.maps.landPasses();
+        return;
+      }
+      if (!playing || minute <= from || minute - from > 30) return;
+      const windFrom = untracked(this.activeWeather).fromDeg;
+      for (const pass of passesBetween(untracked(this.plan.measures), from, minute, windFrom))
+        this.maps.flyPass(pass);
+    });
+    // A discharge put down now makes its first pass now, playing or not.
+    let known = new Set(untracked(this.plan.measures).map((m) => m.id));
+    effect(() => {
+      const measures = this.plan.measures();
+      const fresh = measures.filter((m) => !known.has(m.id));
+      known = new Set(measures.map((m) => m.id));
+      if (!fresh.length || !untracked(this.result)) return;
+      const minute = untracked(this.minutes);
+      const windFrom = untracked(this.activeWeather).fromDeg;
+      for (const pass of passesBetween(fresh, minute - 1e-6, minute, windFrom))
+        this.maps.flyPass(pass);
     });
 
     const chrome = inject(Chrome);
