@@ -1303,6 +1303,15 @@ export class SimulatorView {
             : waterFor(kind === 'amphibious' ? 'amphibious' : 'helicopter', r)),
       )
       .map((r) => ({ point: r.point, name: r.name, metres: distanceM(from, r.point) }))
+      .concat(
+        // Named official lakes outside the square, at a point inside each.
+        AIRCRAFT[kind].loadsAt === 'water'
+          ? this.suppression
+              .lakes()
+              .filter((l) => l.name && !inside(l.point, bounds))
+              .map((l) => ({ point: l.point, name: l.name!, metres: distanceM(from, l.point) }))
+          : [],
+      )
       .sort((a, b) => a.metres - b.metres)
       .slice(0, 5)
       .map((o) => ({ ...o, distance: `${km.format(o.metres / 1000)} km` }));
@@ -1409,12 +1418,15 @@ export class SimulatorView {
       else this.places.release();
     });
 
-    // Where suppression comes from (12.23), inside the domain only.
+    // Where suppression comes from (12.23). Loaded whenever there is a
+    // domain, since aircraft load there (§11.44); the layer menu only shows or
+    // hides the marks.
     effect(() => {
       const point = this.ignition();
-      if (point && this.resources()) void this.suppression.load(domainAround(point));
+      if (point) void this.suppression.load(domainAround(point));
       else this.suppression.release();
     });
+    effect(() => this.suppression.setVisible(this.resources()));
 
     // The elevation under the square, read here as the form reads it. In a tab
     // of its own there is no read to inherit, and the tiles are the ones the

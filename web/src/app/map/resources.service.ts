@@ -12,7 +12,7 @@ import {
   overpassQuery,
   parseEnaireAerodromes,
   parseOverpass,
-  ideibLakesUrl,
+  lakesUrl,
   parseLakes,
   type Extent,
   type Lake,
@@ -57,7 +57,7 @@ export class ResourcesService {
     const cached = this.cache.get(key);
     // Lakes travel apart: they are not drawn, only consulted when a load point
     // is chosen, and a failure only means fewer places to load.
-    void json(fetch(ideibLakesUrl(extent)))
+    void json(fetch(lakesUrl(extent)))
       .then((body) => {
         if (this.asked === key) this.lakes.set(parseLakes(body));
       })
@@ -115,10 +115,27 @@ export class ResourcesService {
     this.show([], []);
   }
 
+  /**
+   * Whether the marks are drawn. Hiding them does not unload them: they are
+   * still where an aircraft may load (§11.44).
+   */
+  readonly visible = signal(true);
+
+  setVisible(on: boolean): void {
+    this.visible.set(on);
+    this.draw();
+  }
+
   private show(resources: readonly Resource[], failed: readonly string[]): void {
     this.resources.set(resources);
     this.failed.set(failed);
+    this.draw();
+  }
+
+  private draw(): void {
     const extent = this.extent;
-    this.maps.setResources(extent ? resources.filter((r) => inside(r.point, extent)) : []);
+    this.maps.setResources(
+      extent && this.visible() ? this.resources().filter((r) => inside(r.point, extent)) : [],
+    );
   }
 }

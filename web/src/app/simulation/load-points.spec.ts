@@ -124,15 +124,17 @@ describe('load points (§11.44)', () => {
       [x, y],
     ];
     const lakes = parseLakes({
-      features: [
+      lakes: [
         {
-          geometry: { type: 'Polygon', coordinates: [square(2, 39, 1), square(2.4, 39.4, 0.2)] },
-          properties: { NOM: 'Embassament de Cúber' },
+          name: 'Embalse de Benagéber',
+          point: [2.1, 39.1],
+          rings: [square(2, 39, 1), square(2.4, 39.4, 0.2)],
         },
-        { geometry: { type: 'Point', coordinates: [2, 39] }, properties: {} },
+        { name: null, point: [9, 9], rings: [] },
+        { name: 'x', point: ['a', 1], rings: [square(0, 0, 1)] },
       ],
     });
-    expect(lakes.map((l) => l.name)).toEqual(['Embassament de Cúber']);
+    expect(lakes.map((l) => l.name)).toEqual(['Embalse de Benagéber']);
     expect(inLake([2.1, 39.1], lakes)).toBe(true);
     expect(inLake([2.5, 39.5], lakes)).toBe(false);
     expect(inLake([3.5, 39.5], lakes)).toBe(false);

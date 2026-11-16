@@ -35,11 +35,13 @@ export interface Resource {
 }
 
 /**
- * A lake or reservoir as an official polygon (§11.44): where an aircraft may
- * load water that is not the sea. Outer rings and holes, in [lon, lat].
+ * A lake or reservoir as an official polygon (§11.44, §11.46): where an
+ * aircraft may load water that is not the sea. Outer ring first, then holes,
+ * in [lon, lat]; `point` is inside it, to list it as a load place.
  */
 export interface Lake {
-  readonly name: string;
+  readonly name: string | null;
+  readonly point: Point;
   readonly rings: readonly (readonly Point[])[];
 }
 
@@ -88,9 +90,8 @@ export const WATER_POINTS_URL = '/api/water-points';
 export const ENAIRE_AERODROMES_URL =
   'https://servais.enaire.es/insignia/rest/services/INSIGNIA_SRV/Aero_SRV_VIGOR_V2/FeatureServer/3/query';
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
-/** IDEIB, surface water bodies of the Balearic hydrological plan, lakes category (2022). */
-export const IDEIB_LAKES_URL =
-  'https://ideib.caib.es/geoserveis/rest/services/public/GOIB_Masses_Aigua_IB/MapServer/5/query';
+/** Standing water of the IGN's hydrography, served by our API (§11.46). */
+export const LAKES_URL = '/api/lakes';
 
 /** ArcGIS REST asks for the envelope as `west,south,east,north` in WGS84. */
 function arcgisQuery(base: string, extent: Extent, where: string, fields: string): string {
@@ -113,9 +114,9 @@ export function waterPointsUrl(extent: Extent): string {
   return `${WATER_POINTS_URL}?bbox=${extent.map((n) => n.toFixed(6)).join(',')}`;
 }
 
-/** Lakes and reservoirs of the Balearic Islands; elsewhere the answer is empty. */
-export function ideibLakesUrl(extent: Extent): string {
-  return arcgisQuery(IDEIB_LAKES_URL, extent, '1=1', 'NOM');
+/** The domain; the API adds the 30 km itself. */
+export function lakesUrl(extent: Extent): string {
+  return `${LAKES_URL}?bbox=${extent.map((n) => n.toFixed(6)).join(',')}`;
 }
 
 const ring = (value: unknown): Point[] | null =>
@@ -125,27 +126,20 @@ const ring = (value: unknown): Point[] | null =>
     ? value.map((p) => [p[0], p[1]] as Point)
     : null;
 
-/** Polygons and multipolygons; anything else is skipped. */
+/** The API's lakes; a lake without a valid ring or point is skipped. */
 export function parseLakes(body: unknown): Lake[] {
-  const features = (body as { features?: unknown })?.features;
-  if (!Array.isArray(features)) throw new Error('Resposta sense entitats.');
-  const lakes: Lake[] = [];
-  for (const feature of features) {
-    const geometry = feature?.geometry;
-    const polygons: unknown[] =
-      geometry?.type === 'Polygon'
-        ? [geometry.coordinates]
-        : geometry?.type === 'MultiPolygon'
-          ? geometry.coordinates
-          : [];
-    const name = text(feature?.properties?.['NOM']) || 'Llac';
-    for (const polygon of polygons) {
-      if (!Array.isArray(polygon)) continue;
-      const rings = polygon.map(ring);
-      if (rings.length && rings.every((r) => r)) lakes.push({ name, rings: rings as Point[][] });
-    }
+  const lakes = (body as { lakes?: unknown })?.lakes;
+  if (!Array.isArray(lakes)) throw new Error('Resposta sense llacs.');
+  const result: Lake[] = [];
+  for (const lake of lakes) {
+    const point = lake?.point;
+    if (!Array.isArray(point) || !finite(point[0]) || !finite(point[1])) continue;
+    if (!Array.isArray(lake.rings) || !lake.rings.length) continue;
+    const rings = lake.rings.map(ring);
+    if (!rings.every((r: Point[] | null) => r)) continue;
+    result.push({ name: text(lake.name) || null, point: [point[0], point[1]], rings });
   }
-  return lakes;
+  return result;
 }
 
 /** Even-odd rule over every ring, so holes (islands) are not water. */
