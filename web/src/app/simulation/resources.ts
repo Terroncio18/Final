@@ -89,7 +89,11 @@ export type Extent = readonly [number, number, number, number];
 export const WATER_POINTS_URL = '/api/water-points';
 export const ENAIRE_AERODROMES_URL =
   'https://servais.enaire.es/insignia/rest/services/INSIGNIA_SRV/Aero_SRV_VIGOR_V2/FeatureServer/3/query';
-export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+/**
+ * Stations (and the aerodrome fallback) from OpenStreetMap, through our API:
+ * Overpass refuses requests a browser makes (§11.47).
+ */
+export const OSM_URL = '/api/osm';
 /** Standing water of the IGN's hydrography, served by our API (§11.46). */
 export const LAKES_URL = '/api/lakes';
 
@@ -167,15 +171,9 @@ export function enaireAerodromesUrl(extent: Extent): string {
   );
 }
 
-/** Overpass QL for stations and, as fallback, aerodromes. `out center` gives ways a point. */
-export function overpassQuery(extent: Extent, aerodromes: boolean): string {
-  const [w, s, e, n] = extent;
-  const box = `(${s},${w},${n},${e})`;
-  return (
-    `[out:json][timeout:25];(nwr["amenity"="fire_station"]${box};` +
-    (aerodromes ? `nwr["aeroway"="aerodrome"]${box};` : '') +
-    `);out center tags;`
-  );
+/** The domain's stations and aerodromes from OpenStreetMap, by our API. */
+export function osmUrl(extent: Extent): string {
+  return `${OSM_URL}?bbox=${extent.map((n) => n.toFixed(6)).join(',')}`;
 }
 
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);

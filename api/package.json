@@ -7,6 +7,7 @@
     "build": "tsc",
     "test:fuels": "npm run build && node --test tests/fuels.test.mjs",
     "fuels:prepare": "npm run build && node scripts/prepare-fuels.mjs",
+    "test:osm": "npm run build && node --test tests/osm.test.mjs",
     "test:water": "npm run build && node --test tests/water.test.mjs",
     "test:lakes": "npm run build && node --test tests/lakes.test.mjs",
     "water:prepare": "npm run build && node scripts/prepare-water.mjs",

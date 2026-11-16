@@ -24,11 +24,13 @@ import {
 import { nearestObservation } from './weather.js';
 import { registerFuelRoutes } from './fuel-routes.js';
 import { registerWaterRoutes } from './water-routes.js';
+import { registerOsmRoutes } from './osm-routes.js';
 import { registerLakesRoutes } from './lakes-routes.js';
 
 const app = Fastify({ logger: { transport: undefined } });
 registerFuelRoutes(app);
 registerWaterRoutes(app);
+registerOsmRoutes(app);
 registerLakesRoutes(app);
 
 interface CacheEntry {

@@ -8,8 +8,7 @@ import {
   parseWaterPoints,
   waterPointsUrl,
   widen,
-  OVERPASS_URL,
-  overpassQuery,
+  osmUrl,
   parseEnaireAerodromes,
   parseOverpass,
   lakesUrl,
@@ -28,8 +27,8 @@ async function json(response: Promise<Response>): Promise<unknown> {
 /**
  * Stations, water points and aerodromes of the domain (12.23). Water points
  * come from our API, which serves the official networks prepared offline
- * (§11.45); aerodromes from ENAIRE and stations from Overpass, which answer
- * the browser with CORS.
+ * (§11.45); aerodromes from ENAIRE, which answers the browser with CORS, and
+ * stations from OpenStreetMap through our API (§11.47).
  *
  * Water points and aerodromes are asked for the domain and 30 km around it:
  * an aircraft may load outside the square. `resources` holds them all; the map
@@ -83,18 +82,7 @@ export class ResourcesService {
       settle('ENAIRE', async () =>
         parseEnaireAerodromes(await json(fetch(enaireAerodromesUrl(around))), around),
       ),
-      settle('OSM', async () =>
-        parseOverpass(
-          await json(
-            fetch(OVERPASS_URL, {
-              method: 'POST',
-              body: new URLSearchParams({ data: overpassQuery(extent, true) }),
-            }),
-          ),
-          extent,
-          true,
-        ),
-      ),
+      settle('OSM', async () => parseOverpass(await json(fetch(osmUrl(extent))), extent, true)),
     ]);
     // OpenStreetMap's aerodromes only where ENAIRE has none: Portugal, or
     // a Spanish domain whose official answer failed.

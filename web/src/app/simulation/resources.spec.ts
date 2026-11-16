@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   enaireAerodromesUrl,
-  overpassQuery,
+  osmUrl,
   parseEnaireAerodromes,
   parseWaterPoints,
   waterFor,
@@ -26,10 +26,8 @@ describe('resources', () => {
     expect(url.searchParams.get('where')).toBe("TYPE_CODE IN ('AD','AH')");
   });
 
-  it('writes the Overpass box south, west, north, east, with aerodromes only on request', () => {
-    expect(overpassQuery(extent, false)).toContain('["amenity"="fire_station"](39.6,2.5,39.9,2.9)');
-    expect(overpassQuery(extent, false)).not.toContain('aeroway');
-    expect(overpassQuery(extent, true)).toContain('["aeroway"="aerodrome"](39.6,2.5,39.9,2.9)');
+  it('asks our API for the OpenStreetMap stations of the domain', () => {
+    expect(osmUrl(extent)).toBe('/api/osm?bbox=2.500000,39.600000,2.900000,39.900000');
   });
 
   it('reads the API water points, with what each source says about aircraft', () => {

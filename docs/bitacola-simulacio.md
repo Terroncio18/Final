@@ -2616,6 +2616,30 @@ combustibles a l'API; la ruta en directe contra l'IDEE (Sóller i Benagéber); l
 134 proves de simulació i les 37 d'Angular, i la compilació sense avisos. **Al
 navegador no s'ha mirat**: ho prova Pere.
 
+### 11.47. Els parcs de bombers d'OpenStreetMap, també per la nostra API
+
+Trobat el 16/11/2026 per Pere al navegador: el menú de capes deia «Sense
+resposta: OSM». **Overpass ja no respon peticions anònimes**: amb l'agent per
+defecte de curl torna 406 i amb el d'un navegador la petició es penja, mentre que
+amb un nom de client respon bé. Una pàgina no pot posar el seu propi
+`User-Agent`, de manera que des del navegador fallaria sempre.
+
+- **La pantalla ho demana a la nostra API**, `GET /api/osm?bbox=…`, que pregunta
+  a Overpass amb un nom de client genèric —«IgnisLab/0.1 (wildfire
+  simulator)», sense res que identifiqui ningú— i torna només la posició i les
+  quatre etiquetes que la pantalla llegeix.
+- **Un dia en memòria per domini**: Overpass limita la taxa (§5 de la fase 1), i
+  les proves seguides d'aquell matí ja el van fer respondre 502 un moment. Els
+  parcs no es mouen d'un dia per l'altre.
+- **Un reintent** si respon «massa peticions» o està ocupat, al cap de 3 s; si
+  torna a fallar, el menú ho diu com fins ara.
+
+Comprovat: quatre proves noves de l'API —la consulta, el que es conserva, la
+ruta amb la memòria i el nom de client, i el reintent— i la ruta en directe
+(Palma: el parc de bombers de Marratxí). Les 134 proves de simulació i les 37
+d'Angular, i la compilació sense avisos. **Al navegador no s'ha mirat**: ho
+prova Pere.
+
 ---
 
 ## 12. Decisions pendents

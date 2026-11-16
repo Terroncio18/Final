@@ -1287,7 +1287,7 @@ Coses que han costat temps i convé no redescobrir.
 | REDIAM — punts d'aigua per a l'extinció d'incendis (WMS `REDIAM_puntos_agua`) | Punts d'aigua del Pla INFOCA | Andalusia | En ús, servit per la nostra API (fase 2 §11.45) |
 | IGN — hidrografia INSPIRE, «Aguas estancadas» (WFS `servicios.idee.es/wfs-inspire/hidrografia`) | Llacs i embassaments | Espanya | En ús, servit per la nostra API (fase 2 §11.46) |
 | ENAIRE — base de dades aeronàutica (`Aero_SRV_VIGOR_V2`, capa 3) | Aeròdroms i aeròdroms amb heliport de l'AIP | Espanya | En ús (12.23, fase 2 §11.41) |
-| OpenStreetMap (Overpass, en directe) | Parcs de bombers (`amenity=fire_station`); aeròdroms (`aeroway=aerodrome`) on ENAIRE no en té | ES i PT | En ús, **no oficial** (12.23) |
+| OpenStreetMap (Overpass, per la nostra API) | Parcs de bombers (`amenity=fire_station`); aeròdroms (`aeroway=aerodrome`) on ENAIRE no en té | ES i PT | En ús, **no oficial** (12.23, fase 2 §11.47) |
 
 **FIRMS.** L'API d'àrea és `/api/area/csv/[MAP_KEY]/[FONT]/[o,s,e,n]/[DIES]`, amb
 un màxim de cinc dies per consulta i 5.000 transaccions cada deu minuts per clau.
