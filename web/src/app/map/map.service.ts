@@ -294,6 +294,9 @@ export class MapService {
       // range would be inert here, so there is none.
       interactive: false,
       attributionControl: false,
+      // Smoothed edges: the 3D figures of the agents (§11.50) are a few dozen
+      // pixels and broke up into loose pixels without it (§11.51).
+      canvasContextAttributes: { antialias: true },
     });
 
     map.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');

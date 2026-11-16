@@ -22,7 +22,7 @@ import type { Point } from '../simulation/point';
  * framing a metre is a tenth of a pixel, and a firefighter at real size would
  * not be there at all; close up, the figure is never smaller than it is.
  */
-const SCREEN_LENGTH_PX = 38;
+const SCREEN_LENGTH_PX = 56;
 
 /**
  * A pass, in seconds of the clock on the wall and not of the simulation: one
@@ -78,9 +78,11 @@ export class Agents3D implements CustomLayerInterface {
 
   constructor(id: string) {
     this.id = id;
-    // Flat colours read best with a soft light from all round and one sun.
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x445544, 1.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.4);
+    // Flat colours read best with plenty of light from all round and one sun.
+    // three.js counts light in physical units, so a Lambert surface reflects
+    // intensity / π: at 1.4 the shaded sides came out almost black (§11.51).
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xc8d0c8, 3.2));
+    const sun = new THREE.DirectionalLight(0xffffff, 2.6);
     sun.position.set(0.5, -0.7, 1);
     this.scene.add(sun);
   }
@@ -184,7 +186,11 @@ export class Agents3D implements CustomLayerInterface {
     for (const agent of this.groundAgents) {
       const figure = this.ground.get(agent.id);
       if (!figure) continue;
-      place(figure.model, map, agent.point, 0, agent.heading, grow(agent.kind));
+      // A little off the ground: the relief MapLibre draws and the height it
+      // reports are not the same mesh, and a figure standing exactly on one
+      // came out half buried in the other, in specks (§11.51).
+      const lift = 0.03 * MODEL_LENGTH_M[agent.kind] * grow(agent.kind);
+      place(figure.model, map, agent.point, lift, agent.heading, grow(agent.kind));
     }
 
     for (const flight of [...this.flights]) {

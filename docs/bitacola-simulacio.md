@@ -2737,6 +2737,26 @@ avisos. **Al navegador no s'ha mirat**: ho prova Pere. En particular, que
 three.js i MapLibre comparteixin el context WebGL sense trepitjar-se l'estat
 només es pot veure a la pantalla.
 
+### 11.51. Les figures es veien negres i a trossos
+
+Vist el 16/11/2026 per Pere en una captura: la brigada sortia com una taca negra
+i groga puntejada. Tres causes, i tres retocs:
+
+- **Massa fosca.** three.js compta la llum en unitats físiques i una superfície
+  mat en reflecteix la intensitat dividida per π: amb la llum de la §11.50, les
+  cares que no tocava el sol sortien gairebé negres. Ara hi ha molta més llum
+  general (hemisfèrica 3,2, amb el terra clar) i el sol a 2,6.
+- **Mig enterrada.** El relleu que dibuixa MapLibre i l'alçada que en dona
+  `queryTerrainElevation` no surten de la mateixa malla, i una figura plantada
+  just a terra hi quedava a trossos: el puntejat. Ara s'aixeca un 3 % de la seva
+  llargada.
+- **Petita i sense vores suaus.** Tres bombers en 38 píxels, sense antialiasing,
+  es desfeien en píxels solts. Ara fan 56 píxels i el mapa es crea amb
+  `antialias`, que suavitza també la resta del mapa a canvi d'una mica de GPU.
+
+Comprovat: les proves i la compilació sense avisos. **Al navegador no s'ha
+mirat**: ho prova Pere.
+
 ---
 
 ## 12. Decisions pendents
