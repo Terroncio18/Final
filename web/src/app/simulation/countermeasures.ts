@@ -320,6 +320,9 @@ const FIELDS = new Set<string>([
   'passes',
   'passIntervalMin',
   'fuelRemaining',
+  'arrivalMin',
+  'crewSize',
+  'ratePerPerson',
 ] satisfies (keyof Countermeasure)[]);
 const temporary = (kind: CountermeasureKind) =>
   kind === 'water-line' || kind === 'helicopter' || kind === 'amphibious' || kind === 'retardant';
@@ -346,6 +349,27 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
     if (unknown !== undefined) return `Camp de contramesura desconegut: «${unknown}».`;
     const def = COUNTERMEASURE_CATALOG.find((d) => d.kind === raw.kind);
     if (!def) return 'Tipus de contramesura desconegut.';
+    const crew = ['arrivalMin', 'crewSize', 'ratePerPerson'].some((key) => key in raw);
+    if (crew) {
+      if (!crewKind(def.kind)) return 'Aquest tipus de contramesura no admet brigades.';
+      if (!['arrivalMin', 'crewSize', 'ratePerPerson'].every((key) => finite(raw[key])))
+        return 'La brigada necessita arribada, efectius i rendiment, tots tres numèrics.';
+      if (
+        raw.arrivalMin < CREW_LIMITS.arrivalMin.min ||
+        raw.arrivalMin > CREW_LIMITS.arrivalMin.max
+      )
+        return 'L’arribada de la brigada ha de ser entre 0 i 720 minuts.';
+      if (
+        !Number.isInteger(raw.crewSize) ||
+        raw.crewSize < CREW_LIMITS.crewSize.min ||
+        raw.crewSize > CREW_LIMITS.crewSize.max
+      )
+        return 'La brigada ha de tenir entre 1 i 500 efectius, sense decimals.';
+      const unit = def.kind === 'mop-up' ? 'ha/h' : 'm/h';
+      const limits = CREW_LIMITS[unit];
+      if (raw.ratePerPerson < limits.min || raw.ratePerPerson > limits.max)
+        return `El rendiment per efectiu ha de ser entre ${limits.min} i ${limits.max} ${unit}.`;
+    }
     if (typeof raw.id !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(raw.id) || ids.has(raw.id))
       return 'Identificador de contramesura incorrecte o repetit.';
     if (
@@ -424,6 +448,9 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
           }
         : {}),
       ...(removal ? { fuelRemaining: raw.fuelRemaining } : {}),
+      ...(crew
+        ? { arrivalMin: raw.arrivalMin, crewSize: raw.crewSize, ratePerPerson: raw.ratePerPerson }
+        : {}),
     });
   }
   return result;
@@ -496,6 +523,96 @@ export function countermeasureCells(centre: Point, measure: Countermeasure): rea
   return [...cells];
 }
 
+/** Metres per minute, with mop-up's area production converted to line length. */
+function crewSpeed(m: Countermeasure): number {
+  const production = (m.crewSize! * m.ratePerPerson!) / 60;
+  return m.kind === 'mop-up' ? (production * 10000) / m.widthM : production;
+}
+
+function lineLengths(points: readonly Point[]): number[] {
+  return points.slice(1).map((b, i) => Math.hypot(b[0] - points[i][0], b[1] - points[i][1]));
+}
+
+/** Project cell centres, retaining the first segment when distances tie. */
+export function crewSchedule(centre: Point, m: Countermeasure): CrewSchedule | undefined {
+  if (!crewMeasure(m)) return undefined;
+  const cells = countermeasureCells(centre, m);
+  const [w, s, e, n] = domainAround(centre);
+  const points: Point[] = m.points.map(([lon, lat]) => [
+    ((lon - w) / (e - w)) * GRID * CELL_M,
+    ((n - lat) / (n - s)) * GRID * CELL_M,
+  ]);
+  const lengths = lineLengths(points);
+  const lengthM = lengths.reduce((sum, length) => sum + length, 0);
+  const workStart = (m.startMin ?? 0) + m.arrivalMin!;
+  const speed = crewSpeed(m);
+  const minutes = new Float32Array(cells.length);
+  const bits = new Uint32Array(minutes.buffer);
+  for (let c = 0; c < cells.length; c++) {
+    const x = ((cells[c] % GRID) + 0.5) * CELL_M;
+    const y = (Math.floor(cells[c] / GRID) + 0.5) * CELL_M;
+    let nearest = Infinity,
+      along = 0,
+      passed = 0;
+    for (let i = 0; i < lengths.length; i++) {
+      const a = points[i],
+        b = points[i + 1];
+      const dx = b[0] - a[0],
+        dy = b[1] - a[1];
+      const fraction = lengths[i]
+        ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (lengths[i] * lengths[i])))
+        : 0;
+      const distance = Math.hypot(x - a[0] - fraction * dx, y - a[1] - fraction * dy);
+      if (distance < nearest) {
+        nearest = distance;
+        along = passed + fraction * lengths[i];
+      }
+      passed += lengths[i];
+    }
+    const activation = workStart + along / speed;
+    minutes[c] = activation;
+    // As with timed ignitions, stored precision must not deploy work in the past.
+    if (minutes[c] < activation) bits[c] += 1;
+  }
+  return { cells, minutes, workStart, workEnd: workStart + lengthM / speed, lengthM };
+}
+
+export function crewHead(m: Countermeasure, minute: number, stoppedMin = Infinity): CrewHead {
+  // A local domain supplies the same metric as the grid without needing its centre.
+  const origin: Point = [
+    (Math.min(...m.points.map((p) => p[0])) + Math.max(...m.points.map((p) => p[0]))) / 2,
+    (Math.min(...m.points.map((p) => p[1])) + Math.max(...m.points.map((p) => p[1]))) / 2,
+  ];
+  const [w, s, e, n] = domainAround(origin);
+  const metric: Point[] = m.points.map(([lon, lat]) => [
+    ((lon - w) / (e - w)) * GRID * CELL_M,
+    ((n - lat) / (n - s)) * GRID * CELL_M,
+  ]);
+  const lengths = lineLengths(metric);
+  const lengthM = lengths.reduce((sum, length) => sum + length, 0);
+  const workStart = (m.startMin ?? 0) + (m.arrivalMin ?? 0);
+  const builtM = crewMeasure(m)
+    ? Math.max(0, Math.min(lengthM, (Math.min(minute, stoppedMin) - workStart) * crewSpeed(m)))
+    : minute >= workStart
+      ? lengthM
+      : 0;
+  let remaining = builtM;
+  for (let i = 0; i < lengths.length; i++) {
+    if (remaining <= lengths[i] && lengths[i] > 0) {
+      const f = remaining / lengths[i],
+        a = m.points[i],
+        b = m.points[i + 1];
+      return {
+        point: [a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1])],
+        builtM,
+        done: builtM >= lengthM,
+      };
+    }
+    remaining -= lengths[i];
+  }
+  return { point: m.points[m.points.length - 1], builtM, done: builtM >= lengthM };
+}
+
 /** Piecewise-constant speed factors, valid from T=0 up to each `until`. */
 export interface TreatmentWindow {
   readonly until: number;
@@ -517,6 +634,7 @@ export interface CountermeasureField {
 export function compileCountermeasures(
   centre: Point,
   input: readonly Countermeasure[],
+  crewStops: ReadonlyMap<string, number> = new Map(),
 ): CountermeasureField {
   const measures = parseCountermeasures(input);
   if (typeof measures === 'string') throw new Error(measures);
@@ -529,8 +647,12 @@ export function compileCountermeasures(
   const mopUp = new Map<number, number>();
   for (const measure of measures) {
     if (physicalMeasure(measure)) continue;
-    const from = measure.startMin ?? 0;
-    for (const cell of countermeasureCells(centre, measure)) {
+    const schedule = crewSchedule(centre, measure);
+    const cells = schedule?.cells ?? countermeasureCells(centre, measure);
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i];
+      const from = schedule?.minutes[i] ?? measure.startMin ?? 0;
+      if (schedule && from > (crewStops.get(measure.id) ?? Infinity)) continue;
       // Mop-up is a barrier from its minute on, like a late firebreak; what
       // it adds is that the fire already in the cell goes out (fire-spread).
       if (measure.kind === 'mop-up') mopUp.set(cell, Math.min(mopUp.get(cell) ?? Infinity, from));

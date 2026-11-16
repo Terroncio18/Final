@@ -15,12 +15,18 @@ import {
   treatmentFactor,
   type Countermeasure,
   physicalMeasure,
+  crewSchedule,
+  parseCountermeasures,
+  MOP_UP_MAX_FLAME_M,
 } from './countermeasures';
 import type { Point } from './point';
 import { ignitionDistances } from './fire-distances';
+import { activeFront } from './fire-display';
 import {
   effectiveWind,
   firelineIntensity,
+  byramIntensity,
+  flameLength,
   lengthToBreadth,
   M_PER_FT,
   windFactor,
@@ -58,6 +64,8 @@ export interface SpreadInput {
   readonly countermeasures?: {
     readonly centre: Point;
     readonly measures: readonly Countermeasure[];
+    /** Already known safety stops, for replaying a forecast with fixed history. */
+    readonly crewStops?: ReadonlyMap<string, number>;
   };
 }
 
@@ -97,6 +105,7 @@ export interface SpreadResult {
   readonly baseRate: number;
   readonly fuelTreatments?: FuelTreatments;
   readonly spotIgnitions?: readonly SpotIgnition[];
+  readonly crewStops?: ReadonlyMap<string, number>;
 }
 
 /** How many cells away a single step may land, along either axis. */
@@ -261,13 +270,110 @@ export async function spread(
   input: SpreadInput,
   onProgress?: (share: number) => void,
 ): Promise<SpreadResult> {
+  const plan = input.countermeasures;
+  const crews = new Map<number, CrewVisit[]>();
+  if (plan) {
+    const parsed = parseCountermeasures(plan.measures);
+    if (typeof parsed === 'string') throw new Error(parsed);
+    for (const m of parsed) {
+      const schedule = crewSchedule(plan.centre, m);
+      if (!schedule) continue;
+      for (let i = 0; i < schedule.cells.length; i++) {
+        const cell = schedule.cells[i];
+        let visits = crews.get(cell);
+        if (!visits) crews.set(cell, (visits = []));
+        visits.push({
+          id: m.id,
+          activation: schedule.minutes[i],
+          workStart: schedule.workStart,
+          workEnd: schedule.workEnd,
+        });
+      }
+    }
+  }
+  const stops = new Map(plan?.crewStops);
+  for (const [id, minute] of stops)
+    if (
+      !Number.isFinite(minute) ||
+      minute < 0 ||
+      !plan?.measures.some((m) => m.id === id && m.crewSize !== undefined)
+    )
+      throw new Error('Parada de brigada incorrecta.');
+  // Fix only the earliest new stop: later stops may disappear when an earlier
+  // one removes future treatments. Each rerun fixes at least one more crew.
+  for (;;) {
+    let stop: { id: string; minute: number } | undefined;
+    const result = await spreadRun(input, onProgress, crews, stops, (id, minute) => {
+      stop ??= { id, minute };
+    });
+    if (!stop) return crews.size ? { ...result, crewStops: stops } : result;
+    stops.set(stop.id, stop.minute);
+  }
+}
+
+interface CrewVisit {
+  readonly id: string;
+  readonly activation: number;
+  readonly workStart: number;
+  readonly workEnd: number;
+}
+
+/** The incoming triangles of frontIntensity, restricted to this cell's neighbourhood. */
+function crewEntryIntensity(
+  arrival: Float32Array,
+  cell: number,
+  heat: number,
+  incomingSpeed: number,
+): number {
+  const time = arrival[cell];
+  const x = cell % GRID,
+    y = Math.floor(cell / GRID);
+  const local = new Float32Array(9).fill(Infinity);
+  let previous = -Infinity;
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      if (x + dx < 0 || x + dx >= GRID || y + dy < 0 || y + dy >= GRID) continue;
+      const t = arrival[cell + dy * GRID + dx];
+      // Only the incoming, already reached side may decide a stop. A future
+      // vertex could move after that stop removes a barrier, changing history.
+      if (t <= time) local[(dy + 1) * 3 + dx + 1] = t;
+      if (t < time) previous = Math.max(previous, t);
+    }
+  if (!(heat > 0)) return 0;
+  // A triangle's pace is constant between vertex times. Sampling inside the
+  // last interval before entry gives its exact left limit, without degenerating
+  // the contour into a zero-length segment at the vertex. Heat is read at entry.
+  let hottest = 0;
+  let found = false;
+  for (const segment of activeFront(local, 3, (previous + time) / 2)) {
+    if (segment.ahead !== 4) continue;
+    found = true;
+    const speed = segment.pace > 0 ? CELL_M / segment.pace : Infinity;
+    hottest = Math.max(hottest, byramIntensity(heat, speed));
+  }
+  // A one-cell fuel corridor has no finite triangle. Its arriving path still
+  // measures the front's speed, including any wait in the destination cell.
+  return found ? hottest : byramIntensity(heat, incomingSpeed);
+}
+
+async function spreadRun(
+  input: SpreadInput,
+  onProgress: ((share: number) => void) | undefined,
+  crews: ReadonlyMap<number, readonly CrewVisit[]>,
+  crewStops: ReadonlyMap<string, number>,
+  stopCrew: (id: string, minute: number) => void,
+): Promise<SpreadResult> {
   const { elevation, bed, horizon } = input;
   const count = GRID * GRID;
   if (elevation.length !== count || (input.fuels && input.fuels.length !== count)) {
     throw new Error('Mida de la graella incorrecta.');
   }
   const treatments = input.countermeasures?.measures.length
-    ? compileCountermeasures(input.countermeasures.centre, input.countermeasures.measures)
+    ? compileCountermeasures(
+        input.countermeasures.centre,
+        input.countermeasures.measures,
+        crewStops,
+      )
     : undefined;
   if (input.spotting && typeof parseSpotting(input.spotting) === 'string')
     throw new Error('Configuració de brases incorrecta.');
@@ -294,6 +400,8 @@ export async function spread(
         input.countermeasures!.measures,
         input.fuelMoistures!,
         input.fuels,
+        FUEL_MODELS,
+        crewStops,
       )
     : undefined;
   // Read for every step of every cell: a byte per cell, not a map lookup.
@@ -507,6 +615,7 @@ export async function spread(
 
   // ---- Dijkstra, with time as the distance. ----
   const arrival = new Float32Array(count).fill(Infinity);
+  const entrySpeed = crews.size ? new Map<number, number>() : undefined;
   const heap = new Heap();
   // Backfire burns real cells; sea, unburnable land and barriers cannot be lit.
   const extraIgnitions = treatments?.ignitions.filter((cell) => rate[cell] > 0) ?? [];
@@ -595,6 +704,7 @@ export async function spread(
           const stored = new Float32Array([candidate.minute]);
           if (stored[0] < candidate.minute) new Uint32Array(stored.buffer)[0] += 1;
           arrival[candidate.cell] = stored[0];
+          entrySpeed?.delete(candidate.cell);
           heap.push(stored[0], candidate.cell);
           spots.set(candidate.cell, { ...candidate, minute: stored[0] });
         }
@@ -614,6 +724,7 @@ export async function spread(
       if (rateNext === 0) continue;
       if (CORNERS[step].some(({ offset }) => rate[cell + offset] === 0)) continue;
       let travel = 0;
+      let incoming = 0;
       for (const segment of PATHS[step]) {
         const at = cell + segment.offset;
         if (rate[at] === 0) {
@@ -626,12 +737,14 @@ export async function spread(
         // Only a cell whose fuel was treated, or a run whose wind changes,
         // needs the time-dependent path; the rest of the grid keeps the
         // baseline ellipse, which is exactly what that path would read for it.
-        travel +=
+        const elapsed =
           (dynamic && winds.length > 0) || treatedFuel?.[at] === 1
             ? windyTravel(at, distance, time + travel, stepE[step], stepN[step])
             : timed?.[at] === 1
               ? treatedTravel(distance, along, time + travel, treatments!.temporary.get(at))
               : distance / along;
+        travel += elapsed;
+        if (entrySpeed && at === next) incoming = elapsed > 0 ? distance / elapsed : 0;
         if (!Number.isFinite(travel)) break;
         if (
           timed &&
@@ -655,6 +768,7 @@ export async function spread(
       if (mopped && time <= mopped[cell] && reached > mopped[cell]) continue;
       if (reached < arrival[next] && reached <= horizon) {
         arrival[next] = reached;
+        if (entrySpeed && crews.has(next)) entrySpeed.set(next, incoming);
         heap.push(reached, next);
       }
     }
@@ -692,6 +806,22 @@ export async function spread(
       rate[cell] *= factor;
       intensity[cell] *= factor;
     }
+  let firstStop: { id: string; minute: number } | undefined;
+  for (const [cell, visits] of crews) {
+    const time = arrival[cell];
+    if (!Number.isFinite(time) || time >= (firstStop?.minute ?? Infinity)) continue;
+    const visit = visits.find(
+      (v) => !crewStops.has(v.id) && time >= v.workStart && time < v.workEnd && time < v.activation,
+    );
+    if (!visit) continue;
+    const entryHeat = fuelTreatments?.at(cell, time)?.bed.heatPerArea ?? heat[cell];
+    if (
+      flameLength(crewEntryIntensity(arrival, cell, entryHeat, entrySpeed?.get(cell) ?? 0)) >
+      MOP_UP_MAX_FLAME_M
+    )
+      firstStop = { id: visit.id, minute: time };
+  }
+  if (firstStop) stopCrew(firstStop.id, firstStop.minute);
   return {
     arrival,
     horizon,
