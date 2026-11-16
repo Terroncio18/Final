@@ -1155,6 +1155,45 @@ input[type='range']::-webkit-slider-thumb {
    the credits are a licence condition, they wrap to as many lines as the card
    is narrow, and a legend placed a fixed distance above them ends up on top of
    them. Up here nothing else changes size. */
+/* The compass: the toolbar's look, in a disc at the bottom right. */
+.map-compass {
+  position: absolute;
+  z-index: 3;
+  right: 16px;
+  bottom: 16px;
+  width: 46px;
+  height: 46px;
+  padding: 3px;
+  background: #14212cf0;
+  border: 1px solid #53637080;
+  border-radius: 50%;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px #0003;
+  pointer-events: none;
+}
+
+.map-compass svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.compass-north {
+  fill: #e8603c;
+}
+
+.compass-south {
+  fill: #6f808b;
+}
+
+.map-compass text {
+  font:
+    700 7px Manrope,
+    sans-serif;
+  fill: #e6edf0;
+  dominant-baseline: middle;
+}
+
 .map-key {
   position: absolute;
   z-index: 3;

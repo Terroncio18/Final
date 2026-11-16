@@ -2132,6 +2132,25 @@ Comprovat: una prova nova de l'assecat, les 81 proves de simulació i les 28
 d'Angular, i la compilació sense avisos. **Al navegador no s'ha mirat**: ho
 prova Pere.
 
+### 11.37. Una brúixola que només indica
+
+Decidit el 16/11/2026, a petició de Pere. En relleu la vista es gira (§11.3), i
+amb el mapa girat no hi havia res que digués on és el nord.
+
+- **A baix a la dreta del mapa**, el racó lliure: la barra d'eines és a dalt a
+  la dreta, el temps i la llegenda a l'esquerra, i l'escala i els crèdits a
+  baix a l'esquerra.
+- **Una agulla amb la N** que gira el contrari del que gira la vista. El servei
+  del mapa porta l'orientació com a senyal (`bearing`), que MapLibre actualitza
+  a cada gir.
+- **Només indica, no es clica.** Ho va triar Pere entre això i un botó que
+  tornés el nord amunt; girar la vista es fa al mapa.
+- L'estil és el de la barra d'eines, en un disc, i el nord en el taronja del
+  foc.
+
+Comprovat: les proves i la compilació sense avisos. **Al navegador no s'ha
+mirat**: ho prova Pere.
+
 ---
 
 ## 12. Decisions pendents

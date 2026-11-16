@@ -236,6 +236,8 @@ function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
 })
 export class SimulatorView {
   private readonly maps = inject(MapService);
+  /** How far the compass needle turns: north on screen is minus the bearing. */
+  protected readonly compassTurn = computed(() => `rotate(${-this.maps.bearing()}deg)`);
   private readonly municipalities = inject(MunicipalitiesService);
   private readonly provinces = inject(ProvincesService);
   private readonly places = inject(PlacesService);

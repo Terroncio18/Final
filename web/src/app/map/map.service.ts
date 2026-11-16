@@ -238,6 +238,9 @@ export class MapService {
   /** False until the style has loaded and the first view is framed. */
   readonly ready = signal(false);
 
+  /** Which way the view faces: degrees clockwise from north, for the compass. */
+  readonly bearing = signal(0);
+
   /**
    * The detection the panel is showing, or nothing.
    *
@@ -348,6 +351,7 @@ export class MapService {
     // map renders. `idle` covers that case so the view is never left hidden.
     map.once('idle', reveal);
 
+    map.on('rotate', () => this.bearing.set(map.getBearing()));
     this.instance = map;
   }
 

@@ -976,6 +976,16 @@
             </div>
           }
         </div>
+
+        <!-- Which way the view faces (§11.37). It only says so: turning the
+             view is done on the map itself. -->
+        <div class="map-compass" role="img" aria-label="Orientació de la vista">
+          <svg viewBox="0 0 40 40" [style.transform]="compassTurn()">
+            <polygon class="compass-north" points="20,7 24.5,20 15.5,20" />
+            <polygon class="compass-south" points="20,33 24.5,20 15.5,20" />
+            <text x="20" y="6" text-anchor="middle">N</text>
+          </svg>
+        </div>
       </div>
 
       <div class="timeline">
