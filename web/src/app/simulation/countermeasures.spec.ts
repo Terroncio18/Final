@@ -4,6 +4,8 @@ import {
   COUNTERMEASURE_CATALOG,
   compileCountermeasures,
   countermeasureCells,
+  crewSchedule,
+  crewHead,
   parseCountermeasures,
   treatedTravel,
   treatmentFactor,
@@ -22,6 +24,149 @@ const make = (patch: Partial<Countermeasure> = {}): Countermeasure => ({
   strength: 0.5,
   durationMin: 10,
   ...patch,
+});
+
+const crew = (patch: Partial<Countermeasure> = {}): Countermeasure =>
+  make({
+    kind: 'defense-line',
+    points: [point(502, 512), point(522, 512)],
+    strength: 0,
+    durationMin: 0,
+    startMin: 10,
+    arrivalMin: 20,
+    crewSize: 50,
+    ratePerPerson: 60,
+    ...patch,
+  });
+
+describe('crew validation, schedule and head', () => {
+  it('never rounds fractional activation into the past', () => {
+    const m = crew({ startMin: 100.000001, arrivalMin: 0 });
+    const schedule = crewSchedule(centre, m)!;
+    expect(Math.min(...schedule.minutes)).toBeGreaterThanOrEqual(schedule.workStart);
+    const field = compileCountermeasures(centre, [m]);
+    for (let i = 0; i < schedule.cells.length; i++)
+      expect(treatmentFactor(field.temporary.get(schedule.cells[i]), 100)).toBe(1);
+  });
+  it('requires all three fields, including explicitly undefined fields', () => {
+    const { arrivalMin, crewSize, ratePerPerson, ...legacy } = crew();
+    expect(parseCountermeasures([legacy])).toEqual([legacy]);
+    for (const fields of [
+      { arrivalMin },
+      { crewSize },
+      { ratePerPerson },
+      { arrivalMin, crewSize },
+      { arrivalMin, ratePerPerson },
+      { crewSize, ratePerPerson },
+      { arrivalMin: undefined },
+    ])
+      expect(parseCountermeasures([{ ...legacy, ...fields }])).toBeTypeOf('string');
+    expect(parseCountermeasures([crew()])).toEqual([crew()]);
+  });
+
+  it('bounds finite arrival, integer headcount and production in the kind’s unit', () => {
+    for (const patch of [
+      { arrivalMin: -1 },
+      { arrivalMin: 721 },
+      { arrivalMin: NaN },
+      { crewSize: 0 },
+      { crewSize: 501 },
+      { crewSize: 1.5 },
+      { crewSize: Infinity },
+      { ratePerPerson: 0.999 },
+      { ratePerPerson: 2001 },
+      { ratePerPerson: NaN },
+    ])
+      expect(parseCountermeasures([crew(patch)])).toBeTypeOf('string');
+    for (const patch of [
+      { arrivalMin: 0, crewSize: 1, ratePerPerson: 1 },
+      { arrivalMin: 720, crewSize: 500, ratePerPerson: 2000 },
+      { kind: 'mop-up' as const, ratePerPerson: 0.001 },
+      { kind: 'mop-up' as const, ratePerPerson: 10 },
+    ])
+      expect(parseCountermeasures([crew(patch)])).not.toBeTypeOf('string');
+    for (const ratePerPerson of [0, 0.0009, 10.01, Infinity])
+      expect(parseCountermeasures([crew({ kind: 'mop-up', ratePerPerson })])).toBeTypeOf('string');
+  });
+
+  it('only accepts crews on ground crew kinds', () => {
+    for (const kind of ['backfire', 'helicopter', 'amphibious', 'retardant'] as const)
+      expect(parseCountermeasures([crew({ kind })])).toMatch(/no admet brigades/);
+    for (const kind of ['defense-line', 'firebreak', 'clearing', 'water-line', 'mop-up'] as const)
+      expect(
+        parseCountermeasures([
+          crew({ kind, ratePerPerson: 1, durationMin: kind === 'water-line' ? 10 : 0 }),
+        ]),
+      ).not.toBeTypeOf('string');
+  });
+
+  it('starts at the first vertex, progresses monotonically, and finishes at the last', () => {
+    const m = crew(),
+      schedule = crewSchedule(centre, m)!;
+    expect(schedule.cells).toEqual(countermeasureCells(centre, m));
+    expect(schedule.workStart).toBe(30);
+    expect(schedule.lengthM).toBeCloseTo(600, 8);
+    expect(schedule.workEnd).toBeCloseTo(42, 8);
+    expect(Math.min(...schedule.minutes)).toBe(30);
+    expect(Math.max(...schedule.minutes)).toBeCloseTo(schedule.workEnd, 5);
+    const row = schedule.cells
+      .map((c, i) => [c % GRID, schedule.minutes[i]])
+      .filter((_, i) => Math.floor(schedule.cells[i] / GRID) === 512)
+      .sort((a, b) => a[0] - b[0]);
+    for (let i = 1; i < row.length; i++) expect(row[i][1]).toBeGreaterThanOrEqual(row[i - 1][1]);
+    const doubled = crewSchedule(centre, crew({ crewSize: 100 }))!;
+    expect(doubled.workEnd - doubled.workStart).toBeCloseTo(
+      (schedule.workEnd - schedule.workStart) / 2,
+      8,
+    );
+    for (let i = 0; i < schedule.cells.length; i++)
+      expect(doubled.minutes[i] - 30).toBeCloseTo((schedule.minutes[i] - 30) / 2, 4);
+    expect(crewSchedule(centre, make())).toBeUndefined();
+  });
+
+  it('follows bends and drawing order, retaining the first segment at a retraced tie', () => {
+    const m = crew({ points: [point(500.5, 500.5), point(510.5, 500.5), point(510.5, 510.5)] });
+    const schedule = crewSchedule(centre, m)!;
+    const at = (cell: number) => schedule.minutes[schedule.cells.indexOf(cell)];
+    expect(at(500 * GRID + 500)).toBeCloseTo(30);
+    expect(at(500 * GRID + 510)).toBeCloseTo(36);
+    expect(at(510 * GRID + 510)).toBeCloseTo(42);
+    const reversed = crewSchedule(centre, { ...m, points: [...m.points].reverse() })!;
+    expect(reversed.minutes[reversed.cells.indexOf(510 * GRID + 510)]).toBeCloseTo(30);
+    const retraced = crewSchedule(
+      centre,
+      crew({ points: [point(500.5, 500.5), point(510.5, 500.5), point(500.5, 500.5)] }),
+    )!;
+    expect(retraced.minutes[retraced.cells.indexOf(500 * GRID + 505)]).toBeCloseTo(33);
+  });
+
+  it('converts mop-up hectares to metres using width, for both schedule and head', () => {
+    const m = crew({ kind: 'mop-up', widthM: 100, crewSize: 20, ratePerPerson: 0.05 });
+    const schedule = crewSchedule(centre, m)!;
+    expect(schedule.workEnd - schedule.workStart).toBeCloseTo(360, 7);
+    expect(crewHead(m, 210).builtM).toBeCloseTo(300, 7);
+    const wider = crewSchedule(centre, { ...m, widthM: 200 })!;
+    expect(wider.workEnd - wider.workStart).toBeCloseTo(720, 7);
+  });
+
+  it('places the head before work, halfway, at completion, and at a frozen stop', () => {
+    const m = crew();
+    expect(crewHead(m, 0)).toEqual({ point: m.points[0], builtM: 0, done: false });
+    const halfway = crewHead(m, 36);
+    expect(halfway.builtM).toBeCloseTo(300, 8);
+    expect(halfway.point[0]).toBeCloseTo(centre[0], 8);
+    expect(halfway.done).toBe(false);
+    expect(crewHead(m, 100).point).toEqual(m.points[1]);
+    expect(crewHead(m, 100).done).toBe(true);
+    expect(crewHead(m, 100, 36)).toEqual(halfway);
+    expect(crewHead(m, 0, 36).builtM).toBe(0);
+    expect(crewHead(m, 100, 20).builtM).toBe(0);
+    const bend = crew({ points: [point(502, 502), point(522, 502), point(522, 522)] });
+    const head = crewHead(bend, 48);
+    expect(head.builtM).toBeCloseTo(900);
+    expect(head.point[0]).toBeCloseTo(bend.points[1][0], 8);
+    expect(head.point[1]).toBeCloseTo(centre[1], 8);
+  });
 });
 
 describe('countermeasure geometry and validation', () => {

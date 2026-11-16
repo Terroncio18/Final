@@ -1,5 +1,10 @@
 import { CELL_M } from './domain';
-import { countermeasureCells, physicalMeasure, type Countermeasure } from './countermeasures';
+import {
+  countermeasureCells,
+  crewSchedule,
+  physicalMeasure,
+  type Countermeasure,
+} from './countermeasures';
 import { fuelBed, FUEL_MODELS, type FuelBed, type FuelModel, type Moistures } from './rothermel';
 import type { Point } from './point';
 
@@ -40,21 +45,26 @@ export class FuelTreatments {
     private readonly moistures: Moistures,
     private readonly fuels?: Uint8Array,
     private readonly models: Readonly<Record<number, FuelModel>> = FUEL_MODELS,
+    crewStops: ReadonlyMap<string, number> = new Map(),
   ) {
     for (const measure of measures.filter(physicalMeasure)) {
-      const footprint = countermeasureCells(centre, measure);
-      for (const cell of footprint) {
+      const schedule = crewSchedule(centre, measure);
+      const footprint = schedule?.cells ?? countermeasureCells(centre, measure);
+      for (let i = 0; i < footprint.length; i++) {
+        const cell = footprint[i];
+        const from = schedule?.minutes[i] ?? measure.startMin ?? 0;
+        if (schedule && from > (crewStops.get(measure.id) ?? Infinity)) continue;
         let history = this.histories.get(cell);
         if (!history) this.histories.set(cell, (history = { drops: [], removals: [] }));
         if (measure.fuelRemaining !== undefined)
           history.removals.push({
-            minute: measure.startMin ?? 0,
+            minute: from,
             remaining: measure.fuelRemaining,
           });
         if (measure.litresPerPass !== undefined) {
           for (let pass = 0; pass < measure.passes!; pass++)
             history.drops.push({
-              minute: (measure.startMin ?? 0) + pass * measure.passIntervalMin!,
+              minute: from + pass * measure.passIntervalMin!,
               litresM2: measure.litresPerPass / (footprint.length * CELL_M * CELL_M),
             });
         }

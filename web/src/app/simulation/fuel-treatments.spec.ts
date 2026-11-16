@@ -3,6 +3,7 @@ vi.mock('./domain', () => ({ GRID: 16, CELL_M: 30, domainAround: () => [0, 0, 16
 import { FuelTreatments, WETTING } from './fuel-treatments';
 import {
   countermeasureCells,
+  crewSchedule,
   parseCountermeasures,
   liquidCapacity,
   type Countermeasure,
@@ -26,6 +27,88 @@ const water = (patch: Partial<Countermeasure> = {}): Countermeasure => ({
   ...patch,
 });
 describe('water and dry fuel treatment', () => {
+  it('removes fuel at each crew activation and leaves unfinished cells untouched after a stop', () => {
+    const m = water({
+      kind: 'clearing',
+      points: [
+        [3.5, 7.5],
+        [12.5, 7.5],
+      ],
+      litresPerPass: undefined,
+      passes: undefined,
+      passIntervalMin: undefined,
+      fuelRemaining: 0.2,
+      arrivalMin: 10,
+      crewSize: 1,
+      ratePerPerson: 60,
+    });
+    const schedule = crewSchedule(centre, m)!;
+    const field = new FuelTreatments(centre, [m], moistures);
+    const stopped = new FuelTreatments(
+      centre,
+      [m],
+      moistures,
+      undefined,
+      FUEL_MODELS,
+      new Map([[m.id, 100]]),
+    );
+    for (let i = 0; i < schedule.cells.length; i++) {
+      const cell = schedule.cells[i],
+        activation = schedule.minutes[i];
+      expect(field.at(cell, activation - 0.001)).toBeUndefined();
+      expect(field.next(cell, activation - 0.001)).toBe(activation);
+      expect(field.at(cell, activation)!.remaining).toBe(0.2);
+      expect(field.at(cell, activation)!.bed.loadTonHa).toBeCloseTo(
+        fuelBed(FUEL_MODELS[1], moistures).loadTonHa * 0.2,
+        8,
+      );
+      if (activation > 100) {
+        expect(stopped.has(cell)).toBe(false);
+        expect(stopped.at(cell, 10000)).toBeUndefined();
+      } else expect(stopped.at(cell, 10000)!.remaining).toBe(0.2);
+    }
+  });
+
+  it('offsets every water pass by cell activation without changing the dose per square metre', () => {
+    const m = water({
+      kind: 'water-line',
+      points: [
+        [3.5, 7.5],
+        [12.5, 7.5],
+      ],
+      litresPerPass: 1000,
+      arrivalMin: 10,
+      crewSize: 1,
+      ratePerPerson: 60,
+    });
+    const schedule = crewSchedule(centre, m)!;
+    const field = new FuelTreatments(centre, [m], moistures);
+    const stopped = new FuelTreatments(
+      centre,
+      [m],
+      moistures,
+      undefined,
+      FUEL_MODELS,
+      new Map([[m.id, 100]]),
+    );
+    const kgFine = 0.74 * 0.22417;
+    const dose = ((1000 / (schedule.cells.length * 900)) * WETTING.retainedFraction) / kgFine;
+    for (let i = 0; i < schedule.cells.length; i++) {
+      const cell = schedule.cells[i],
+        activation = schedule.minutes[i];
+      expect(field.at(cell, activation - 0.001)).toBeUndefined();
+      expect(field.at(cell, activation)!.moisture1h).toBeCloseTo(moistures.dead1 + dose, 8);
+      expect(field.next(cell, activation)).toBe(activation + 15);
+      expect(field.at(cell, activation + 15)!.moisture1h).toBeCloseTo(
+        moistures.dead1 + dose * (1 + Math.exp(-15 / 60)),
+        8,
+      );
+      // The contract freezes the unfinished footprint, retaining completed cells' histories.
+      if (activation <= 100)
+        expect(stopped.at(cell, activation + 15)).toEqual(field.at(cell, activation + 15));
+      else expect(stopped.at(cell, 10000)).toBeUndefined();
+    }
+  });
   it('conserves dose over the raster footprint, wets only at each pass and dries afterwards', () => {
     const m = water(),
       field = new FuelTreatments(centre, [m], moistures);
