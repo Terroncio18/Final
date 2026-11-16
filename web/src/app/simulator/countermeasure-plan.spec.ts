@@ -125,7 +125,13 @@ describe('the countermeasure plan', () => {
 
   it('puts down a measure with the values chosen for the tool, and checks them first', () => {
     const plan = new CountermeasurePlan();
-    const chosen = { ...defaultSettings('helicopter'), widthM: 120, litresPerPass: 900, passes: 3 };
+    const chosen = {
+      ...defaultSettings('helicopter'),
+      widthM: 120,
+      litresPerPass: 900,
+      passes: 3,
+      loadMin: 2,
+    };
     expect(checkSettings('helicopter', chosen)).toBeNull();
     expect(checkSettings('helicopter', { ...chosen, litresPerPass: 5000 })).toMatch(/Descàrrega/);
     expect(checkSettings('firebreak', { widthM: 10 })).toMatch(/amplada/);
@@ -528,5 +534,36 @@ describe('lengthM', () => {
       checkSettings('defense-line', { ...defaultSettings('defense-line'), crewSize: 2.5 }),
     ).not.toBeNull();
     expect(checkSettings('mop-up', defaultSettings('mop-up'))).toBeNull();
+  });
+
+  it('asks where an aircraft loads after the drop, and derives the interval (§11.44)', () => {
+    const plan = new CountermeasurePlan();
+    const water: Point = [2.72, 39.77];
+    plan.loadPicker = (_kind, p) => (p[0] === water[0] ? water : 'No hi ha aigua aquí.');
+    expect(checkSettings('helicopter', defaultSettings('helicopter'))).toMatch(/temps de càrrega/);
+    const settings = { ...defaultSettings('helicopter'), loadMin: 2 };
+    expect(checkSettings('helicopter', settings)).toBeNull();
+    plan.begin('helicopter', false, settings);
+    plan.click(a, bounds);
+    expect(plan.measures()).toEqual([]);
+    expect(plan.loading()).toEqual([a]);
+    plan.click(b, bounds);
+    expect(plan.note()).toEqual({ text: 'No hi ha aigua aquí.', failed: true });
+    expect(plan.loading()).toEqual([a]);
+    plan.undo();
+    expect(plan.loading()).toBeNull();
+    expect(plan.kind()).toBe('helicopter');
+    plan.click(a, bounds);
+    plan.click(water, bounds);
+    const [measure] = plan.measures();
+    expect(measure).toMatchObject({ loadPoint: water, loadMin: 2 });
+    expect(measure.passIntervalMin).toBeGreaterThan(2);
+    expect(plan.kind()).toBeNull();
+  });
+
+  it('the scooper and the retardant plane carry their published load times', () => {
+    expect(defaultSettings('amphibious').loadMin).toBe(0.2);
+    expect(defaultSettings('retardant').loadMin).toBe(5);
+    expect(defaultSettings('helicopter').loadMin).toBeUndefined();
   });
 });

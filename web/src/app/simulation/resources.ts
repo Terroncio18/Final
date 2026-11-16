@@ -26,7 +26,32 @@ export interface Resource {
   readonly name: string;
   readonly point: Point;
   readonly source: ResourceSource;
+  /** ICNF's type of water point (reservoir, lake, ocean…), where it says. */
+  readonly detail?: string;
 }
+
+/**
+ * A lake or reservoir as an official polygon (§11.44): where an aircraft may
+ * load water that is not the sea. Outer rings and holes, in [lon, lat].
+ */
+export interface Lake {
+  readonly name: string;
+  readonly rings: readonly (readonly Point[])[];
+}
+
+/**
+ * ICNF types that are open water large enough to be more than a tank: the
+ * ones a scooper could use. The rest (tanks, wells, pools…) are for the
+ * helicopter's bucket only. No minimum size is checked: none was found
+ * published (12.26).
+ */
+export const OPEN_WATER = new Set([
+  'Albufeira de barragem',
+  'Albufeira de açude',
+  'Lago',
+  'Oceano',
+  'Estuário',
+]);
 
 /** `[west, south, east, north]`, degrees. */
 export type Extent = readonly [number, number, number, number];
@@ -36,6 +61,9 @@ export const ICNF_WATER_URL =
 export const ENAIRE_AERODROMES_URL =
   'https://servais.enaire.es/insignia/rest/services/INSIGNIA_SRV/Aero_SRV_VIGOR_V2/FeatureServer/3/query';
 export const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+/** IDEIB, surface water bodies of the Balearic hydrological plan, lakes category (2022). */
+export const IDEIB_LAKES_URL =
+  'https://ideib.caib.es/geoserveis/rest/services/public/GOIB_Masses_Aigua_IB/MapServer/5/query';
 
 /** ArcGIS REST asks for the envelope as `west,south,east,north` in WGS84. */
 function arcgisQuery(base: string, extent: Extent, where: string, fields: string): string {
@@ -61,6 +89,56 @@ export function icnfWaterUrl(extent: Extent): string {
     "Classe IN ('Aéreo','Misto')",
     'Nome,Classe,Tipo,Operacionalidade',
   );
+}
+
+/** Lakes and reservoirs of the Balearic Islands; elsewhere the answer is empty. */
+export function ideibLakesUrl(extent: Extent): string {
+  return arcgisQuery(IDEIB_LAKES_URL, extent, '1=1', 'NOM');
+}
+
+const ring = (value: unknown): Point[] | null =>
+  Array.isArray(value) &&
+  value.length >= 4 &&
+  value.every((p) => Array.isArray(p) && finite(p[0]) && finite(p[1]))
+    ? value.map((p) => [p[0], p[1]] as Point)
+    : null;
+
+/** Polygons and multipolygons; anything else is skipped. */
+export function parseLakes(body: unknown): Lake[] {
+  const features = (body as { features?: unknown })?.features;
+  if (!Array.isArray(features)) throw new Error('Resposta sense entitats.');
+  const lakes: Lake[] = [];
+  for (const feature of features) {
+    const geometry = feature?.geometry;
+    const polygons: unknown[] =
+      geometry?.type === 'Polygon'
+        ? [geometry.coordinates]
+        : geometry?.type === 'MultiPolygon'
+          ? geometry.coordinates
+          : [];
+    const name = text(feature?.properties?.['NOM']) || 'Llac';
+    for (const polygon of polygons) {
+      if (!Array.isArray(polygon)) continue;
+      const rings = polygon.map(ring);
+      if (rings.length && rings.every((r) => r)) lakes.push({ name, rings: rings as Point[][] });
+    }
+  }
+  return lakes;
+}
+
+/** Even-odd rule over every ring, so holes (islands) are not water. */
+export function inLake(point: Point, lakes: readonly Lake[]): boolean {
+  return lakes.some((lake) => {
+    let inside = false;
+    for (const r of lake.rings)
+      for (let i = 0, j = r.length - 1; i < r.length; j = i++)
+        if (
+          r[i][1] > point[1] !== r[j][1] > point[1] &&
+          point[0] < ((r[j][0] - r[i][0]) * (point[1] - r[i][1])) / (r[j][1] - r[i][1]) + r[i][0]
+        )
+          inside = !inside;
+    return inside;
+  });
 }
 
 /** Aerodromes and aerodromes with heliport; not bare heliports, model fields or balloon sites. */
@@ -116,6 +194,7 @@ export function parseIcnfWater(body: unknown, extent: Extent): Resource[] {
       name: text(properties['Nome']) || "Punt d'aigua",
       point,
       source: 'ICNF' as const,
+      ...(text(properties['Tipo']) ? { detail: text(properties['Tipo']) } : {}),
     }));
 }
 

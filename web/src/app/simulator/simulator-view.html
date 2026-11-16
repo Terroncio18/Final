@@ -554,7 +554,9 @@
           <div class="measure-drawing" [style.--measure]="active.color">
             <p class="tool-hint">
               <strong>{{ active.label }}.</strong>
-              @if (active.geometry === 'point') {
+              @if (plan.loading()) {
+                Clic esquerre: {{ loadHint() }} · clic dret: tornar.
+              } @else if (active.geometry === 'point') {
                 Clic esquerre: aplicar · clic dret: cancel·lar.
               } @else {
                 Clic esquerre: vèrtex · clic dret: treure l’últim.
@@ -1300,6 +1302,16 @@
           >{{ aircraft.name }} · capacitat {{ aircraft.capacityL }} L</a
         >
       }
+      @if (config.flight; as flight) {
+        <a [href]="flight.source" target="_blank" rel="noopener noreferrer"
+          >Creuer {{ flight.cruiseKt }} kt{{
+            flight.fixedLoad === null ? '' : ' · càrrega ' + flight.fixedLoadText
+          }}</a
+        >
+        @if (flight.fixedLoad === null) {
+          <small class="crew-source">Temps de càrrega sense font oficial</small>
+        }
+      }
       <div class="measure-fields">
         <label>
           <span>{{ config.widthLabel }} (m)</span>
@@ -1336,17 +1348,33 @@
               (change)="setSetting('passes', $event)"
             />
           </label>
-          <label>
-            <span>Temps entre passades (min)</span>
-            <input
-              type="number"
-              min="1"
-              max="120"
-              step="1"
-              [value]="shown(config.settings.passIntervalMin)"
-              (change)="setSetting('passIntervalMin', $event)"
-            />
-          </label>
+          @if (config.flight; as flight) {
+            @if (flight.fixedLoad === null) {
+              <label>
+                <span>Temps de càrrega (min)</span>
+                <input
+                  type="number"
+                  min="0"
+                  [max]="flight.maxLoad"
+                  step="any"
+                  [value]="shown(config.settings.loadMin)"
+                  (change)="setSetting('loadMin', $event)"
+                />
+              </label>
+            }
+          } @else {
+            <label>
+              <span>Temps entre passades (min)</span>
+              <input
+                type="number"
+                min="1"
+                max="120"
+                step="1"
+                [value]="shown(config.settings.passIntervalMin)"
+                (change)="setSetting('passIntervalMin', $event)"
+              />
+            </label>
+          }
         }
         @if (config.removal) {
           <label>

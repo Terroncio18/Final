@@ -52,6 +52,28 @@ integrar exactament cada trajecte, la humitat es pren constant a trams de cinc
 minuts. La retenció i l'assecat són **hipòtesis experimentals**, no rendiments
 calibrats d'extinció.
 
+### On carreguen les aeronaus
+
+Des de la versió 7 (§11.44 de la bitàcola), l'interval entre passades d'un mitjà
+aeri no s'escriu: es tria **on carrega** i l'interval en surt.
+
+```
+interval = 2 × distància(descàrrega, càrrega) ÷ velocitat de creuer + temps de càrrega
+```
+
+| Aparell | Capacitat | Creuer | Càrrega | Font |
+| --- | --- | --- | --- | --- |
+| Bell 412 (helicòpter) | 1.350 L | 123 kt | **s'escriu**: no hi ha font oficial | fitxa del Bell 412EPX |
+| DHC-515 (amfibi) | 7.000 L | 180 kt | 12 s | fitxa de De Havilland |
+| AT-802F (retardant) | 3.104 L | 162 kt (a 8.000 ft) | 5 min a la base | fullet d'Air Tractor |
+
+L'helicòpter carrega a un punt d'aigua del mapa, al mar o en un llac oficial;
+l'amfibi, al mar, en un embassament o en un llac; l'avió de retardant, en un
+aeròdrom del mapa. El mar és el terreny a cota 0 o per sota, com el llegeix el
+model; els llacs, la capa de masses d'aigua de l'IDEIB (Balears). No es comprova
+la mida de la làmina d'aigua. El fitxer porta `loadPoint` i `loadMin`, i el
+lector comprova que `passIntervalMin` en sigui el resultat.
+
 ### Tala
 
 La tala multiplica la càrrega de totes les classes de partícules pel

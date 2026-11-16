@@ -1,4 +1,12 @@
-import { crewHead, type Countermeasure, type CountermeasureKind } from './countermeasures';
+import {
+  aircraftKind,
+  crewHead,
+  distanceM,
+  dropPoint,
+  legMin,
+  type Countermeasure,
+  type CountermeasureKind,
+} from './countermeasures';
 import type { Point } from './point';
 import type { Resource, ResourceKind } from './resources';
 
@@ -26,13 +34,6 @@ const LOADS_AT: Partial<Record<CountermeasureKind, ResourceKind>> = {
   retardant: 'aerodrome',
 };
 
-/** Flat-earth distance in metres, enough to pick the nearest place in a domain. */
-function distanceM(a: Point, b: Point): number {
-  const north = (b[1] - a[1]) * 111_320;
-  const east = (b[0] - a[0]) * 111_320 * Math.cos((((a[1] + b[1]) / 2) * Math.PI) / 180);
-  return Math.hypot(north, east);
-}
-
 /** The nearest resource of a kind to a point, or null if the map has none. */
 export function nearest(
   point: Point,
@@ -53,15 +54,6 @@ const lerp = (a: Point, b: Point, t: number): Point => [
   a[0] + (b[0] - a[0]) * t,
   a[1] + (b[1] - a[1]) * t,
 ];
-
-/** The middle of a drop: the point of a discharge, or the middle vertex of a line of retardant. */
-function dropPoint(measure: Countermeasure): Point {
-  const points = measure.points;
-  if (points.length === 1) return points[0];
-  const a = points[Math.floor((points.length - 1) / 2)],
-    b = points[Math.floor((points.length - 1) / 2) + 1] ?? a;
-  return lerp(a, b, points.length % 2 === 0 ? 0.5 : 0);
-}
 
 /**
  * Where an aircraft is at a minute, or null when it is not in the air.
@@ -92,6 +84,18 @@ export function aircraftAt(
       ? drop
       : null;
   }
+  // A chosen load point (§11.44): the interval is the flight at cruise speed
+  // and the load, so the aircraft flies at that speed and waits while loading.
+  if (measure.loadPoint && aircraftKind(measure.kind)) {
+    const leg = legMin(measure.kind, drop, load);
+    if (leg === 0 || minute < start - leg || minute > last + leg) return null;
+    if (minute <= start) return lerp(load, drop, (minute - (start - leg)) / leg);
+    if (minute >= last) return lerp(drop, load, (minute - last) / leg);
+    const since = (minute - start) % interval;
+    if (since <= leg) return lerp(drop, load, since / leg);
+    if (since >= interval - leg) return lerp(load, drop, (since - (interval - leg)) / leg);
+    return load;
+  }
   if (minute < start - half || minute > last + half) return null;
   if (minute <= start) return lerp(load, drop, (minute - (start - half)) / half);
   if (minute >= last) return lerp(drop, load, (minute - last) / half);
@@ -120,7 +124,8 @@ export function agentsAt(
     }
     const loadsAt = LOADS_AT[measure.kind];
     if (!loadsAt) continue;
-    const load = nearest(dropPoint(measure), loadsAt, resources);
+    // The point chosen with the measure; for older plans, the nearest on the map.
+    const load = measure.loadPoint ?? nearest(dropPoint(measure), loadsAt, resources);
     const point = aircraftAt(measure, minute, load);
     if (point)
       agents.push({

@@ -40,7 +40,7 @@ const LIMITS = {
 } as const;
 
 const HEADER = '# IgnisLab · escenari de simulació';
-const VERSION = '6';
+const VERSION = '7';
 
 /**
  * What a key the file does not carry stands for: the screen's own starting
@@ -133,6 +133,7 @@ export function formatScenario(scenario: Scenario, saved: Date): string {
           '# Contramesures: startMin és el minut de desplegament (absent = 0).',
           '# durationMin compta des del desplegament; coordenades [longitud,latitud].',
           '# Brigades: arrivalMin en minuts, crewSize en efectius i ratePerPerson en m/h (extinció de restes: ha/h).',
+          '# Descàrregues aèries: loadPoint [longitud,latitud] i loadMin en minuts; passIntervalMin en surt.',
           `contramesures = ${JSON.stringify(scenario.countermeasures)}`,
         ]
       : []),
@@ -193,6 +194,7 @@ export function readScenario(text: string): ScenarioRead | string {
     version !== '3' &&
     version !== '4' &&
     version !== '5' &&
+    version !== '6' &&
     version !== VERSION
   )
     return 'Versió d’escenari no compatible.';

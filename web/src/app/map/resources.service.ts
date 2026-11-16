@@ -9,7 +9,10 @@ import {
   parseEnaireAerodromes,
   parseIcnfWater,
   parseOverpass,
+  ideibLakesUrl,
+  parseLakes,
   type Extent,
+  type Lake,
   type Resource,
   type ResourceSource,
 } from '../simulation/resources';
@@ -35,6 +38,8 @@ export class ResourcesService {
 
   readonly resources = signal<readonly Resource[]>([]);
   readonly failed = signal<readonly ResourceSource[]>([]);
+  /** Official lakes and reservoirs of the domain, where an aircraft may load (§11.44). */
+  readonly lakes = signal<readonly Lake[]>([]);
   private asked: string | null = null;
   private readonly cache = new Map<string, readonly Resource[]>();
 
@@ -42,6 +47,15 @@ export class ResourcesService {
     const key = extent.map((n) => n.toFixed(5)).join(',');
     this.asked = key;
     const cached = this.cache.get(key);
+    // Lakes travel apart: they are not drawn, only consulted when a load point
+    // is chosen, and a failure only means fewer places to load.
+    void json(fetch(ideibLakesUrl(extent)))
+      .then((body) => {
+        if (this.asked === key) this.lakes.set(parseLakes(body));
+      })
+      .catch(() => {
+        if (this.asked === key) this.lakes.set([]);
+      });
     if (cached) return this.show(cached, []);
 
     const failed: ResourceSource[] = [];
@@ -81,6 +95,7 @@ export class ResourcesService {
 
   release(): void {
     this.asked = null;
+    this.lakes.set([]);
     this.show([], []);
   }
 
