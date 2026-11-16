@@ -2636,7 +2636,7 @@ amb un nom de client respon bé. Una pàgina no pot posar el seu propi
 
 Comprovat: quatre proves noves de l'API —la consulta, el que es conserva, la
 ruta amb la memòria i el nom de client, i el reintent— i la ruta en directe
-(Palma: el parc de bombers de Marratxí). Les 134 proves de simulació i les 37
+(entorn de Palma: torna el parc de bombers d'OpenStreetMap). Les 134 proves de simulació i les 37
 d'Angular, i la compilació sense avisos. **Al navegador no s'ha mirat**: ho
 prova Pere.
 
