@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-
 import {
   buildDropCurtain,
   buildModel,

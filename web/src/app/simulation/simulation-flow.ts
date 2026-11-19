@@ -1,6 +1,5 @@
 import { Component, DestroyRef, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-
 import { MapService } from '../map/map.service';
 import { LevelsService } from './levels.service';
 

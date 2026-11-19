@@ -1,6 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-
 import { MapService } from '../map/map.service';
 import { LevelsService } from './levels.service';
 import { RegionsService } from './regions.service';
@@ -51,11 +50,6 @@ export class RegionStep {
     })).filter((group) => group.regions.length > 0);
   });
 
-  /** The region the pointer or the keyboard is on. Null clears the outline. */
-  protected focus(id: string | null): void {
-    this.maps.focusRegion(id);
-  }
-
   public constructor() {
     this.regions.load();
 
@@ -67,5 +61,10 @@ export class RegionStep {
     // framing is repeated so the panel does not cover what it frames, which
     // also brings the map back when a later step returns here.
     this.maps.goToView(this.maps.scope(), true);
+  }
+
+  /** The region the pointer or the keyboard is on. Null clears the outline. */
+  protected focus(id: string | null): void {
+    this.maps.focusRegion(id);
   }
 }

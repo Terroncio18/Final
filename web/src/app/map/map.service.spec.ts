@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import type { FeatureCollection } from 'geojson';
-import type { Map as LibreMap, MapMouseEvent } from 'maplibre-gl';
+import type { Map as LibreMap, MapMouseEvent, StyleSpecification } from 'maplibre-gl';
 import { MapService } from './map.service';
 import {
   DOMAIN_SOURCE,
@@ -64,7 +64,7 @@ vi.mock('maplibre-contour', () => ({
 function mapDouble() {
   const sources = new Map<string, ReturnType<typeof source>>(),
     layers = new Map<string, { id: string }>();
-  const handlers = new Map<string, Set<(event: any) => void>>();
+  const handlers = new Map<string, Set<(event: unknown) => void>>();
   const canvas = document.createElement('canvas'),
     container = document.createElement('div');
   const handler = () => ({ enable: vi.fn(), disable: vi.fn() });
@@ -74,21 +74,21 @@ function mapDouble() {
     canvas,
     container,
     handlers,
-    on: vi.fn((name: string, fn: (event: any) => void) => {
+    on: vi.fn((name: string, fn: (event: unknown) => void) => {
       if (!handlers.has(name)) handlers.set(name, new Set());
       handlers.get(name)!.add(fn);
     }),
-    off: vi.fn((name: string, fn: (event: any) => void) => {
+    off: vi.fn((name: string, fn: (event: unknown) => void) => {
       handlers.get(name)?.delete(fn);
     }),
-    once: vi.fn((name: string, fn: (event: any) => void) => {
-      const once = (event: any) => {
+    once: vi.fn((name: string, fn: (event: unknown) => void) => {
+      const once = (event: unknown) => {
         handlers.get(name)?.delete(once);
         fn(event);
       };
       map.on(name, once);
     }),
-    emit: (name: string, event: any = {}) => {
+    emit: (name: string, event: unknown = {}) => {
       for (const fn of [...(handlers.get(name) ?? [])]) fn(event);
     },
     addControl: vi.fn(),
@@ -121,7 +121,7 @@ function mapDouble() {
     setFeatureState: vi.fn(),
     triggerRepaint: vi.fn(),
     remove: vi.fn(),
-    queryRenderedFeatures: vi.fn((): any[] => []),
+    queryRenderedFeatures: vi.fn((): unknown[] => []),
     dragRotate: handler(),
     touchPitch: handler(),
     dragPan: handler(),
@@ -155,9 +155,10 @@ describe('MapService and map overlays', () => {
   beforeEach(() => {
     map = mapDouble();
     doubles.markers.length = 0;
-    doubles.makeMap = (options: any) => {
-      for (const [id, value] of Object.entries(options.style.sources)) map.addSource(id, value);
-      for (const layer of options.style.layers) map.addLayer(layer);
+    doubles.makeMap = (options: unknown) => {
+      const { style } = options as { style: StyleSpecification };
+      for (const [id, value] of Object.entries(style.sources)) map.addSource(id, value);
+      for (const layer of style.layers) map.addLayer(layer);
       return map;
     };
     service = TestBed.inject(MapService);

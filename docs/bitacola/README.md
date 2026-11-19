@@ -133,11 +133,11 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.60** El servidor es parteix en dos per a poder preguntar-li
 - **11.61** Un dia que no existeix i una hora que no era
 - **11.62** La interfície també es prova, i la porta es posa verda
+- **11.63** El linter entra, i el que no deixa passar
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):
 
-- **12.28** Si hi va un linter
 - **12.16** Calibrar els coeficients de les contramesures
 - **12.18** El manual d'usuari
 - **12.26** El que falta dels llocs de càrrega

@@ -52,7 +52,10 @@ function headingAlong(points: readonly Point[], at: Point): number {
           )
         : 0;
     const distance = Math.hypot(at[0] - a[0] - t * dx, at[1] - a[1] - t * dy);
-    if (distance < bestDistance) ((bestDistance = distance), (best = i));
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = i;
+    }
   }
   return points.length > 1 ? bearing(points[best], points[best + 1]) : 0;
 }

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-
 import { COUNTERMEASURE_CATALOG, CREW_DEFAULTS } from '../simulation/countermeasures';
 import { domainAround } from '../simulation/domain';
 import type { Point } from '../simulation/point';

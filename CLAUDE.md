@@ -24,6 +24,7 @@ monorepo: cada meitat té el seu `package.json` i s'hi entra per separat.
 cd web && npm test              # les proves del model i les d'Angular
 cd web && npm run build
 cd web && npx prettier --check .
+cd web && npm run lint          # ESLint: el full d'estil que una eina pot mirar
 cd api && npm test              # les de l'API, que llegeixen src/ i no dist/
 
 # La cobertura, a cada meitat. Deixa l'lcov a punt per a Sonar, amb els

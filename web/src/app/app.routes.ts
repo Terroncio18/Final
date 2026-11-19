@@ -1,5 +1,4 @@
 import { Routes } from '@angular/router';
-
 import { MapShell } from './map/map-shell';
 import { MapView } from './map/map-view';
 import { IgnitionStep } from './simulation/ignition-step';

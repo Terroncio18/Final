@@ -13,7 +13,6 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-
 import { Chrome } from '../chrome';
 import { CountermeasureDisplay } from '../map/countermeasure-display';
 import { SpottingDisplay, spotPoint } from '../map/spotting-display';
@@ -249,6 +248,24 @@ function heatOf(result: SpreadResult): (cell: number, minute: number) => number 
 }
 
 /** Two lists holding the same items, in the same order. */
+/** Over the ten minutes up to this one: the fastest run, the hottest front, the latest heading. */
+function recentFront(
+  rate: Float32Array,
+  intensity: Float32Array,
+  heading: Float32Array,
+  minute: number,
+): { fastest: number; hottest: number; bearing: number } {
+  let fastest = 0;
+  let hottest = 0;
+  let bearing = Number.NaN;
+  for (let m = minute; m >= Math.max(minute - 10, 0); m -= 1) {
+    if (rate[m] > fastest) fastest = rate[m];
+    if (intensity[m] > hottest) hottest = intensity[m];
+    if (Number.isNaN(bearing) && !Number.isNaN(heading[m])) bearing = heading[m];
+  }
+  return { fastest, hottest, bearing };
+}
+
 function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
   return a.length === b.length && a.every((item, i) => item === b[i]);
 }
@@ -1075,23 +1092,11 @@ export class SimulatorView {
     const whole = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 0 });
     const size = (value: number) => (value < 100 ? one : whole).format(value);
 
-    let fastest = 0;
-    let hottest = 0;
-    let bearing = Number.NaN;
-    for (let m = minute; m >= Math.max(minute - 10, 0); m -= 1) {
-      if (rate[m] > fastest) fastest = rate[m];
-      if (intensity[m] > hottest) hottest = intensity[m];
-      if (Number.isNaN(bearing) && !Number.isNaN(heading[m])) bearing = heading[m];
-    }
-
+    const { fastest, hottest, bearing } = recentFront(rate, intensity, heading, minute);
     const back = Math.max(minute - 30, 0);
     const perHour = minute > back ? ((area[minute] - area[back]) / (minute - back)) * 60 : 0;
     const total = result.burnable * ((CELL_M * CELL_M) / 10_000);
     const towards = Number.isNaN(bearing) ? null : this.compass(bearing);
-    // Past the timeline the fire is still computed (FORECAST_MARGIN_MINUTES), but
-    // an arrival at the edge out there is not something this screen reports.
-    const reachedEdge = result.reachedEdge <= this.horizon.minutes ? result.reachedEdge : Infinity;
-    const edgeReached = reachedEdge <= minute;
     // Byram's flame length for that intensity, and the band of the fire
     // characteristics chart it falls in. A stopped front has neither.
     const flame = flameLength(hottest);
@@ -1116,16 +1121,31 @@ export class SimulatorView {
       headingNote: towards
         ? `${Math.round(bearing)}° · cap al ${towards.name}`
         : 'Sense front actiu',
-      edge: Number.isFinite(reachedEdge) ? `T + ${this.clock(reachedEdge)}` : 'No hi arriba',
-      edgeNote: !Number.isFinite(reachedEdge)
-        ? `En ${this.horizon.hours} h el foc no surt del domini`
-        : edgeReached
-          ? "A partir d'aquí el foc surt del que es calcula"
-          : 'Més enllà el foc surt del que es calcula',
-      edgeReached,
+      ...this.edgeFigures(result.reachedEdge, minute),
       cursor: (minute / this.horizon.minutes) * 300,
     };
   });
+
+  /** Whether, and when, the fire leaves the domain, as the figures say it. */
+  private edgeFigures(arrival: number, minute: number) {
+    // Past the timeline the fire is still computed (FORECAST_MARGIN_MINUTES), but
+    // an arrival at the edge out there is not something this screen reports.
+    const reachedEdge = arrival <= this.horizon.minutes ? arrival : Infinity;
+    const edgeReached = reachedEdge <= minute;
+    if (!Number.isFinite(reachedEdge))
+      return {
+        edge: 'No hi arriba',
+        edgeNote: `En ${this.horizon.hours} h el foc no surt del domini`,
+        edgeReached,
+      };
+    return {
+      edge: `T + ${this.clock(reachedEdge)}`,
+      edgeNote: edgeReached
+        ? "A partir d'aquí el foc surt del que es calcula"
+        : 'Més enllà el foc surt del que es calcula',
+      edgeReached,
+    };
+  }
 
   /**
    * What has burned so far, by fuel model: which fuels the fire is living on.
@@ -1576,6 +1596,16 @@ export class SimulatorView {
         paintedForecast = forecast;
         emittersMinute = minute;
       };
+      const changedSincePaint = (
+        minute: number,
+        metres: number | undefined,
+        forecast: boolean,
+        motion: boolean,
+      ) =>
+        minute !== paintedMinute ||
+        metres !== paintedScale ||
+        forecast !== paintedForecast ||
+        motion !== motionWas;
       const draw = (now: number) => {
         const dt = Math.min(Math.max((now - last) / 1000, 0), 0.1);
         last = now;
@@ -1590,11 +1620,7 @@ export class SimulatorView {
             (minute < previousMinute || minute - previousMinute > 3);
           if (
             now - lastPaint >= 33 &&
-            (motion ||
-              minute !== paintedMinute ||
-              metres !== paintedScale ||
-              forecast !== paintedForecast ||
-              motion !== motionWas)
+            (motion || changedSincePaint(minute, metres, forecast, motion))
           ) {
             painter.paint(minute, motion ? visualSeconds : 0, forecast, metres);
             this.maps.refreshFire();

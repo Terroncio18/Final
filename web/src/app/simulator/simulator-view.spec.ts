@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { vi } from 'vitest';
+import { vi, type Mock } from 'vitest';
 import { SimulatorView, SIMULATE_FIRE } from './simulator-view';
 import { Chrome } from '../chrome';
 import { MapService } from '../map/map.service';
@@ -16,6 +16,7 @@ import { WeatherService, type Observation } from './weather.service';
 import { spread, type SpreadResult } from '../simulation/fire-spread';
 import { type Terrain, cellOf } from '../simulation/terrain';
 import type { FuelGrid } from '../simulation/fuel-data';
+import type { FuelTreatments } from '../simulation/fuel-treatments';
 import { type Point, formatPoints } from '../simulation/point';
 import { GRID, domainAround } from '../simulation/domain';
 import { COUNTERMEASURE_CATALOG, type Countermeasure } from '../simulation/countermeasures';
@@ -96,9 +97,97 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+const MAP_METHODS = [
+  'setGroundAgents',
+  'setAgentsMotion',
+  'landPasses',
+  'flyPass',
+  'create',
+  'setHotspotsVisible',
+  'setRegionsVisible',
+  'showProvincesOf',
+  'focusMunicipality',
+  'setIgnition',
+  'setDomain',
+  'setDomainMask',
+  'setTerrain3D',
+  'setOrbit',
+  'goToBounds',
+  'setSandboxBounds',
+  'setContours',
+  'setReliefEmphasis',
+  'setPicking',
+  'setFireStarts',
+  'setSlopes',
+  'setFire',
+  'setFireParticles',
+  'refreshFire',
+  'resetFireParticles',
+  'setFireMotion',
+  'destroy',
+  'zoomBy',
+  'focusFire',
+] as const;
+function mapsDouble() {
+  const methods = Object.fromEntries(MAP_METHODS.map((name) => [name, vi.fn()])) as Record<
+    (typeof MAP_METHODS)[number],
+    Mock
+  >;
+  return {
+    ready: signal(false),
+    bearing: signal(30),
+    pointer: signal<Point | null>(null),
+    picked: signal<Point | null>(null),
+    rightClicks: signal(0),
+    map: null as object | null,
+    ...methods,
+    metresPerPixel: vi.fn((): number | null => null),
+  };
+}
+function terrainDouble() {
+  return {
+    terrain: signal<Terrain | null>(null),
+    reading: signal(false),
+    failed: signal(false),
+    read: vi.fn(),
+    clear: vi.fn(),
+  };
+}
+function fuelsDouble() {
+  return {
+    grid: signal<FuelGrid | null>(null),
+    reading: signal(false),
+    error: signal<string | null>(null),
+    read: vi.fn().mockResolvedValue(undefined),
+    clear: vi.fn(),
+  };
+}
+function weatherDouble() {
+  return {
+    observation: signal<Observation | null>(null),
+    loading: signal(false),
+    failed: signal(false),
+    load: vi.fn(),
+    clear: vi.fn(),
+  };
+}
+function placesDouble() {
+  return { load: vi.fn(), release: vi.fn() };
+}
+function municipalitiesDouble() {
+  return {
+    load: vi.fn(),
+    find: vi.fn((id: string) => (id === 'ES_07061' ? { name: 'Sóller' } : undefined)),
+  };
+}
 describe('simulator screen', () => {
   let fixture: ComponentFixture<SimulatorView>, c: SimulatorView;
-  let maps: any, terrain: any, fuels: any, weather: any, places: any, municipalities: any;
+  let maps: ReturnType<typeof mapsDouble>,
+    terrain: ReturnType<typeof terrainDouble>,
+    fuels: ReturnType<typeof fuelsDouble>,
+    weather: ReturnType<typeof weatherDouble>,
+    places: ReturnType<typeof placesDouble>,
+    municipalities: ReturnType<typeof municipalitiesDouble>;
   let simulate: ReturnType<typeof vi.fn<typeof spread>>,
     navigate: ReturnType<typeof vi.fn<Router['navigate']>>;
   let frames: Map<number, FrameRequestCallback>,
@@ -139,84 +228,23 @@ describe('simulator screen', () => {
         getExtension: () => null,
         isContextLost: () => false,
         createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }),
-      } as Record<string, any>,
+      } as Record<string, unknown>,
       { get: (target, name: string) => (target[name] ??= vi.fn()) },
     );
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-      gl as CanvasRenderingContext2D,
+      gl as unknown as CanvasRenderingContext2D,
     );
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;slope');
     for (const method of ['attach', 'detach', 'setMeasures', 'setDraft'] as const)
       vi.spyOn(CountermeasureDisplay.prototype, method).mockImplementation(() => {});
     for (const method of ['set', 'detach'] as const)
       vi.spyOn(SpottingDisplay.prototype, method).mockImplementation(() => {});
-    maps = {
-      ready: signal(false),
-      bearing: signal(30),
-      pointer: signal<Point | null>(null),
-      picked: signal<Point | null>(null),
-      rightClicks: signal(0),
-      map: null,
-    };
-    for (const method of [
-      'setGroundAgents',
-      'setAgentsMotion',
-      'landPasses',
-      'flyPass',
-      'create',
-      'setHotspotsVisible',
-      'setRegionsVisible',
-      'showProvincesOf',
-      'focusMunicipality',
-      'setIgnition',
-      'setDomain',
-      'setDomainMask',
-      'setTerrain3D',
-      'setOrbit',
-      'goToBounds',
-      'setSandboxBounds',
-      'setContours',
-      'setReliefEmphasis',
-      'setPicking',
-      'setFireStarts',
-      'setSlopes',
-      'setFire',
-      'setFireParticles',
-      'refreshFire',
-      'resetFireParticles',
-      'setFireMotion',
-      'destroy',
-      'zoomBy',
-      'focusFire',
-    ])
-      maps[method] = vi.fn();
-    maps.metresPerPixel = vi.fn(() => null);
-    terrain = {
-      terrain: signal<Terrain | null>(null),
-      reading: signal(false),
-      failed: signal(false),
-      read: vi.fn(),
-      clear: vi.fn(),
-    };
-    fuels = {
-      grid: signal<FuelGrid | null>(null),
-      reading: signal(false),
-      error: signal<string | null>(null),
-      read: vi.fn().mockResolvedValue(undefined),
-      clear: vi.fn(),
-    };
-    weather = {
-      observation: signal<Observation | null>(null),
-      loading: signal(false),
-      failed: signal(false),
-      load: vi.fn(),
-      clear: vi.fn(),
-    };
-    places = { load: vi.fn(), release: vi.fn() };
-    municipalities = {
-      load: vi.fn(),
-      find: vi.fn((id: string) => (id === 'ES_07061' ? { name: 'Sóller' } : undefined)),
-    };
+    maps = mapsDouble();
+    terrain = terrainDouble();
+    fuels = fuelsDouble();
+    weather = weatherDouble();
+    places = placesDouble();
+    municipalities = municipalitiesDouble();
     simulate = vi.fn<typeof spread>();
     TestBed.configureTestingModule({
       providers: [
@@ -804,7 +832,7 @@ describe('simulator screen', () => {
     expect(maps.focusFire).toHaveBeenCalledTimes(2);
     c['result'].set({
       ...result,
-      spotIgnitions: [{ cell: centreCell, minute: 1, distanceM: 100.4 } as any],
+      spotIgnitions: [{ cell: centreCell, source: centreCell, minute: 1, distanceM: 100.4 }],
     });
     expect(c['spotRows']()[0]).toMatchObject({
       label: 'Focus per brasa 1',
@@ -816,7 +844,7 @@ describe('simulator screen', () => {
     const treatment = {
       at: vi.fn(() => ({ moisture1h: 0.15, bed: { loadTonHa: 8 }, remaining: 0.5 })),
     };
-    c['result'].set({ ...result, fuelTreatments: treatment as any });
+    c['result'].set({ ...result, fuelTreatments: treatment as unknown as FuelTreatments });
     expect(c['treatedCell']()).toMatchObject({
       where: 'Cel·la sota el cursor',
       moisture: '15',
@@ -1016,7 +1044,7 @@ describe('simulator screen', () => {
     expect(c['plan'].guard?.(burning)).toContain('més de 12');
     c['result'].set({
       ...result,
-      fuelTreatments: { at: () => ({ bed: { heatPerArea: 2000 } }) } as any,
+      fuelTreatments: { at: () => ({ bed: { heatPerArea: 2000 } }) } as unknown as FuelTreatments,
     });
     expect(c['plan'].guard?.(burning)).toContain('Front massa intens');
     c['result'].set({ ...result, heat: new Float32Array(GRID * GRID) });
@@ -1068,8 +1096,9 @@ describe('simulator screen', () => {
     vi.stubGlobal(
       'URL',
       class extends URL {
-        public static override createObjectURL = () => 'blob:scenario';
         public static override revokeObjectURL = vi.fn();
+
+        public static override createObjectURL = () => 'blob:scenario';
       },
     );
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});

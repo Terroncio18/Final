@@ -99,23 +99,6 @@ export class FireField {
     }
   }
 
-  /** Smooth noise over the ground, from 0 to 1. */
-  private noise(x: number, y: number): number {
-    const fx = Math.floor(x);
-    const fy = Math.floor(y);
-    let tx = x - fx;
-    let ty = y - fy;
-    tx = tx * tx * (3 - 2 * tx);
-    ty = ty * ty * (3 - 2 * ty);
-    const x0 = fx & (LATTICE - 1);
-    const x1 = (fx + 1) & (LATTICE - 1);
-    const y0 = (fy & (LATTICE - 1)) * LATTICE;
-    const y1 = ((fy + 1) & (LATTICE - 1)) * LATTICE;
-    const top = this.lattice[y0 + x0] + (this.lattice[y0 + x1] - this.lattice[y0 + x0]) * tx;
-    const bottom = this.lattice[y1 + x0] + (this.lattice[y1 + x1] - this.lattice[y1 + x0]) * tx;
-    return top + (bottom - top) * ty;
-  }
-
   /**
    * Paints the fire at `minute` of the simulation and `seconds` of the visual
    * clock. With `motion` off the shimmer is frozen; the timeline still works.
@@ -214,6 +197,23 @@ export class FireField {
   /** True while there is a front or warm ground to animate. */
   public get moving(): boolean {
     return this.count > 0;
+  }
+
+  /** Smooth noise over the ground, from 0 to 1. */
+  private noise(x: number, y: number): number {
+    const fx = Math.floor(x);
+    const fy = Math.floor(y);
+    let tx = x - fx;
+    let ty = y - fy;
+    tx = tx * tx * (3 - 2 * tx);
+    ty = ty * ty * (3 - 2 * ty);
+    const x0 = fx & (LATTICE - 1);
+    const x1 = (fx + 1) & (LATTICE - 1);
+    const y0 = (fy & (LATTICE - 1)) * LATTICE;
+    const y1 = ((fy + 1) & (LATTICE - 1)) * LATTICE;
+    const top = this.lattice[y0 + x0] + (this.lattice[y0 + x1] - this.lattice[y0 + x0]) * tx;
+    const bottom = this.lattice[y1 + x0] + (this.lattice[y1 + x1] - this.lattice[y1 + x0]) * tx;
+    return top + (bottom - top) * ty;
   }
 
   private char(i: number): void {

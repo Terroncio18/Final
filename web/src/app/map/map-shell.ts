@@ -7,7 +7,6 @@ import {
   viewChild,
 } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-
 import { HotspotsService } from './hotspots.service';
 import { MapService } from './map.service';
 

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-
 import { bearing, groundAgentsAt, passesBetween } from './agents';
 import type { Countermeasure } from './countermeasures';
 import type { Point } from './point';

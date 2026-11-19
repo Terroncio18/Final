@@ -1277,6 +1277,7 @@
   <!-- A countermeasure is set up before it is used, here and not in the list
        (§11.39). -->
   @if (configView(); as config) {
+    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- Escape closes it from anywhere: the host listens on the document. -->
     <div class="modal-backdrop" (click)="cancelSettings()"></div>
     <div
       class="tool-modal"

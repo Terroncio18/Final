@@ -21,6 +21,7 @@ export interface FuelGrid {
 }
 
 /** Strict decoding prevents a truncated/misaligned response from becoming fuel. */
+// eslint-disable-next-line complexity -- pending (docs/estil.md §4): a validator, one check per field of the response.
 export function decodeFuels(raw: unknown, bounds: readonly number[], size: number): FuelGrid {
   const data = raw as Record<string, unknown> | null;
   const fail = (): never => {

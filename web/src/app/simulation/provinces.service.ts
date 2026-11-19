@@ -1,6 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
 import type { FeatureCollection } from 'geojson';
-
 import { PROVINCES_URL } from '../map/map.config';
 import { MapService } from '../map/map.service';
 import { boundsOf, type AreaGeometry } from './bounds';

@@ -1,5 +1,4 @@
 import { inject, Injectable } from '@angular/core';
-
 import { MapService } from '../map/map.service';
 import { PlacesService } from '../map/places.service';
 import { MunicipalitiesService } from './municipalities.service';

@@ -122,22 +122,6 @@ export class CountermeasureDisplay {
   private drawing = false;
   private onSelect: ((id: string | null) => void) | null = null;
 
-  private readonly clicked = (event: MapMouseEvent) => {
-    const map = this.map;
-    // While a tool is in the hand a click is a vertex, not a selection.
-    if (!map || this.drawing || !this.onSelect) return;
-    const { x, y } = event.point;
-    const hits = map.queryRenderedFeatures(
-      [
-        [x - HIT_SLOP, y - HIT_SLOP],
-        [x + HIT_SLOP, y + HIT_SLOP],
-      ],
-      { layers: [LAYERS.axis, LAYERS.band, LAYERS.disc] },
-    );
-    const id = hits[0]?.properties?.['id'];
-    this.onSelect(typeof id === 'string' ? id : null);
-  };
-
   /** Puts the layers up. The style must have loaded: wait for MapService.ready. */
   public attach(map: MapLibreMap, onSelect: (id: string | null) => void): void {
     if (this.map === map) return;
@@ -312,6 +296,22 @@ export class CountermeasureDisplay {
       // The map was removed first and took its layers with it: nothing left to undo.
     }
   }
+
+  private readonly clicked = (event: MapMouseEvent) => {
+    const map = this.map;
+    // While a tool is in the hand a click is a vertex, not a selection.
+    if (!map || this.drawing || !this.onSelect) return;
+    const { x, y } = event.point;
+    const hits = map.queryRenderedFeatures(
+      [
+        [x - HIT_SLOP, y - HIT_SLOP],
+        [x + HIT_SLOP, y + HIT_SLOP],
+      ],
+      { layers: [LAYERS.axis, LAYERS.band, LAYERS.disc] },
+    );
+    const id = hits[0]?.properties?.['id'];
+    this.onSelect(typeof id === 'string' ? id : null);
+  };
 
   private write(source: string, data: FeatureCollection): void {
     writeSource(this.map?.getSource(source) as GeoJSONSource | undefined, data);

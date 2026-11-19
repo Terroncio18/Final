@@ -1,5 +1,4 @@
 import { Component, computed, ElementRef, inject, signal } from '@angular/core';
-
 import { HotspotsService } from '../map/hotspots.service';
 import {
   isDay,
@@ -34,20 +33,12 @@ export class RangePicker {
   private readonly hotspots = inject(HotspotsService);
   private readonly host = inject(ElementRef<HTMLElement>);
 
-  protected readonly presets = PRESETS;
-  protected readonly maxDays = MAX_RANGE_DAYS;
-  protected readonly today = today();
-
   protected readonly range = this.hotspots.range;
   protected readonly loading = this.hotspots.loading;
   protected readonly failed = this.hotspots.failed;
   protected readonly count = this.hotspots.countInScope;
   protected readonly earliest = this.hotspots.earliest;
-
   protected readonly open = signal(false);
-
-  protected readonly label = computed(() => labelOf(this.range()));
-  protected readonly current = computed(() => presetOf(this.range()));
 
   /**
    * The two fields, which are a draft and not the state.
@@ -58,6 +49,12 @@ export class RangePicker {
    */
   protected readonly from = signal(this.range().from);
   protected readonly to = signal(this.range().to);
+
+  protected readonly presets = PRESETS;
+  protected readonly maxDays = MAX_RANGE_DAYS;
+  protected readonly today = today();
+  protected readonly label = computed(() => labelOf(this.range()));
+  protected readonly current = computed(() => presetOf(this.range()));
 
   /** Nothing when the draft is a range, and what is wrong with it when not. */
   protected readonly problem = computed(() => {

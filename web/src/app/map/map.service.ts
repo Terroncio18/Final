@@ -11,9 +11,7 @@ import {
   type MapGeoJSONFeature,
   type MapMouseEvent,
 } from 'maplibre-gl';
-
 import type { Feature, FeatureCollection, Point } from 'geojson';
-
 import type { Hotspot } from './hotspot';
 import { BOUNDARIES_ATTRIBUTION, INITIAL_VIEW, VIEWS, type ViewId } from './map.config';
 import {
@@ -269,6 +267,29 @@ export class MapService {
    * and asking again would be the step §2.18 does away with.
    */
   public readonly scope = signal<ViewId>(INITIAL_VIEW);
+
+  /** What the colour of the marks is saying. The legend reads it. */
+  public readonly hotspotColourBy = signal<HotspotColourBy>('power');
+
+  /**
+   * How much the marks have been shrunk for the number on screen, from 1 down.
+   * Published because the legend draws the same circles and has to match.
+   */
+  public readonly hotspotScale = signal(1);
+
+  /**
+   * The 3D figures of who works on the fire (§11.50). The layer, and three.js
+   * with it, is loaded the first time anyone is at work: a screen that never
+   * puts a crew or an aircraft down does not pay for it.
+   */
+  private agents3d: Agents3D | null = null;
+  private agents3dModule: Promise<typeof import('./agents-3d')> | null = null;
+  /** The latest wishes, applied once the layer exists. */
+  private groundWanted: readonly GroundAgent[] = [];
+  private agentsMotion = true;
+
+  /** The flames and the smoke over the fire. See setFireParticles(). */
+  private particles: FireParticles | null = null;
 
   public get map(): MapLibreMap | null {
     return this.instance;
@@ -546,21 +567,6 @@ export class MapService {
     this.withStyle((map) => this.applyProvinces(map));
   }
 
-  private applyProvinces(map: MapLibreMap): void {
-    if (!map.getLayer(LAYERS.provincesLine)) return;
-    const filter = ['==', ['get', 'region'], this.provincesOf ?? ''] as never;
-    map.setFilter(LAYERS.provincesLine, filter);
-  }
-
-  private setFocus(fill: string, line: string, id: string | null): void {
-    this.withStyle((map) => {
-      if (!map.getLayer(fill)) return;
-      const filter = ['==', ['get', 'id'], id ?? ''] as never;
-      map.setFilter(fill, filter);
-      map.setFilter(line, filter);
-    });
-  }
-
   /**
    * Puts a set of detections on the map, replacing whatever was there.
    *
@@ -573,9 +579,6 @@ export class MapService {
       writeSource(source, data);
     });
   }
-
-  /** What the colour of the marks is saying. The legend reads it. */
-  public readonly hotspotColourBy = signal<HotspotColourBy>('power');
 
   /**
    * Makes the colour of the marks say the power, or the date.
@@ -590,12 +593,6 @@ export class MapService {
       map.setPaintProperty(LAYERS.hotspots, 'circle-color', hotspotColour(by)),
     );
   }
-
-  /**
-   * How much the marks have been shrunk for the number on screen, from 1 down.
-   * Published because the legend draws the same circles and has to match.
-   */
-  public readonly hotspotScale = signal(1);
 
   /**
    * Sizes and thins the marks for how many of them are in view.
@@ -705,31 +702,6 @@ export class MapService {
     this.withStyle((map) => {
       const source = map.getSource(PLACES_SOURCE) as GeoJSONSource | undefined;
       writeSource(source, data ?? { type: 'FeatureCollection', features: [] });
-    });
-  }
-
-  /**
-   * The 3D figures of who works on the fire (§11.50). The layer, and three.js
-   * with it, is loaded the first time anyone is at work: a screen that never
-   * puts a crew or an aircraft down does not pay for it.
-   */
-  private agents3d: Agents3D | null = null;
-  private agents3dModule: Promise<typeof import('./agents-3d')> | null = null;
-  /** The latest wishes, applied once the layer exists. */
-  private groundWanted: readonly GroundAgent[] = [];
-  private agentsMotion = true;
-
-  private withAgents(map: MapLibreMap, then: (layer: Agents3D) => void): void {
-    if (this.agents3d && map.getLayer(this.agents3d.id)) return then(this.agents3d);
-    this.agents3dModule ??= import('./agents-3d');
-    void this.agents3dModule.then(({ Agents3D }) => {
-      if (!this.agents3d || !map.getLayer(this.agents3d.id)) {
-        this.agents3d = new Agents3D(LAYERS.agents);
-        map.addLayer(this.agents3d);
-        this.agents3d.setMotion(this.agentsMotion);
-        this.agents3d.setGround(this.groundWanted);
-      }
-      then(this.agents3d);
     });
   }
 
@@ -876,9 +848,6 @@ export class MapService {
       );
     });
   }
-
-  /** The flames and the smoke over the fire. See setFireParticles(). */
-  private particles: FireParticles | null = null;
 
   /**
    * Puts flames and smoke over the cells the fire is in, or takes them off.
@@ -1192,6 +1161,54 @@ export class MapService {
     this.select(null);
   }
 
+  public destroy(): void {
+    this.particles = null;
+    this.centreMarker?.remove();
+    this.centreMarker = null;
+    for (const mark of this.fireStarts) mark.remove();
+    this.fireStarts = [];
+    this.instance?.remove();
+    this.instance = null;
+    this.queued.length = 0;
+    this.framed = false;
+    this.styled = false;
+    this.picking = false;
+    this.terrain3D = false;
+    this.picked.set(null);
+    this.pointer.set(null);
+    this.ready.set(false);
+    this.selected.set(null);
+  }
+
+  private applyProvinces(map: MapLibreMap): void {
+    if (!map.getLayer(LAYERS.provincesLine)) return;
+    const filter = ['==', ['get', 'region'], this.provincesOf ?? ''] as never;
+    map.setFilter(LAYERS.provincesLine, filter);
+  }
+
+  private setFocus(fill: string, line: string, id: string | null): void {
+    this.withStyle((map) => {
+      if (!map.getLayer(fill)) return;
+      const filter = ['==', ['get', 'id'], id ?? ''] as never;
+      map.setFilter(fill, filter);
+      map.setFilter(line, filter);
+    });
+  }
+
+  private withAgents(map: MapLibreMap, then: (layer: Agents3D) => void): void {
+    if (this.agents3d && map.getLayer(this.agents3d.id)) return then(this.agents3d);
+    this.agents3dModule ??= import('./agents-3d');
+    void this.agents3dModule.then(({ Agents3D }) => {
+      if (!this.agents3d || !map.getLayer(this.agents3d.id)) {
+        this.agents3d = new Agents3D(LAYERS.agents);
+        map.addLayer(this.agents3d);
+        this.agents3d.setMotion(this.agentsMotion);
+        this.agents3d.setGround(this.groundWanted);
+      }
+      then(this.agents3d);
+    });
+  }
+
   /**
    * Opens a detection, or closes whichever was open.
    *
@@ -1250,24 +1267,5 @@ export class MapService {
     if (!hits.length) return null;
 
     return hits.reduce((best, hit) => (frpOf(hit) > frpOf(best) ? hit : best), hits[0]!);
-  }
-
-  public destroy(): void {
-    this.particles = null;
-    this.centreMarker?.remove();
-    this.centreMarker = null;
-    for (const mark of this.fireStarts) mark.remove();
-    this.fireStarts = [];
-    this.instance?.remove();
-    this.instance = null;
-    this.queued.length = 0;
-    this.framed = false;
-    this.styled = false;
-    this.picking = false;
-    this.terrain3D = false;
-    this.picked.set(null);
-    this.pointer.set(null);
-    this.ready.set(false);
-    this.selected.set(null);
   }
 }

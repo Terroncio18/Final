@@ -1,6 +1,5 @@
 import { Component, computed, effect, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-
 import { MapService } from '../map/map.service';
 import { LevelsService } from './levels.service';
 import { ProvincesService } from './provinces.service';
@@ -20,13 +19,13 @@ import { SearchBox } from './search-box';
   styleUrl: './step-panel.css',
 })
 export class ProvinceStep {
+  /** The `:region` segment, bound by withComponentInputBinding(). */
+  public readonly region = input.required<string>();
+
   private readonly regions = inject(RegionsService);
   private readonly provinces = inject(ProvincesService);
   private readonly maps = inject(MapService);
   private readonly levels = inject(LevelsService);
-
-  /** The `:region` segment, bound by withComponentInputBinding(). */
-  public readonly region = input.required<string>();
 
   protected readonly failed = this.provinces.failed;
 

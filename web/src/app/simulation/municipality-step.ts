@@ -1,6 +1,5 @@
 import { Component, computed, effect, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-
 import { MapService } from '../map/map.service';
 import { LevelsService } from './levels.service';
 import { MunicipalitiesService } from './municipalities.service';
@@ -21,21 +20,20 @@ import { SearchBox } from './search-box';
   styleUrl: './step-panel.css',
 })
 export class MunicipalityStep {
+  /** The two segments above, bound by withComponentInputBinding(). */
+  public readonly region = input.required<string>();
+  public readonly province = input.required<string>();
+
   private readonly provinces = inject(ProvincesService);
   private readonly municipalities = inject(MunicipalitiesService);
   private readonly maps = inject(MapService);
   private readonly levels = inject(LevelsService);
 
-  /** The two segments above, bound by withComponentInputBinding(). */
-  public readonly region = input.required<string>();
-  public readonly province = input.required<string>();
-
   protected readonly failed = this.municipalities.failed;
+  protected readonly options = this.municipalities.municipalities;
 
   /** Nothing when the URL carries a code that is not a province. */
   protected readonly chosen = computed(() => this.provinces.find(this.province()));
-
-  protected readonly options = this.municipalities.municipalities;
 
   /**
    * What the level is called here.

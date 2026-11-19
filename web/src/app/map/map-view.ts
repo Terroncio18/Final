@@ -1,5 +1,4 @@
 import { Component, computed, effect, inject, input } from '@angular/core';
-
 import { HotspotPanel } from '../hotspot-panel/hotspot-panel';
 import { HotspotsService } from './hotspots.service';
 import { INITIAL_VIEW, VIEWS, type ViewId } from './map.config';
@@ -20,19 +19,22 @@ import { HOTSPOT_DATE_STOPS, HOTSPOT_STOPS } from './map.style';
   styleUrl: './map-view.css',
 })
 export class MapView {
+  // The `:scope` route parameter, bound by withComponentInputBinding().
+  public readonly scope = input<string>();
+
   private readonly maps = inject(MapService);
   private readonly hotspots = inject(HotspotsService);
 
-  // The `:scope` route parameter, bound by withComponentInputBinding().
-  public readonly scope = input<string>();
+  protected readonly selected = this.maps.selected;
+
+  /** The marks shrink when the view is crowded, and the legend with them. */
+  protected readonly scale = this.maps.hotspotScale;
 
   // The route accepts any text, so an unknown scope falls back to the default.
   private readonly view = computed<ViewId>(() => {
     const raw = this.scope();
     return raw !== undefined && raw in VIEWS ? (raw as ViewId) : INITIAL_VIEW;
   });
-
-  protected readonly selected = this.maps.selected;
 
   /**
    * True while the colour of the marks says the date and not the power.
@@ -62,9 +64,6 @@ export class MapView {
       to: short.format(new Date(range.to + 'T00:00:00Z')),
     };
   });
-
-  /** The marks shrink when the view is crowded, and the legend with them. */
-  protected readonly scale = this.maps.hotspotScale;
 
   /**
    * The legend's rows: the layer's own stops, with the figure written out.

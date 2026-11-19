@@ -47,29 +47,8 @@ export class FuelTreatments {
     private readonly models: Readonly<Record<number, FuelModel>> = FUEL_MODELS,
     crewStops: ReadonlyMap<string, number> = new Map(),
   ) {
-    for (const measure of measures.filter(physicalMeasure)) {
-      const schedule = crewSchedule(centre, measure);
-      const footprint = schedule?.cells ?? countermeasureCells(centre, measure);
-      for (let i = 0; i < footprint.length; i++) {
-        const cell = footprint[i];
-        const from = schedule?.minutes[i] ?? measure.startMin ?? 0;
-        if (schedule && from > (crewStops.get(measure.id) ?? Infinity)) continue;
-        let history = this.histories.get(cell);
-        if (!history) this.histories.set(cell, (history = { drops: [], removals: [] }));
-        if (measure.fuelRemaining !== undefined)
-          history.removals.push({
-            minute: from,
-            remaining: measure.fuelRemaining,
-          });
-        if (measure.litresPerPass !== undefined) {
-          for (let pass = 0; pass < measure.passes!; pass++)
-            history.drops.push({
-              minute: from + pass * measure.passIntervalMin!,
-              litresM2: measure.litresPerPass / (footprint.length * CELL_M * CELL_M),
-            });
-        }
-      }
-    }
+    for (const measure of measures.filter(physicalMeasure))
+      this.record(centre, measure, crewStops.get(measure.id) ?? Infinity);
     for (const history of this.histories.values()) {
       history.drops.sort((a, b) => a.minute - b.minute);
       history.removals.sort((a, b) => a.minute - b.minute);
@@ -85,6 +64,7 @@ export class FuelTreatments {
     return this.histories.keys();
   }
 
+  // eslint-disable-next-line complexity -- pending (docs/estil.md §4): called per cell and step from spreadRun; split measuring, with it.
   public at(cell: number, minute: number): TreatedFuel | undefined {
     const history = this.histories.get(cell),
       model = this.models[this.fuels?.[cell] ?? 1];
@@ -167,5 +147,30 @@ export class FuelTreatments {
       h.drops.find((d) => d.minute > minute)?.minute ?? Infinity,
       h.removals.find((r) => r.minute > minute)?.minute ?? Infinity,
     );
+  }
+
+  /** Writes one measure into the history of every cell it reaches, up to its crew's stop. */
+  private record(centre: Point, measure: Countermeasure, stop: number): void {
+    const schedule = crewSchedule(centre, measure);
+    const footprint = schedule?.cells ?? countermeasureCells(centre, measure);
+    for (let i = 0; i < footprint.length; i++) {
+      const cell = footprint[i];
+      const from = schedule?.minutes[i] ?? measure.startMin ?? 0;
+      if (schedule && from > stop) continue;
+      let history = this.histories.get(cell);
+      if (!history) this.histories.set(cell, (history = { drops: [], removals: [] }));
+      if (measure.fuelRemaining !== undefined)
+        history.removals.push({
+          minute: from,
+          remaining: measure.fuelRemaining,
+        });
+      if (measure.litresPerPass !== undefined) {
+        for (let pass = 0; pass < measure.passes!; pass++)
+          history.drops.push({
+            minute: from + pass * measure.passIntervalMin!,
+            litresM2: measure.litresPerPass / (footprint.length * CELL_M * CELL_M),
+          });
+      }
+    }
   }
 }

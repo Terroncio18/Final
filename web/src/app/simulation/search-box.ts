@@ -1,6 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-
 import { SearchService, SHORTEST, type Match } from './search.service';
 
 /**

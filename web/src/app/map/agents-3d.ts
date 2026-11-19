@@ -5,7 +5,6 @@ import {
   type Map as MapLibreMap,
 } from 'maplibre-gl';
 import * as THREE from 'three';
-
 import {
   buildDropCurtain,
   buildModel,

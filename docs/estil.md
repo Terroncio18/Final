@@ -1,7 +1,7 @@
 # Full d'estil
 
 Com és un fitxer d'aquest projecte. És la fase 0 de
-[`pla-poliment.md`](pla-poliment.md), i es va escrivint a mesura que es
+[`pla-poliment/`](pla-poliment/README.md), i es va escrivint a mesura que es
 decideix: el que hi ha aquí està decidit i es pot aplicar; el que és al final,
 a «Per decidir», encara no.
 
@@ -80,19 +80,22 @@ segueixen passant.
 
 ### Qui no la compleix, avui
 
-Mirat el 19/11/2026 sobre les 37 classes de `web/src/app`: **30 ja la
-compleixen** i 7 barregen els grups. La primera, `map/hotspots.service.ts`, ja
-està feta; queden `map/map-view.ts`, `simulation/ignition-step.ts`, `simulation/search.service.ts`,
-`simulator/countermeasure-plan.ts`, `top-bar/range-picker.ts` i
-`simulator/simulator-view.ts`. A cinc d'elles és moure dues o tres línies.
+**Totes la compleixen, menys dues**, des del 19/11/2026 (§11.63). El linter en
+comprova la meitat que pot veure —`@typescript-eslint/member-ordering`: camps,
+constructor, mètodes públics i protegits, privats—. L'ordre de dins dels camps
+(punts 1 a 4) es va posar a mà en sis classes: `map/map-view.ts`,
+`simulation/ignition-step.ts`, `simulation/search.service.ts`,
+`top-bar/range-picker.ts`, `simulation/municipality-step.ts` i
+`simulation/province-step.ts`. Aquestes dues últimes tenien les entrades després
+de les injeccions i el recompte del matí no les havia vist.
 
-Les altres dues són un cas a part, i és una pregunta oberta: `simulator-view.ts`
-—2.169 línies, més de vuitanta peces d'estat— i `countermeasure-plan.ts` no
-estan desordenades per descuit, sinó **agrupades per tema**: el senyal i el
-derivat d'una mateixa cosa, un al costat de l'altre. Posar-les per tipus
-escamparia coses que es llegeixen juntes al llarg de mil línies. O s'hi aplica
-igualment, o la regla val per blocs dins del fitxer, o el que cal no és
-reordenar sinó partir el component. Decidir-ho és part de la fase 5.
+Les dues que queden són un cas a part: `simulator-view.ts` —2.169 línies, més
+de vuitanta peces d'estat— i `countermeasure-plan.ts`. No estan desordenades
+per descuit, sinó **agrupades per tema**: el senyal i el derivat d'una mateixa
+cosa, un al costat de l'altre. Posar-les per tipus escamparia coses que es
+llegeixen juntes al llarg de mil línies. **Decidit per Pere el 19/11/2026**: no
+s'hi aplica, perquè el que cal és partir el component. Fins llavors queden fora
+de `member-ordering`, i `eslint.config.mjs` en diu el motiu.
 
 ## 2. Cap membre sense dir qui el pot veure
 
@@ -113,17 +116,11 @@ En una classe d'Angular els tres tenen un sentit propi i no és cap formalitat:
 `protected` és el que veu la plantilla i no el món, i `private` és el que es
 pot canviar sense mirar qui més ho fa servir.
 
-**On som avui**, mirat el 19/11/2026 sobre `web/src/app`: dels camps, 295 duen
-modificador i **79 no**; dels mètodes, 160 el duen i **240 no**. Són 31
-fitxers. Part dels que no en duen són obligats per una interfície de fora
-—`id`, `type`, `renderingMode` i `onAdd` de `CustomLayerInterface`, a
-`map/agents-3d.ts` i `map/fire-particles.ts`—: aquests passen a `public`
-explícit, que és el que ja són.
-
-Això no és feina de llegir-s'ho tot: és la regla
-`@typescript-eslint/explicit-member-accessibility`, que un linter comprova i
-arregla sol —els 319 membres, amb una ordre—. És un argument a favor de la
-12.28.
+**On som avui**: complerta a tot `web/` des del 19/11/2026 (`83b48b2`), i la
+comprova el linter amb `@typescript-eslint/explicit-member-accessibility`. Els
+membres que imposa una interfície de fora —`id`, `type`, `renderingMode` i
+`onAdd` de `CustomLayerInterface`, a `map/agents-3d.ts` i
+`map/fire-particles.ts`— són `public` explícit, que és el que ja eren.
 
 ## 3. Els imports, tots seguits
 
@@ -137,8 +134,10 @@ L'ordre dins del bloc es queda com està: primer el que ve de fora —Angular,
 MapLibre, Fastify— i després el que és nostre, dels més generals als més
 propers. Prettier no els ordena, de manera que això ho sosté qui escriu.
 
-**On som avui**: de 101 fitxers amb imports, **37 tenen línies en blanc** al
-mig del bloc, gairebé sempre una.
+**On som avui**: complerta des del 19/11/2026 (§11.63). Hi havia 36 fitxers
+amb línies en blanc al mig del bloc, 35 a `web/` i `api/src/app.ts`. **No la
+comprova cap regla**: caldria un connector, `eslint-plugin-import-x`, que no
+s'ha afegit. Prettier no la desfà, però tampoc no la manté.
 
 
 
@@ -167,6 +166,15 @@ quatre són les que de debò pesen:
 Per fitxer, Sonar diu el mateix: `fire-spread.ts` (complexitat cognitiva 365),
 `simulator-view.ts` (285) i `countermeasures.ts` (199) són els tres que
 concentren el problema.
+
+**On som, 19/11/2026 (§11.63).** Se n'han partit cinc —les que es podien
+partir sense tocar el bucle de la graella— i les altres deu porten una marca de
+trinquet: `// eslint-disable-next-line complexity -- pending (docs/estil.md §4): …`,
+amb el motiu. La regla és `error`: el que hi ha marcat es tolera, però una funció
+nova que passi de 15 no passa. Es llisten amb
+`grep -rn "complexity -- pending" web/src`. El recompte del linter no és el de
+la taula, perquè compta cada clausura a part: `spreadRun()` hi fa 160, i les
+dues clausures que porta dins, 20 i 19.
 
 **Un avís abans de desfer el primer**: `spreadRun()` és el bucle que recorre
 la graella cel·la a cel·la —1.024² cel·les— i partir-lo en funcions petites es

@@ -1,5 +1,4 @@
 import Fastify from 'fastify';
-
 import {
   AEMET_API_KEY,
   CACHE_TTL_MS,
@@ -18,7 +17,6 @@ import {
   type Day,
   type HotspotCollection,
 } from './firms.js';
-
 import { nearestObservation } from './weather.js';
 import { registerFuelRoutes } from './fuel-routes.js';
 

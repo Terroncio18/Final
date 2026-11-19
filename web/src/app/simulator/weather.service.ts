@@ -1,5 +1,4 @@
 import { Injectable, signal } from '@angular/core';
-
 import type { Point } from '../simulation/point';
 
 /**

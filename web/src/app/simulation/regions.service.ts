@@ -1,5 +1,4 @@
 import { Injectable, signal } from '@angular/core';
-
 import { REGIONS_URL } from '../map/map.config';
 import { boundsOf, type AreaGeometry } from './bounds';
 import type { Region } from './region';

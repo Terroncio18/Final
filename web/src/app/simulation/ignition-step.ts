@@ -9,7 +9,6 @@ import {
   viewChild,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-
 import { MapService } from '../map/map.service';
 import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from './domain';
 import { LevelsService } from './levels.service';
@@ -38,6 +37,13 @@ import { TerrainService } from './terrain.service';
   styleUrl: './step-panel.css',
 })
 export class IgnitionStep {
+  public readonly region = input.required<string>();
+  public readonly province = input.required<string>();
+  public readonly municipality = input.required<string>();
+
+  /** The `@lon,lat` segment, absent until something has been clicked. */
+  public readonly point = input<string>();
+
   private readonly provinces = inject(ProvincesService);
   private readonly municipalities = inject(MunicipalitiesService);
   private readonly maps = inject(MapService);
@@ -48,12 +54,9 @@ export class IgnitionStep {
   /** Only in the template once there is a point, so it is not required. */
   private readonly relief = viewChild<ElementRef<HTMLCanvasElement>>('relief');
 
-  public readonly region = input.required<string>();
-  public readonly province = input.required<string>();
-  public readonly municipality = input.required<string>();
-
-  /** The `@lon,lat` segment, absent until something has been clicked. */
-  public readonly point = input<string>();
+  protected readonly reading = this.terrain.reading;
+  protected readonly failedTerrain = this.terrain.failed;
+  protected readonly ground = this.terrain.terrain;
 
   protected readonly chosen = computed(() => this.municipalities.find(this.municipality()));
 
@@ -79,10 +82,6 @@ export class IgnitionStep {
     const point = this.ignition();
     return point ? point[1].toFixed(5) + ', ' + point[0].toFixed(5) : '';
   });
-
-  protected readonly reading = this.terrain.reading;
-  protected readonly failedTerrain = this.terrain.failed;
-  protected readonly ground = this.terrain.terrain;
 
   /** One decimal: the slope of a 30 m cell does not know more than that. */
   protected readonly slopes = computed(() => {

@@ -1,6 +1,5 @@
 import { inject, Injectable } from '@angular/core';
 import type { FeatureCollection, Point } from 'geojson';
-
 import { MapService } from './map.service';
 import { PLACES_URL } from './map.config';
 

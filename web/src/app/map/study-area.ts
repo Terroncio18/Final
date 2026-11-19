@@ -1,6 +1,5 @@
 import { Injectable, signal } from '@angular/core';
 import type { Feature, Point as GeoPoint } from 'geojson';
-
 // The only description of point-in-polygon in the project, written for the
 // municipalities (§2.25). It is pure geometry with no opinion about forms or
 // maps, so it is borrowed rather than written a second time; the day a shared

@@ -1,6 +1,5 @@
 import { addProtocol } from 'maplibre-gl';
 import mlcontour from 'maplibre-contour';
-
 import { DEM_MAX_ZOOM, DEM_TILES } from './map.config';
 
 /**

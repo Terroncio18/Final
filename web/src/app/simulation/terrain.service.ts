@@ -1,5 +1,4 @@
 import { Injectable, signal } from '@angular/core';
-
 import { formatPoint, type Point } from './point';
 import { readTerrain, type Terrain } from './terrain';
 

@@ -1,6 +1,5 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-
 import type { Hotspot } from '../map/hotspot';
 import { formatPoint, formatPoints } from '../simulation/point';
 import { PointLocator, type Place } from '../simulation/point-locator';
@@ -52,23 +51,6 @@ export class HotspotPanel {
   private readonly locator = inject(PointLocator);
   /** Where the detection is, by the codes the simulator is addressed by (§11.53). */
   private readonly place = signal<Place | null | 'pending' | 'failed'>('pending');
-
-  public constructor() {
-    effect(() => {
-      const { lon, lat } = this.hotspot();
-      this.place.set('pending');
-      this.locator
-        .locate([lon, lat])
-        .then((place) => {
-          // A slow answer for a detection no longer selected changes nothing.
-          if (this.hotspot().lon === lon && this.hotspot().lat === lat) this.place.set(place);
-        })
-        .catch((error: unknown) => {
-          console.error('[hotspot-panel]', error);
-          this.place.set('failed');
-        });
-    });
-  }
 
   /**
    * The simulator, centred on the detection and with the fire starting there:
@@ -143,4 +125,21 @@ export class HotspotPanel {
     const { lat, lon } = this.hotspot();
     return `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
   });
+
+  public constructor() {
+    effect(() => {
+      const { lon, lat } = this.hotspot();
+      this.place.set('pending');
+      this.locator
+        .locate([lon, lat])
+        .then((place) => {
+          // A slow answer for a detection no longer selected changes nothing.
+          if (this.hotspot().lon === lon && this.hotspot().lat === lat) this.place.set(place);
+        })
+        .catch((error: unknown) => {
+          console.error('[hotspot-panel]', error);
+          this.place.set('failed');
+        });
+    });
+  }
 }

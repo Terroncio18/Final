@@ -169,6 +169,7 @@ export function parseScenario(text: string): Scenario | string {
   return typeof read === 'string' ? read : read.scenario;
 }
 
+// eslint-disable-next-line complexity -- pending (docs/estil.md §4): a reader, one check per key of the file.
 export function readScenario(text: string): ScenarioRead | string {
   if (text.length > MAX_SCENARIO_SIZE) return SCENARIO_TOO_LARGE;
   if (!text.includes('IgnisLab')) return 'El fitxer no és un escenari d’IgnisLab.';

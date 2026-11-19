@@ -189,6 +189,10 @@ class Heap {
   private cells = new Int32Array(1 << 16);
   public size = 0;
 
+  /** Where pop() leaves the smallest. */
+  public key = 0;
+  public cell = 0;
+
   public push(key: number, cell: number): void {
     if (this.size === this.keys.length) {
       const keys = new Float64Array(this.size * 2);
@@ -211,8 +215,6 @@ class Heap {
   }
 
   /** Removes the smallest and leaves it in `key` and `cell`. */
-  public key = 0;
-  public cell = 0;
   public pop(): void {
     this.key = this.keys[0];
     this.cell = this.cells[0];
@@ -271,34 +273,10 @@ export async function spread(
   onProgress?: (share: number) => void,
 ): Promise<SpreadResult> {
   const plan = input.countermeasures;
-  const crews = new Map<number, CrewVisit[]>();
-  if (plan) {
-    const parsed = parseCountermeasures(plan.measures);
-    if (typeof parsed === 'string') throw new Error(parsed);
-    for (const m of parsed) {
-      const schedule = crewSchedule(plan.centre, m);
-      if (!schedule) continue;
-      for (let i = 0; i < schedule.cells.length; i++) {
-        const cell = schedule.cells[i];
-        let visits = crews.get(cell);
-        if (!visits) crews.set(cell, (visits = []));
-        visits.push({
-          id: m.id,
-          activation: schedule.minutes[i],
-          workStart: schedule.workStart,
-          workEnd: schedule.workEnd,
-        });
-      }
-    }
-  }
+  const crews = plan ? crewVisits(plan) : new Map<number, CrewVisit[]>();
   const stops = new Map(plan?.crewStops);
   for (const [id, minute] of stops)
-    if (
-      !Number.isFinite(minute) ||
-      minute < 0 ||
-      !plan?.measures.some((m) => m.id === id && m.crewSize !== undefined)
-    )
-      throw new Error('Parada de brigada incorrecta.');
+    if (!validStop(plan, id, minute)) throw new Error('Parada de brigada incorrecta.');
   // Fix only the earliest new stop: later stops may disappear when an earlier
   // one removes future treatments. Each rerun fixes at least one more crew.
   for (;;) {
@@ -316,6 +294,40 @@ interface CrewVisit {
   readonly activation: number;
   readonly workStart: number;
   readonly workEnd: number;
+}
+
+type PlannedMeasures = NonNullable<SpreadInput['countermeasures']>;
+
+/** Per cell, the crews that will work it and when. Throws on a plan the model refuses. */
+function crewVisits(plan: PlannedMeasures): Map<number, CrewVisit[]> {
+  const parsed = parseCountermeasures(plan.measures);
+  if (typeof parsed === 'string') throw new Error(parsed);
+  const crews = new Map<number, CrewVisit[]>();
+  for (const m of parsed) {
+    const schedule = crewSchedule(plan.centre, m);
+    if (!schedule) continue;
+    for (let i = 0; i < schedule.cells.length; i++) {
+      const cell = schedule.cells[i];
+      let visits = crews.get(cell);
+      if (!visits) crews.set(cell, (visits = []));
+      visits.push({
+        id: m.id,
+        activation: schedule.minutes[i],
+        workStart: schedule.workStart,
+        workEnd: schedule.workEnd,
+      });
+    }
+  }
+  return crews;
+}
+
+/** A stop is a real minute, on a measure of this plan that has a crew. */
+function validStop(plan: PlannedMeasures | undefined, id: string, minute: number): boolean {
+  return (
+    Number.isFinite(minute) &&
+    minute >= 0 &&
+    (plan?.measures.some((m) => m.id === id && m.crewSize !== undefined) ?? false)
+  );
 }
 
 /** The incoming triangles of frontIntensity, restricted to this cell's neighbourhood. */
@@ -356,6 +368,7 @@ function crewEntryIntensity(
   return found ? hottest : byramIntensity(heat, incomingSpeed);
 }
 
+// eslint-disable-next-line complexity -- pending (docs/estil.md §4): the cell-by-cell loop; split only measuring before and after.
 async function spreadRun(
   input: SpreadInput,
   onProgress: ((share: number) => void) | undefined,
@@ -527,6 +540,7 @@ async function spreadRun(
     for (let i = windFields.length - 1; i >= 0; i--) if (windFields[i].start <= minute) return i;
     return -1;
   };
+  // eslint-disable-next-line complexity -- pending (docs/estil.md §4): spreadRun's loop, per cell and step; split with it.
   const ellipse = (cell: number, epoch: number, minute: number) => {
     const changed = fuelTreatments?.at(cell, minute)?.bed;
     if (cachedEpoch![cell] === epoch && cachedFuel.get(cell) === changed) return;
@@ -575,6 +589,7 @@ async function spreadRun(
     const ratio = phi ? lengthToBreadth(effectiveWind(localBed, phi)) : 1;
     cachedEcc![cell] = Math.sqrt(1 - 1 / (ratio * ratio));
   };
+  /* eslint-disable complexity -- pending (docs/estil.md §4): spreadRun's loop, per cell and step; split with it. */
   const windyTravel = (
     cell: number,
     distance: number,
@@ -605,6 +620,7 @@ async function spreadRun(
     }
     return now - start;
   };
+  /* eslint-enable complexity */
 
   // ---- Each step: its length and its direction, worked out once. ----
   const stepOffset = STEPS.map(([dx, dy]) => dy * GRID + dx);
@@ -856,6 +872,7 @@ async function spreadRun(
  * - **Run** is how far the fire has got from the ignition nearest to each
  *   cell, in a straight line, and the farthest so far.
  */
+// eslint-disable-next-line complexity -- pending (docs/estil.md §4): every series in one pass over the grid; split measuring, like spreadRun.
 function measure(
   arrival: Float32Array,
   rate: Float32Array,

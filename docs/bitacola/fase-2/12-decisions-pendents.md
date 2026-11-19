@@ -28,8 +28,9 @@
   canviar una validació i una hora és una decisió, i les proves diuen avui el
   que el codi fa.
 
-- **12.28. Si hi va un linter.** Surt de la 12.27. Avui no n'hi ha cap: només
-  Prettier, que ordena però no judica. ESLint amb `angular-eslint` i
+- ~~**12.28. Si hi va un linter.**~~ Resolta el 19/11/2026 a la §11.63:
+  ESLint a `web/`, amb les regles del full d'estil. El que es plantejava: surt
+  de la 12.27. Avui no n'hi ha cap: només Prettier, que ordena però no judica. ESLint amb `angular-eslint` i
   `typescript-eslint` caçaria el que el formatador no veu —promeses sense
   `await`, senyals llegits on no toca, imports morts—, i és mitja hora de
   configuració. Sonar en dirà algunes coses, però no les mateixes i no al

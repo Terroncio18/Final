@@ -1,6 +1,5 @@
 import { Component } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-
 import { VIEWS, type ViewId } from '../map/map.config';
 import { RangePicker } from './range-picker';
 

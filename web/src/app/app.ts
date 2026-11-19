@@ -1,6 +1,5 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-
 import { Chrome } from './chrome';
 import { TopBar } from './top-bar/top-bar';
 

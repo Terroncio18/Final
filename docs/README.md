@@ -14,9 +14,10 @@ docs/bitacola` ja diu quin és el fitxer i s'estalvia fins i tot l'índex.
   números no es renumeren mai.
 - **`estil.md`** — com és un fitxer d'aquest projecte: l'ordre de dins d'una
   classe i el que Prettier no mira. S'hi va afegint el que es decideix.
-- **`pla-poliment.md`** — el pla de deixar l'aplicació acabada, per fases,
-  amb qui fa cada una i de què depèn. **Qui hi treballi, que el llegeixi
-  primer**: hi ha les regles de treballar-hi dos alhora.
+- **`pla-poliment/`** — el pla de deixar l'aplicació acabada, per fases. El
+  `README.md` és l'índex: la taula d'estat, qui fa cada fase i les regles de
+  treballar-hi dos alhora. **Qui hi treballi, que el llegeixi primer**, i que
+  obri només el fitxer de la fase que agafa, on hi ha marcat el que és fet.
 - **`contramesures.md`** — què fa cada contramesura al càlcul: multiplicadors,
   litres, retenció, assecat, i què s'ha mirat al navegador. Els motius són a
   la bitàcola, de la §11.27 a la §11.31.

@@ -1,5 +1,4 @@
 import { computed, Injectable, signal } from '@angular/core';
-
 import { MUNICIPALITY_INDEX_URL } from '../map/map.config';
 
 /**
@@ -137,10 +136,10 @@ export class SearchService {
   /** Empty until the file is in, so the field can say it is waiting. */
   private readonly entries = signal<readonly Entry[]>([]);
 
-  public readonly ready = computed(() => this.entries().length > 0);
   public readonly failed = signal(false);
-
   private asked = false;
+
+  public readonly ready = computed(() => this.entries().length > 0);
 
   /**
    * Reads the index, once, the first time somebody means to search.

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-
 import { shapeAt } from './point-locator';
 
 const square = (x: number, y: number): [number, number][][] => [

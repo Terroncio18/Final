@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
 vi.mock('./domain', () => ({
   GRID: 8,
   CELL_M: 30,
@@ -30,8 +30,9 @@ import { readTerrain, cellOf, groundAt, type Terrain } from './terrain';
 import type { CustomRenderMethodInput, Map as LibreMap } from 'maplibre-gl';
 import type { GroundAgent, Pass } from './agents';
 
+/** A WebGL2 context that records its calls, typed after the real one so it cannot drift from it. */
 function graphics() {
-  const gl: Record<string, any> = {};
+  const gl: Record<string, unknown> = {};
   for (const [index, key] of [
     'VERTEX_SHADER',
     'FRAGMENT_SHADER',
@@ -113,7 +114,7 @@ function graphics() {
   gl['getExtension'] = vi.fn(() => ({ loseContext: vi.fn() }));
   gl['drawingBufferWidth'] = 800;
   gl['drawingBufferHeight'] = 600;
-  return gl;
+  return gl as unknown as Mocked<WebGL2RenderingContext>;
 }
 const projection = {
   defaultProjectionData: { mainMatrix: new THREE.Matrix4().elements },
@@ -164,7 +165,7 @@ describe('fire rendering at the graphics boundary', () => {
     layer.setEmitters(emitters);
     time.mockReturnValue(200);
     layer.render(gpu(), projection);
-    expect(gl['drawArrays'].mock.calls.map((c: any[]) => c[2])).toEqual([1000, 150]);
+    expect(gl['drawArrays'].mock.calls.map((c) => c[2])).toEqual([1000, 150]);
     for (const call of gl['bufferData'].mock.calls)
       expect(Array.from(call[1] as Float32Array).every(Number.isFinite)).toBe(true);
     expect(gl['depthMask']).toHaveBeenLastCalledWith(true);
@@ -270,7 +271,9 @@ describe('fire rendering at the graphics boundary', () => {
       vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
         failure === 'context' ? null : gpu(),
       );
-      if (failure === 'program-allocation') gl['createProgram'].mockReturnValue(null);
+      // The DOM types say it never returns null; a lost context does.
+      if (failure === 'program-allocation')
+        gl['createProgram'].mockReturnValue(null as unknown as WebGLProgram);
       if (failure.startsWith('shader')) gl['getShaderParameter'].mockReturnValue(false);
       if (failure.startsWith('link')) gl['getProgramParameter'].mockReturnValue(false);
       if (failure.endsWith('no-message')) {

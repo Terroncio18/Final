@@ -11,6 +11,7 @@
     "test:coverage": "npm run test:simulation -- --coverage && ng test --configuration coverage && node ../scripts/lcov-paths.mjs web coverage/model/lcov.info coverage/web/lcov.info",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "lint": "eslint .",
     "data:regions": "node scripts/fetch-regions.mjs",
     "data:provinces": "node scripts/fetch-provinces.mjs",
     "data:municipalities": "node --max-old-space-size=6144 scripts/fetch-municipalities.mjs",

@@ -29,6 +29,7 @@
       @if (results().length) {
         <ul class="results" id="search-results" role="listbox" aria-label="Resultats de la cerca">
           @for (match of results(); track match.id; let i = $index) {
+            <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- the keyboard stays in the field, which moves through the rows. -->
             <li
               class="result"
               [class.on]="i === highlighted()"

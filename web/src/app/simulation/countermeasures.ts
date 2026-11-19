@@ -407,6 +407,7 @@ const validPoint = (p: unknown): p is Point =>
   Math.abs(p[1]) < 85;
 
 /** Strict, bounded and all-or-nothing: a malformed barrier must never disappear silently. */
+// eslint-disable-next-line complexity -- pending (docs/estil.md §4): a validator, one check per field; to be split by kind of measure.
 export function parseCountermeasures(value: unknown): readonly Countermeasure[] | string {
   if (!Array.isArray(value) || value.length > MAX_COUNTERMEASURES)
     return `El pla admet fins a ${MAX_COUNTERMEASURES} contramesures.`;
@@ -730,6 +731,7 @@ export interface CountermeasureField {
   readonly timedIgnitions: readonly { cell: number; minute: number }[];
 }
 
+// eslint-disable-next-line complexity -- pending (docs/estil.md §4): one branch per kind of measure; split with parseCountermeasures.
 export function compileCountermeasures(
   centre: Point,
   input: readonly Countermeasure[],

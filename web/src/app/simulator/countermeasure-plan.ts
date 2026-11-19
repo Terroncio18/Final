@@ -1,5 +1,4 @@
 import { computed, signal } from '@angular/core';
-
 import {
   COUNTERMEASURE_CATALOG,
   AIRCRAFT,
@@ -245,6 +244,7 @@ export class CountermeasurePlan {
     const counts = new Map<CountermeasureKind, number>();
     const whole = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 0 });
     const one = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
+    // eslint-disable-next-line complexity -- pending (docs/estil.md §4): one label per kind of measure; waits for the component to be split.
     return this.measures().map((measure) => {
       const entry = catalogEntry(measure.kind);
       const ordinal = (counts.get(measure.kind) ?? 0) + 1;
