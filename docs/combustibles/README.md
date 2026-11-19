@@ -99,7 +99,7 @@ CC-BY por deducción.
 
 ## 2. España: corregir una premisa de la bitácora
 
-La frase de `docs/bitacola.md` que afirma que la península no lleva modelo
+La frase de `docs/bitacola/fase-1/5-fonts-de-dades.md` que afirma que la península no lleva modelo
 asignado es demasiado general (enmendada en su §5 el 14/11/2026). El [documentador SIG del IFN4, página 18 y anexo 23](https://www.miteco.gob.es/content/dam/miteco/es/biodiversidad/temas/inventarios-nacionales/documentador_sig_tcm30-536622.pdf)
 define `ModComb` como el modelo predominante fotointerpretado y describe los
 códigos 1–13. Ese documento identifica expresamente falta de información en
