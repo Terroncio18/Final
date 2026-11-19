@@ -12,6 +12,8 @@ docs/bitacola` ja diu quin és el fitxer i s'estalvia fins i tot l'índex.
   tancada el 5/11/2026— a `fase-1/`, i la fase 2 —el simulador i la vista 3D,
   oberta— a `fase-2/`. Una decisió és un fitxer de menys de 150 línies i els
   números no es renumeren mai.
+- **`estil.md`** — com és un fitxer d'aquest projecte: l'ordre de dins d'una
+  classe i el que Prettier no mira. S'hi va afegint el que es decideix.
 - **`pla-poliment.md`** — el pla de deixar l'aplicació acabada, per fases,
   amb qui fa cada una i de què depèn. **Qui hi treballi, que el llegeixi
   primer**: hi ha les regles de treballar-hi dos alhora.
