@@ -46,14 +46,14 @@ test('a day is ten characters of a real date, and nothing else', () => {
     assert.equal(isDay(bad), false, `${String(bad)} is not a day`);
   }
 
-  // A day that does not exist does get through, and it is written down here
-  // because the test is what found it: the month is in range, so the shape
-  // holds, and `Date` rolls the 30th of February over to the 1st of March
-  // instead of refusing it. FIRMS answers such a day with no rows, so it reads
-  // as a day with no fires and not as an error. Tightening it would mean
-  // comparing the parsed date back against the string.
-  assert.equal(isDay('2024-02-30'), true);
-  assert.equal(isDay('2024-13-01'), false, 'a month out of range is refused, though');
+  // Days that do not exist, which the shape alone would let through: the
+  // month is in range and ten characters is ten characters. These are the
+  // ones that only the date written back out catches.
+  assert.equal(isDay('2024-02-30'), false, 'February never has thirty');
+  assert.equal(isDay('2023-02-29'), false, '2023 was not a leap year');
+  assert.equal(isDay('2024-04-31'), false, 'April has thirty');
+  assert.equal(isDay('2024-02-29'), true, 'but 2024 was a leap year');
+  assert.equal(isDay('2024-13-01'), false, 'and a month out of range never passed');
 });
 
 test('today is a day, and it is the one the system clock says', () => {

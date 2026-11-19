@@ -57,6 +57,19 @@ function isNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+/**
+ * The hour of an observation, as the instant it is.
+ *
+ * Both services publish in UTC and neither says so in the string: AEMET's
+ * `fint` is `2026-11-19T10:00:00` and IPMA's key is `2026-11-19T10:00`. Read
+ * as they come, `new Date()` would put the server's own zone on them —an hour
+ * out in winter here, two in summer— and the simulator would be given a wind
+ * from the wrong hour. A zone is added unless the string already carries one.
+ */
+function asUtc(stamp: string): string {
+  return /(?:Z|[+-]\d{2}:?\d{2})$/.test(stamp) ? stamp : `${stamp}Z`;
+}
+
 // ------------------------------------------------------------------ AEMET
 
 interface AemetRow {
@@ -109,7 +122,7 @@ async function fromAemet(): Promise<Observation[]> {
   return [...latest.values()].map((row) => ({
     source: 'AEMET' as const,
     station: { id: row.idema, name: row.ubi, lon: row.lon, lat: row.lat },
-    observedAt: new Date(row.fint).toISOString(),
+    observedAt: new Date(asUtc(row.fint)).toISOString(),
     // Metres per second to kilometres per hour.
     windKmh: Math.round((row.vv as number) * 36) / 10,
     windFromDeg: row.dv as number,
@@ -198,8 +211,7 @@ async function fromIpma(): Promise<Observation[]> {
       found.set(id, {
         source: 'IPMA',
         station: { id, ...station },
-        // IPMA writes the hour without a zone, and it is UTC.
-        observedAt: new Date(hour + ':00Z').toISOString(),
+        observedAt: new Date(asUtc(hour + ':00')).toISOString(),
         windKmh: row.intensidadeVentoKM,
         windFromDeg: bearing,
         humidity: row.humidade,

@@ -95,9 +95,18 @@ export function today(): Day {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** `2024-08-01` and nothing else: no `2024-8-1`, no instants, no text. */
+/**
+ * `2024-08-01` and nothing else: no `2024-8-1`, no instants, no text.
+ *
+ * And no day that does not exist. The shape is not enough on its own, because
+ * `Date` rolls the 30th of February over to the 1st of March instead of
+ * refusing it, so what is asked for is that the date written back out is the
+ * one that came in.
+ */
 export function isDay(value: unknown): value is Day {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const at = new Date(value + 'T00:00:00Z');
+  return !Number.isNaN(at.getTime()) && at.toISOString().slice(0, 10) === value;
 }
 
 interface Span {

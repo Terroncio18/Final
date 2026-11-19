@@ -112,6 +112,7 @@ test('a range that cannot be answered is refused, and the reason is said', async
   const refusals: [string, RegExp][] = [
     ['/api/hotspots?from=ahir', /YYYY-MM-DD/],
     ['/api/hotspots?from=2024-8-1&to=2024-08-02', /YYYY-MM-DD/],
+    ['/api/hotspots?from=2024-02-30&to=2024-03-01', /YYYY-MM-DD/],
     ['/api/hotspots?from=2024-08-10&to=2024-08-01', /posterior/],
     [`/api/hotspots?from=${addDays(today(), 1)}&to=${addDays(today(), 1)}`, /futures/],
     ['/api/hotspots?from=2024-08-01&to=2024-09-30', /rang màxim/],

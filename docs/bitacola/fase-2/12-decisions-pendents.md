@@ -14,8 +14,9 @@
   dir-ho a la memòria, que també és una resposta: és muntatge, i el que
   decideix de debò —el model, el combustible, les dates— ja està provat.
 
-- **12.29. Dues coses que les proves de l'API han trobat.** Surten de la
-  §11.58, i són totes dues de validació, no de càlcul. (a) `isDay()` accepta
+- ~~**12.29. Dues coses que les proves de l'API han trobat.**~~ Resoltes el
+  19/11/2026 a la §11.61: el dia que no existeix es refusa i l'hora d'AEMET
+  es llegeix en UTC. El que es plantejava: surten de la §11.58, i són totes dues de validació, no de càlcul. (a) `isDay()` accepta
   el **30 de febrer**: l'expressió regular hi passa i `Date` el fa rodar a l'1
   de març en lloc de refusar-lo. FIRMS contesta un dia així sense cap fila, de
   manera que es llegeix com un dia sense focs i no com un error; estrènyer-ho

@@ -80,7 +80,9 @@ test('AEMET answers in two steps, in its own encoding, and the latest complete r
   const answer = await nearestObservation('ES', 2.65, 39.57);
   assert.ok(answer, 'Son Bonet is the closest station to Palma');
   assert.equal(answer.observation.station.id, 'B228');
-  assert.equal(answer.observation.observedAt.endsWith('Z'), true);
+  // `fint` comes without a zone and AEMET publishes in UTC: ten o'clock is
+  // ten o'clock whatever zone this machine is in.
+  assert.equal(answer.observation.observedAt, '2026-11-19T10:00:00.000Z');
   // Five metres per second is eighteen kilometres per hour, and it is the
   // ten o'clock row and not the nine o'clock one.
   assert.equal(answer.observation.windKmh, 18);
