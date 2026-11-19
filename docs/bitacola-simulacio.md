@@ -2871,12 +2871,65 @@ de `@angular/build` i ja hi era.
 Comprovat: les tres ordres de cobertura, les proves senceres,
 `prettier --check` i la compilació.
 
+### 11.55. SonarQube Cloud llegeix el que les proves mesuren
+
+Demanat per Pere el 19/11/2026, i tanca la 12.27. La cobertura ja la donava
+vitest (§11.54); el que es compra aquí és l'anàlisi pròpia de Sonar
+—duplicació, complexitat, *code smells*, *security hotspots*— i un panell d'on
+surtin una captura i una taula per a la memòria.
+
+- **Sense servidor i sense CI**: un `sonar-project.properties` a l'arrel i
+  l'escàner llançat a mà des d'allà amb `npx -y sonarqube-scanner`, que es
+  baixa sol i no deixa cap dependència al repositori. No hi ha cap *workflow*:
+  si algun dia es vol a cada *commit*, l'acció de GitHub de SonarSource faria
+  el mateix amb el mateix fitxer.
+- **El token no és al repositori**: viu a la variable `SONAR_TOKEN` del
+  terminal que llança l'escàner. Al fitxer només hi ha les claus del projecte i
+  de l'organització, que no són secretes.
+- **Què mira**: `web/src` i `api/src` com a codi; els `*.spec.ts` i el
+  `*.test.mjs`, declarats a part, com a proves —de manera que es comptin com a
+  proves i no com a codi a jutjar—; i fora les dades preparades, les lletres,
+  les compilacions i els informes. Els dos `tsconfig.json` van declarats perquè
+  les regles de TypeScript que necessiten tipus puguin funcionar.
+- **El detall que no es veu i deixa la cobertura buida**: vitest escriu els
+  camins des de `web/`, i amb les barres de Windows; Sonar els llegeix des de
+  l'arrel, de manera que sense tocar-los no es resol cap fitxer i la cobertura
+  surt a zero sense dir per què. `scripts/lcov-paths.mjs`, que és l'últim pas
+  de `npm run test:coverage`, reescriu les línies `SF:` dels dos informes —37
+  fitxers del model i 28 de la interfície— perquè comencin a `web/src`.
+  Executar-lo dues vegades no prefixa dues vegades.
+- **La cobertura de l'API no hi va**: Node la mesura sobre `dist/`, el
+  JavaScript compilat, que no és al repositori. Es mira a mà amb
+  `npm run test:fuels:coverage`, com diu la §11.54.
+- **El que queda a les mans de Pere**, perquè és el seu compte: entrar a
+  SonarQube Cloud amb el GitHub, importar el repositori —el pla gratuït demana
+  que sigui públic, i en privat és de pagament—, confirmar que les dues claus
+  del fitxer són les que el lloc mostra, generar el token i, a la configuració
+  del projecte, deixar l'anàlisi en mans de la CI: un projecte amb *Automatic
+  Analysis* encès rebutja les crides de l'escàner.
+- **Què hi sortirà**: el 95,1 % del model i el 23,6 % de la interfície de la
+  §11.54, i una xifra global que no arribarà a la meitat, perquè hi pesen el
+  mapa, el 3D i una API amb proves d'una sola ruta. No s'ha exclòs res de la
+  cobertura per a fer-la pujar: la xifra ha de poder-se explicar, no maquillar.
+
+Comprovat: que tots els camins que el fitxer anomena existeixen i que les
+línies `SF:` dels dos informes es resolen des de l'arrel. **L'escàner no s'ha
+executat**: demana el token i el compte, i puja el codi a un servei de fora.
+
 ---
 
 ## 12. Decisions pendents
 
-- **12.27. Si la qualitat del codi es mesura amb SonarQube.** Preguntat per
-  Pere el 19/11/2026. La cobertura no el necessita: la dona vitest, i Sonar
+- **12.28. Si hi va un linter.** Surt de la 12.27. Avui no n'hi ha cap: només
+  Prettier, que ordena però no judica. ESLint amb `angular-eslint` i
+  `typescript-eslint` caçaria el que el formatador no veu —promeses sense
+  `await`, senyals llegits on no toca, imports morts—, i és mitja hora de
+  configuració. Sonar en dirà algunes coses, però no les mateixes i no al
+  terminal.
+
+- ~~**12.27. Si la qualitat del codi es mesura amb SonarQube.**~~ Resolta el
+  19/11/2026 a la §11.55: sí, SonarQube Cloud, amb l'escàner a mà i sense CI.
+  El que es plantejava: la cobertura no el necessita: la dona vitest, i Sonar
   llegiria el mateix `lcov` que la §11.54 ja genera. El que hi afegiria és
   anàlisi pròpia —duplicació, complexitat ciclomàtica, *code smells*,
   *security hotspots*—, un historial per *commit* i un panell d'on sortirien
@@ -2885,9 +2938,8 @@ Comprovat: les tres ordres de cobertura, les proves senceres,
   SonarQube Community en local vol Docker, Java i uns 3 GB de memòria. Si es
   fa, la via barata és SonarCloud amb el repositori públic, un
   `sonar-project.properties` i l'escàner llançat a mà un parell de vegades,
-  no a cada *commit*, i després del manual (12.18). Queda per decidir també
-  si abans hi va un linter: avui no n'hi ha cap, i ESLint amb
-  `angular-eslint` caçaria errors que el formatador no veu.
+  no a cada *commit*, i després del manual (12.18). El linter que es plantejava
+  al costat és ara la 12.28.
 
 - **12.16. Calibrar els coeficients de les contramesures.** Ve de la §11.27,
   i s'amplia a la §11.31. Les reduccions dels escenaris antics, la retenció
