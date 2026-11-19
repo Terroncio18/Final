@@ -12,6 +12,9 @@ docs/bitacola` ja diu quin és el fitxer i s'estalvia fins i tot l'índex.
   tancada el 5/11/2026— a `fase-1/`, i la fase 2 —el simulador i la vista 3D,
   oberta— a `fase-2/`. Una decisió és un fitxer de menys de 150 línies i els
   números no es renumeren mai.
+- **`pla-poliment.md`** — el pla de deixar l'aplicació acabada, per fases,
+  amb qui fa cada una i de què depèn. **Qui hi treballi, que el llegeixi
+  primer**: hi ha les regles de treballar-hi dos alhora.
 - **`contramesures.md`** — què fa cada contramesura al càlcul: multiplicadors,
   litres, retenció, assecat, i què s'ha mirat al navegador. Els motius són a
   la bitàcola, de la §11.27 a la §11.31.
