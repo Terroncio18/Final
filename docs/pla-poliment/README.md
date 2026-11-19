@@ -1,0 +1,52 @@
+# Pla de poliment
+
+Demanat per Pere el 19/11/2026, abans del manual d'usuari: deixar l'aplicació
+acabada —provada, sense codi mort, amb un estil únic i llegible, optimitzada,
+documentada i publicada—. **Es fa en diverses sessions**, i aquesta carpeta és
+la memòria del pla: aquest índex diu què toca i qui ho té, i cada fase és un
+fitxer propi amb el que hi ha fet (`[x]`) i el que queda (`[ ]`).
+
+La xarxa de seguretat ja hi és: 97,9 % de cobertura i 0 avisos de Sonar
+(§11.62). Esborrar i refer coses té avui un cost que fa un mes no tenia.
+
+## Com es comença una sessió
+
+1. Llegir aquest índex i mirar la taula d'estat. **Obrir només el fitxer de la
+   fase que s'agafa**, no la carpeta sencera.
+2. Triar **una** fase que tingui les seves dependències fetes, escriure el nom
+   de qui l'agafa a la taula, i no agafar-ne dues.
+3. Treballar només als fitxers de la fase. Si cal tocar-ne un de fora, dir-ho
+   a la taula abans.
+4. Acabar en verd: proves, compilació, `prettier --check` i `npm run lint`.
+   Commit. I **abans de plegar**, marcar al fitxer de la fase el que s'ha fet
+   i posar al dia la fila de la taula, encara que la fase quedi a mitges.
+
+### Les regles de treballar-hi dos alhora
+
+1. **Dos no toquen mai el mateix fitxer al mateix temps.** El repartiment és
+   per carpetes: `web/src/app/{map,simulator,top-bar,hotspot-panel}` d'una
+   banda, `web/src/app/simulation` i `api/` de l'altra.
+2. **Qui acaba, commiteja i avisa.** La feina de Codex del 19/11 es va quedar
+   sense desar i va caldre rescatar-la (§11.62).
+3. **El que es decideixi, a la bitàcola**: fitxer nou a `fase-2/` i una línia
+   a l'índex. Les regles d'estil, a [`../estil.md`](../estil.md).
+
+## Estat
+
+| # | Fase | Depèn de | Estat | Qui |
+| --- | --- | --- | --- | --- |
+| 0 | [El full d'estil](fase-00-full-d-estil.md) | — | **A mitges**: 4 regles escrites, 4 decisions obertes | Claude |
+| 0b | [El linter](fase-00b-linter.md) | 0 | **A mitges**: `web/` en verd (§11.63); falta `api/` | Claude |
+| 1 | [Inventari](fase-01-inventari.md) | — | **Feta**: dues llistes a `docs/inventari-web.md` i `docs/inventari-api.md`, les sis categories cobertes | Claude |
+| 2 | [Provar l'aplicació sencera](fase-02-provar-l-aplicacio.md) | — | Per començar (guió per escriure amb Pere) | — |
+| 3 | [Errors](fase-03-errors.md) | 1, 2 | Per començar | — |
+| 4 | [Codi mort](fase-04-codi-mort.md) | 1 | Per començar | — |
+| 5 | [Estil](fase-05-estil.md) | 0, 0b, 4 | **A mitges**: regles 1 a 3 fetes menys els dos grans; 10 funcions al trinquet | Claude |
+| 6 | [Optimitzacions](fase-06-optimitzacions.md) | 1, 2 | Per començar | — |
+| 7 | [Prova global final](fase-07-prova-global.md) | 3, 4, 5, 6 | Per començar | — |
+| 8 | [Manuals i README](fase-08-manuals.md) | 7 | Per començar | — |
+| 9 | [Publicar](fase-09-publicar.md) | 8 + decisió | **Bloquejada per una decisió** | — |
+| 10 | [Sonar i tancament](fase-10-sonar-i-tancament.md) | 9 | Per començar | — |
+
+**Les independents de debò són la 1 i la 2**: es poden fer avui, alhora, i les
+dues només llegeixen. La 0 i la 0b també són independents de tot.
