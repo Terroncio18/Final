@@ -1,6 +1,7 @@
 # 12. Decisions pendents
 
-- **12.30. Si el servidor es parteix en dos per a poder provar-lo.** Ve de la
+- ~~**12.30. Si el servidor es parteix en dos per a poder provar-lo.**~~
+  Resolta el 19/11/2026 a la §11.60: partit. El que es plantejava: ve de la
   §11.59. `server.ts` fa tres coses en carregar-se: construeix l'aplicació,
   hi penja les rutes i es posa a escoltar. La tercera és la que impedeix
   provar les altres dues, perquè importar el fitxer obre un port. El que es
