@@ -187,9 +187,9 @@ const CORNERS = STEPS.map(([dx, dy]) => {
 class Heap {
   private keys = new Float64Array(1 << 16);
   private cells = new Int32Array(1 << 16);
-  size = 0;
+  public size = 0;
 
-  push(key: number, cell: number): void {
+  public push(key: number, cell: number): void {
     if (this.size === this.keys.length) {
       const keys = new Float64Array(this.size * 2);
       keys.set(this.keys);
@@ -211,9 +211,9 @@ class Heap {
   }
 
   /** Removes the smallest and leaves it in `key` and `cell`. */
-  key = 0;
-  cell = 0;
-  pop(): void {
+  public key = 0;
+  public cell = 0;
+  public pop(): void {
     this.key = this.keys[0];
     this.cell = this.cells[0];
     const last = --this.size;

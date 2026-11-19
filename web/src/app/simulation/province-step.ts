@@ -26,7 +26,7 @@ export class ProvinceStep {
   private readonly levels = inject(LevelsService);
 
   /** The `:region` segment, bound by withComponentInputBinding(). */
-  readonly region = input.required<string>();
+  public readonly region = input.required<string>();
 
   protected readonly failed = this.provinces.failed;
 
@@ -46,7 +46,7 @@ export class ProvinceStep {
    */
   protected readonly single = computed(() => this.options().length === 1);
 
-  constructor() {
+  public constructor() {
     this.regions.load();
     this.provinces.load();
 

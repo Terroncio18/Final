@@ -46,14 +46,14 @@ const HIGH_MW = 50;
   styleUrl: './hotspot-panel.css',
 })
 export class HotspotPanel {
-  readonly hotspot = input.required<Hotspot>();
-  readonly closed = output<void>();
+  public readonly hotspot = input.required<Hotspot>();
+  public readonly closed = output<void>();
 
   private readonly locator = inject(PointLocator);
   /** Where the detection is, by the codes the simulator is addressed by (§11.53). */
   private readonly place = signal<Place | null | 'pending' | 'failed'>('pending');
 
-  constructor() {
+  public constructor() {
     effect(() => {
       const { lon, lat } = this.hotspot();
       this.place.set('pending');

@@ -40,7 +40,7 @@ const LATTICE = 64;
 
 export class FireField {
   /** Reused RGBA buffer: wrap it in one ImageData and keep it. */
-  readonly pixels: Uint8ClampedArray<ArrayBuffer>;
+  public readonly pixels: Uint8ClampedArray<ArrayBuffer>;
 
   /** Minutes the front takes to cross each cell: the local scale of time. */
   private readonly pace: Float32Array;
@@ -50,7 +50,7 @@ export class FireField {
   private count = 0;
   private minute = Number.NaN;
 
-  constructor(private readonly arrival: Float32Array) {
+  public constructor(private readonly arrival: Float32Array) {
     const cells = arrival.length;
     this.pixels = new Uint8ClampedArray(cells * 4);
     this.pace = new Float32Array(cells);
@@ -123,7 +123,7 @@ export class FireField {
    * When the minute has not changed only the cells near the front and the
    * warm ones behind it are repainted: the cold char does not move.
    */
-  paint(minute: number, seconds = 0, motion = true): Uint8ClampedArray<ArrayBuffer> {
+  public paint(minute: number, seconds = 0, motion = true): Uint8ClampedArray<ArrayBuffer> {
     const arrival = this.arrival;
     if (minute !== this.minute) {
       this.minute = minute;
@@ -212,7 +212,7 @@ export class FireField {
   }
 
   /** True while there is a front or warm ground to animate. */
-  get moving(): boolean {
+  public get moving(): boolean {
     return this.count > 0;
   }
 

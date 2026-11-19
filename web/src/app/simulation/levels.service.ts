@@ -61,7 +61,7 @@ export class LevelsService {
    * the router destroys before it creates, but the browser's back button can
    * land on any level of the hierarchy.
    */
-  show(level: Level, of: Of = {}): void {
+  public show(level: Level, of: Of = {}): void {
     // One level of borders at a time, and never two. A region's outline is the
     // outer edge of its provinces and a province's is the outer edge of its
     // municipalities, so a level drawn under the one being chosen repeats every
@@ -126,7 +126,7 @@ export class LevelsService {
    * keep in step with the other two, and that duplication is what the first
    * version paid for in SimulationFlow.
    */
-  clear(): void {
+  public clear(): void {
     this.show('region');
   }
 }

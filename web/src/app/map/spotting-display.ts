@@ -14,7 +14,7 @@ export function spotPoint(cell: number, centre: Point): [number, number] {
 }
 export class SpottingDisplay {
   private map: MapLibreMap | null = null;
-  set(map: MapLibreMap, centre: Point, spots: readonly SpotIgnition[]): void {
+  public set(map: MapLibreMap, centre: Point, spots: readonly SpotIgnition[]): void {
     if (this.map !== map) {
       this.detach();
       this.map = map;
@@ -42,7 +42,7 @@ export class SpottingDisplay {
       });
     } else writeSource(map.getSource('spot-ignitions') as GeoJSONSource, data);
   }
-  detach(): void {
+  public detach(): void {
     if (this.map?.getLayer('spot-ignitions')) this.map.removeLayer('spot-ignitions');
     if (this.map?.getSource('spot-ignitions')) this.map.removeSource('spot-ignitions');
     this.map = null;

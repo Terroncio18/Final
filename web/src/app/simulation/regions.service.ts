@@ -40,10 +40,10 @@ function toRegion(feature: RegionFeature): Region {
 @Injectable({ providedIn: 'root' })
 export class RegionsService {
   /** Empty until the file is in. The step says it is waiting. */
-  readonly regions = signal<readonly Region[]>([]);
+  public readonly regions = signal<readonly Region[]>([]);
 
   /** True when the file could not be read, so the step can say so. */
-  readonly failed = signal(false);
+  public readonly failed = signal(false);
 
   private asked = false;
 
@@ -54,7 +54,7 @@ export class RegionsService {
    * the browser answers from cache and there is no second source of truth for
    * the names.
    */
-  load(): void {
+  public load(): void {
     if (this.asked) return;
     this.asked = true;
 
@@ -75,7 +75,7 @@ export class RegionsService {
   }
 
   /** The region a URL code names, or nothing if it names none. */
-  find(id: string): Region | undefined {
+  public find(id: string): Region | undefined {
     return this.regions().find((region) => region.id === id);
   }
 }

@@ -35,8 +35,8 @@ export class MunicipalitiesService {
   private readonly maps = inject(MapService);
 
   /** The province now loaded, and its municipalities. */
-  readonly municipalities = signal<readonly Municipality[]>([]);
-  readonly failed = signal(false);
+  public readonly municipalities = signal<readonly Municipality[]>([]);
+  public readonly failed = signal(false);
 
   private readonly cache = new Map<string, readonly Municipality[]>();
   private readonly sources = new Map<string, FeatureCollection>();
@@ -51,7 +51,7 @@ export class MunicipalitiesService {
   private readonly shapes = new Map<string, AreaGeometry>();
   private asked: string | null = null;
 
-  load(province: string): void {
+  public load(province: string): void {
     if (this.asked === province) return;
     this.asked = province;
     this.failed.set(false);
@@ -90,13 +90,13 @@ export class MunicipalitiesService {
   }
 
   /** Clears the list and takes the outlines off the map. */
-  release(): void {
+  public release(): void {
     this.asked = null;
     this.municipalities.set([]);
     this.maps.setMunicipalities(null);
   }
 
-  find(id: string): Municipality | undefined {
+  public find(id: string): Municipality | undefined {
     return this.municipalities().find((municipality) => municipality.id === id);
   }
 
@@ -113,7 +113,7 @@ export class MunicipalitiesService {
    * The extent is tested first because it is four comparisons and rules out
    * every municipality but a handful; the ray casting then runs on those.
    */
-  at(point: Point): Municipality | null {
+  public at(point: Point): Municipality | null {
     const [lon, lat] = point;
 
     for (const municipality of this.municipalities()) {

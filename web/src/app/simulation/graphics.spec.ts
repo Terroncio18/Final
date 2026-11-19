@@ -12,10 +12,10 @@ vi.mock('three', async (original) => {
     ...actual,
     WebGLRenderer: vi.fn(
       class {
-        autoClear = true;
-        resetState = vi.fn();
-        render = vi.fn();
-        dispose = vi.fn();
+        public autoClear = true;
+        public resetState = vi.fn();
+        public render = vi.fn();
+        public dispose = vi.fn();
       },
     ),
   };
@@ -425,11 +425,11 @@ describe('terrain pixels and sampling', () => {
     vi.stubGlobal(
       'OffscreenCanvas',
       class {
-        constructor(
+        public constructor(
           public width: number,
           public height: number,
         ) {}
-        getContext() {
+        public getContext() {
           return {
             drawImage: vi.fn(),
             getImageData: () => {
@@ -467,7 +467,7 @@ describe('terrain pixels and sampling', () => {
     vi.stubGlobal(
       'OffscreenCanvas',
       class {
-        getContext() {
+        public getContext() {
           return null;
         }
       },
@@ -476,7 +476,7 @@ describe('terrain pixels and sampling', () => {
     vi.stubGlobal(
       'OffscreenCanvas',
       class {
-        getContext() {
+        public getContext() {
           return {};
         }
       },

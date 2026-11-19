@@ -48,7 +48,7 @@ export class PointLocator {
   private readonly regions = new Map<string, string>();
   private readonly municipalities = new Map<string, Promise<Shape[]>>();
 
-  async locate(point: Point): Promise<Place | null> {
+  public async locate(point: Point): Promise<Place | null> {
     this.provinces ??= read(PROVINCES_URL).then((c) => {
       for (const f of c.features) this.regions.set(String(f.id), String(f.properties?.['region']));
       return shapes(c, (f) => String(f.id));

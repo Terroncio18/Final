@@ -220,7 +220,7 @@ export class MapService {
    * A fresh array every time, so clicking the same place twice still counts as
    * two answers: the value is what changed, not where it is.
    */
-  readonly picked = signal<[number, number] | null>(null);
+  public readonly picked = signal<[number, number] | null>(null);
 
   /**
    * Where the pointer is over the canvas, as [lon, lat], or nothing when it
@@ -228,14 +228,14 @@ export class MapService {
    * pointer and not the flat plane behind it, which is what a reading of the
    * terrain needs.
    */
-  readonly pointer = signal<[number, number] | null>(null);
+  public readonly pointer = signal<[number, number] | null>(null);
 
   /**
    * Counts the right clicks on the canvas while picking: a tool's «undo» or
    * «cancel» (§11.39). A right-button drag turns the relief instead, and does
    * not count.
    */
-  readonly rightClicks = signal(0);
+  public readonly rightClicks = signal(0);
 
   /** Whether the style has loaded once, which is when the layers start existing. */
   private styled = false;
@@ -248,10 +248,10 @@ export class MapService {
   private provincesOf: string | null = null;
 
   /** False until the style has loaded and the first view is framed. */
-  readonly ready = signal(false);
+  public readonly ready = signal(false);
 
   /** Which way the view faces: degrees clockwise from north, for the compass. */
-  readonly bearing = signal(0);
+  public readonly bearing = signal(0);
 
   /**
    * The detection the panel is showing, or nothing.
@@ -259,7 +259,7 @@ export class MapService {
    * A signal because the application is zoneless: a MapLibre click happens
    * outside Angular and nothing would redraw on its own.
    */
-  readonly selected = signal<Hotspot | null>(null);
+  public readonly selected = signal<Hotspot | null>(null);
 
   /**
    * The scope the camera is on.
@@ -268,13 +268,13 @@ export class MapService {
    * has already said which map they are looking at with the header's toggle,
    * and asking again would be the step §2.18 does away with.
    */
-  readonly scope = signal<ViewId>(INITIAL_VIEW);
+  public readonly scope = signal<ViewId>(INITIAL_VIEW);
 
-  get map(): MapLibreMap | null {
+  public get map(): MapLibreMap | null {
     return this.instance;
   }
 
-  create(container: HTMLElement): void {
+  public create(container: HTMLElement): void {
     if (this.instance) return;
 
     const map = new MapLibreMap({
@@ -391,7 +391,7 @@ export class MapService {
   }
 
   /** Frames one of the two fixed scope views. */
-  goToView(view: ViewId, clearOfPanel = false): void {
+  public goToView(view: ViewId, clearOfPanel = false): void {
     this.scope.set(view);
     this.goToBounds(VIEWS[view].bounds, clearOfPanel);
   }
@@ -406,7 +406,7 @@ export class MapService {
    * `clearOfPanel` is for the steps of the form, which always have a panel
    * open over the right of the canvas.
    */
-  goToBounds(bounds: LngLatBoundsLike, clearOfPanel = false): void {
+  public goToBounds(bounds: LngLatBoundsLike, clearOfPanel = false): void {
     this.withStyle((map) => {
       const fit = clearOfPanel ? FIT_BESIDE_PANEL : FIT;
       // The lean goes in the framing and not in a move of its own. The first
@@ -431,7 +431,7 @@ export class MapService {
    * The filter runs inside MapLibre against the `scope` property baked into the
    * data, so switching scope costs nothing: no refetch, no new source.
    */
-  showRegionsFor(scope: ViewId): void {
+  public showRegionsFor(scope: ViewId): void {
     this.withStyle((map) => {
       const filter = ['==', ['get', 'scope'], scope] as never;
       map.setFilter(LAYERS.regionsFill, filter);
@@ -452,7 +452,7 @@ export class MapService {
    * make a region clickable, which is not something to offer while the user is
    * two levels further down.
    */
-  setRegionsVisible(visible: boolean): void {
+  public setRegionsVisible(visible: boolean): void {
     this.withStyle((map) => {
       const visibility = visible ? 'visible' : 'none';
       for (const id of [LAYERS.regionsFill, LAYERS.regionsLine]) {
@@ -468,17 +468,17 @@ export class MapService {
    * is what makes it cheap enough to follow a pointer down a list: no paint
    * property is recomputed and no expression is rebuilt.
    */
-  focusRegion(id: string | null): void {
+  public focusRegion(id: string | null): void {
     this.setFocus(LAYERS.regionFocusFill, LAYERS.regionFocusLine, id);
   }
 
   /** The same, one level down. Does nothing until the provinces have arrived. */
-  focusProvince(id: string | null): void {
+  public focusProvince(id: string | null): void {
     this.setFocus(LAYERS.provinceFocusFill, LAYERS.provinceFocusLine, id);
   }
 
   /** And one further down still. */
-  focusMunicipality(id: string | null): void {
+  public focusMunicipality(id: string | null): void {
     this.setFocus(LAYERS.municipalityFocusFill, LAYERS.municipalityFocusLine, id);
   }
 
@@ -490,7 +490,7 @@ export class MapService {
    * nothing hides the layers, which also stops them being drawn over the levels
    * above when the form moves back up.
    */
-  setMunicipalities(data: FeatureCollection | null): void {
+  public setMunicipalities(data: FeatureCollection | null): void {
     this.withStyle((map) => {
       if (!map.getSource(MUNICIPALITIES_SOURCE)) {
         if (!data) return;
@@ -525,7 +525,7 @@ export class MapService {
    * arrive as an already parsed collection rather than a URL, so the file is
    * downloaded and parsed exactly once for both the list and the map.
    */
-  addProvinces(data: FeatureCollection): void {
+  public addProvinces(data: FeatureCollection): void {
     this.withStyle((map) => {
       if (map.getSource(PROVINCES_SOURCE)) return;
       map.addSource(PROVINCES_SOURCE, {
@@ -541,7 +541,7 @@ export class MapService {
   }
 
   /** Shows the borders of one region's provinces, or of none. */
-  showProvincesOf(region: string | null): void {
+  public showProvincesOf(region: string | null): void {
     this.provincesOf = region;
     this.withStyle((map) => this.applyProvinces(map));
   }
@@ -567,7 +567,7 @@ export class MapService {
    * The style declares the source empty (§2.30bis): which detections belong on
    * screen depends on the dates in the URL, and the style is built once.
    */
-  setHotspots(data: FeatureCollection): void {
+  public setHotspots(data: FeatureCollection): void {
     this.withStyle((map) => {
       const source = map.getSource(HOTSPOTS_SOURCE) as GeoJSONSource | undefined;
       writeSource(source, data);
@@ -575,7 +575,7 @@ export class MapService {
   }
 
   /** What the colour of the marks is saying. The legend reads it. */
-  readonly hotspotColourBy = signal<HotspotColourBy>('power');
+  public readonly hotspotColourBy = signal<HotspotColourBy>('power');
 
   /**
    * Makes the colour of the marks say the power, or the date.
@@ -584,7 +584,7 @@ export class MapService {
    * dates are written on the features, and a map recoloured ahead of its data
    * would paint the old answer by a rule it was not prepared for.
    */
-  setHotspotColourBy(by: HotspotColourBy): void {
+  public setHotspotColourBy(by: HotspotColourBy): void {
     this.hotspotColourBy.set(by);
     this.withStyle((map) =>
       map.setPaintProperty(LAYERS.hotspots, 'circle-color', hotspotColour(by)),
@@ -595,7 +595,7 @@ export class MapService {
    * How much the marks have been shrunk for the number on screen, from 1 down.
    * Published because the legend draws the same circles and has to match.
    */
-  readonly hotspotScale = signal(1);
+  public readonly hotspotScale = signal(1);
 
   /**
    * Sizes and thins the marks for how many of them are in view.
@@ -605,7 +605,7 @@ export class MapService {
    * same distance from the mark it is around; the dark edge thins with the
    * mark, because a full pixel of edge around a two-pixel dot is mostly edge.
    */
-  setHotspotDensity(count: number): void {
+  public setHotspotDensity(count: number): void {
     const { scale, opacity } = hotspotDensity(count);
     this.hotspotScale.set(scale);
     this.withStyle((map) => {
@@ -623,7 +623,7 @@ export class MapService {
    * `queryRenderedFeatures` does not return features from a hidden layer, so
    * featureAt() finds nothing and no panel can open behind the form.
    */
-  setHotspotsVisible(visible: boolean): void {
+  public setHotspotsVisible(visible: boolean): void {
     this.withStyle((map) => {
       // The ring goes with the marks: it is drawn from the same source, and a
       // ring left over the form would point at a detection that is not there.
@@ -640,7 +640,7 @@ export class MapService {
    * this possible without touching the gesture handlers: the only difference
    * between picking and not is what the handler does with the event.
    */
-  setPicking(on: boolean): void {
+  public setPicking(on: boolean): void {
     this.picking = on;
     if (!on) this.picked.set(null);
     const canvas = this.instance?.getCanvas();
@@ -648,7 +648,7 @@ export class MapService {
   }
 
   /** Marks the simulation centre, or takes it off. Kept under its existing API name. */
-  setIgnition(point: readonly [number, number] | null): void {
+  public setIgnition(point: readonly [number, number] | null): void {
     this.withStyle((map) => {
       this.centreMarker?.remove();
       this.centreMarker = point
@@ -668,7 +668,7 @@ export class MapService {
    * Taken down and put up again on every call rather than diffed: there are a
    * handful of them, and each is two DOM elements (see spawn-marker.ts).
    */
-  setFireStarts(
+  public setFireStarts(
     starts: readonly { readonly point: readonly [number, number]; readonly label: string }[],
   ): void {
     this.withStyle((map) => {
@@ -685,7 +685,7 @@ export class MapService {
    * nothing to free —what the style asks for is only asked for while the
    * layers are on.
    */
-  setContours(on: boolean): void {
+  public setContours(on: boolean): void {
     this.withStyle((map) => {
       const visibility = on ? 'visible' : 'none';
       for (const id of [LAYERS.contourLines, LAYERS.contourLabels]) {
@@ -701,7 +701,7 @@ export class MapService {
    * kilobytes, the style filters what is on screen, and cutting it to the
    * domain would mean a fetch every time the point moves.
    */
-  setPlaces(data: FeatureCollection | null): void {
+  public setPlaces(data: FeatureCollection | null): void {
     this.withStyle((map) => {
       const source = map.getSource(PLACES_SOURCE) as GeoJSONSource | undefined;
       writeSource(source, data ?? { type: 'FeatureCollection', features: [] });
@@ -734,7 +734,7 @@ export class MapService {
   }
 
   /** The crews and machines at work at the cursor's minute, as 3D figures. */
-  setGroundAgents(agents: readonly GroundAgent[]): void {
+  public setGroundAgents(agents: readonly GroundAgent[]): void {
     this.groundWanted = agents;
     this.withStyle((map) => {
       if (!agents.length && !this.agents3d) return;
@@ -743,23 +743,23 @@ export class MapService {
   }
 
   /** An aircraft makes one pass, in real time. */
-  flyPass(pass: Pass): void {
+  public flyPass(pass: Pass): void {
     if (!this.agentsMotion) return;
     this.withStyle((map) => this.withAgents(map, (layer) => layer.fly(pass)));
   }
 
   /** Every pass in the air is put away. */
-  landPasses(): void {
+  public landPasses(): void {
     this.agents3d?.land();
   }
 
-  setAgentsMotion(on: boolean): void {
+  public setAgentsMotion(on: boolean): void {
     this.agentsMotion = on;
     this.agents3d?.setMotion(on);
   }
 
   /** Draws the simulation domain, or takes it off. */
-  setDomain(ring: readonly (readonly [number, number])[] | null): void {
+  public setDomain(ring: readonly (readonly [number, number])[] | null): void {
     this.withStyle((map) => {
       const source = map.getSource(DOMAIN_SOURCE) as GeoJSONSource | undefined;
       writeSource(source, {
@@ -786,7 +786,7 @@ export class MapService {
    * its image, and a megapixel texture is not worth keeping for a layer that
    * is off by default.
    */
-  setSlopes(image: string | null, bounds?: readonly [number, number, number, number]): void {
+  public setSlopes(image: string | null, bounds?: readonly [number, number, number, number]): void {
     this.withStyle((map) => {
       if (!image || !bounds) {
         if (map.getLayer(LAYERS.slopes)) map.removeLayer(LAYERS.slopes);
@@ -839,7 +839,7 @@ export class MapService {
    * (§13.1), and it sits above them and under the contours, the mask and the
    * outline: the fire is on the ground, and the lines are drawn on the fire.
    */
-  setFire(
+  public setFire(
     canvas: HTMLCanvasElement | null,
     bounds?: readonly [number, number, number, number],
   ): void {
@@ -892,7 +892,7 @@ export class MapService {
    * is not draped put between two that are splits the stack MapLibre renders
    * to the terrain in one pass (§13.1).
    */
-  setFireParticles(emitters: Emitters | null, towardsDeg = 0, windKmh = 0): void {
+  public setFireParticles(emitters: Emitters | null, towardsDeg = 0, windKmh = 0): void {
     this.withStyle((map) => {
       if (!emitters) {
         if (this.particles && map.getLayer(this.particles.id)) map.removeLayer(this.particles.id);
@@ -909,15 +909,15 @@ export class MapService {
   }
 
   /** Stops the particles for whoever has asked for less motion, or lets them go. */
-  setFireMotion(on: boolean): void {
+  public setFireMotion(on: boolean): void {
     this.particles?.setMotion(on);
   }
 
-  resetFireParticles(): void {
+  public resetFireParticles(): void {
     this.particles?.reset();
   }
 
-  focusFire(bounds: readonly [number, number, number, number]): void {
+  public focusFire(bounds: readonly [number, number, number, number]): void {
     this.withStyle((map) =>
       map.fitBounds(
         [
@@ -942,7 +942,7 @@ export class MapService {
    * animated is made to read its canvas once: pausing uploads the texture a
    * last time before it stops.
    */
-  refreshFire(): void {
+  public refreshFire(): void {
     this.withStyle((map) => {
       const source = map.getSource(FIRE_SOURCE) as CanvasSource | undefined;
       if (!source) return;
@@ -981,7 +981,7 @@ export class MapService {
    * The highlight borrows the prototype's own warm light, `#fff0d3`, so the
    * sunlit faces read as sunlit instead of washed out.
    */
-  setReliefEmphasis(on: boolean): void {
+  public setReliefEmphasis(on: boolean): void {
     this.withStyle((map) => {
       map.setPaintProperty(LAYERS.hillshade, 'hillshade-exaggeration', on ? 0.62 : 0.3);
       map.setPaintProperty(
@@ -1011,7 +1011,7 @@ export class MapService {
    * geometry seen from the other side and a second source would be one more
    * thing to keep in step.
    */
-  setDomainMask(on: boolean): void {
+  public setDomainMask(on: boolean): void {
     this.withStyle((map) =>
       map.setLayoutProperty(LAYERS.domainMask, 'visibility', on ? 'visible' : 'none'),
     );
@@ -1034,7 +1034,7 @@ export class MapService {
    * to a second animation that would interrupt it. goToBounds() reads the
    * state this sets.
    */
-  setTerrain3D(on: boolean): void {
+  public setTerrain3D(on: boolean): void {
     if (on === this.terrain3D) return;
     this.terrain3D = on;
     this.withStyle((map) => {
@@ -1060,7 +1060,7 @@ export class MapService {
    * On touch, two fingers tilt. Turning them would mean enabling the pinch
    * handler, and that one brings the zoom with it.
    */
-  setOrbit(on: boolean): void {
+  public setOrbit(on: boolean): void {
     this.withStyle((map) => {
       if (on) {
         // Linear and not MapLibre's default: turning follows the horizontal
@@ -1102,7 +1102,7 @@ export class MapService {
    * Turning stays where it was, in setOrbit(): it is the relief's and this is
    * the frame's, and the simulator is the only screen that asks for either.
    */
-  setSandboxBounds(bounds: readonly [number, number, number, number] | null): void {
+  public setSandboxBounds(bounds: readonly [number, number, number, number] | null): void {
     this.withStyle((map) => {
       if (!bounds) {
         map.dragPan.disable();
@@ -1168,7 +1168,7 @@ export class MapService {
    * offer. No limits of its own: the floor and the ceiling are the ones
    * setSandboxBounds() set, and MapLibre stops at them by itself.
    */
-  zoomBy(levels: number): void {
+  public zoomBy(levels: number): void {
     this.withStyle((map) => map.easeTo({ zoom: map.getZoom() + levels, duration: 250 }));
   }
 
@@ -1181,14 +1181,14 @@ export class MapService {
    * ground, so a width in cells is a hairline from afar and a band up close.
    * MapLibre's tiles are 512 px, hence half the usual constant.
    */
-  metresPerPixel(): number | null {
+  public metresPerPixel(): number | null {
     const map = this.instance;
     if (!map || !this.styled) return null;
     const latitude = (map.getCenter().lat * Math.PI) / 180;
     return (78_271.517 * Math.cos(latitude)) / 2 ** map.getZoom();
   }
 
-  clearSelection(): void {
+  public clearSelection(): void {
     this.select(null);
   }
 
@@ -1252,7 +1252,7 @@ export class MapService {
     return hits.reduce((best, hit) => (frpOf(hit) > frpOf(best) ? hit : best), hits[0]!);
   }
 
-  destroy(): void {
+  public destroy(): void {
     this.particles = null;
     this.centreMarker?.remove();
     this.centreMarker = null;

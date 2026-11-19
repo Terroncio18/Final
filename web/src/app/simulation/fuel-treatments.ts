@@ -39,7 +39,7 @@ export class FuelTreatments {
   private readonly cache = new Map<number, Map<number, TreatedFuel>>();
   /** Per cell, the plain-fuel state once its water has dried off, and since when. */
   private readonly dried = new Map<number, { from: number; state: TreatedFuel }>();
-  constructor(
+  public constructor(
     centre: Point,
     measures: readonly Countermeasure[],
     private readonly moistures: Moistures,
@@ -76,16 +76,16 @@ export class FuelTreatments {
     }
   }
 
-  has(cell: number): boolean {
+  public has(cell: number): boolean {
     return this.histories.has(cell);
   }
 
   /** Every cell with a treatment, whenever it comes. */
-  cells(): IterableIterator<number> {
+  public cells(): IterableIterator<number> {
     return this.histories.keys();
   }
 
-  at(cell: number, minute: number): TreatedFuel | undefined {
+  public at(cell: number, minute: number): TreatedFuel | undefined {
     const history = this.histories.get(cell),
       model = this.models[this.fuels?.[cell] ?? 1];
     if (!history || !model) return undefined;
@@ -160,7 +160,7 @@ export class FuelTreatments {
     return state;
   }
 
-  next(cell: number, minute: number): number {
+  public next(cell: number, minute: number): number {
     const h = this.histories.get(cell);
     if (!h) return Infinity;
     return Math.min(

@@ -46,7 +46,7 @@ interface RegionFeature {
 @Injectable({ providedIn: 'root' })
 export class StudyArea {
   /** True when the outlines could not be read, so nothing is filtered. */
-  readonly failed = signal(false);
+  public readonly failed = signal(false);
 
   private areas: readonly Area[] = [];
   private reading: Promise<void> | null = null;
@@ -58,7 +58,7 @@ export class StudyArea {
    * fires too many is a smaller lie than a map showing none, and the one thing
    * an empty map must never mean is «nothing is burning».
    */
-  async inside<T extends Feature>(features: readonly T[]): Promise<readonly T[]> {
+  public async inside<T extends Feature>(features: readonly T[]): Promise<readonly T[]> {
     await this.read();
     if (!this.areas.length) return features;
 

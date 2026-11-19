@@ -29,19 +29,19 @@ vi.mock('maplibre-gl', async () => {
   const { vi } = await import('vitest');
   return {
     MapLibreMap: class {
-      constructor(options: unknown) {
+      public constructor(options: unknown) {
         return doubles.makeMap(options) as object;
       }
     },
     Marker: class {
-      remove = vi.fn();
-      constructor(public options: { element: HTMLElement }) {
+      public remove = vi.fn();
+      public constructor(public options: { element: HTMLElement }) {
         doubles.markers.push(this);
       }
-      setLngLat() {
+      public setLngLat() {
         return this;
       }
-      addTo() {
+      public addTo() {
         return this;
       }
     },
@@ -54,8 +54,8 @@ vi.mock('maplibre-gl', async () => {
 vi.mock('maplibre-contour', () => ({
   default: {
     DemSource: class {
-      setupMaplibre() {}
-      contourProtocolUrl = () => 'contour://test';
+      public setupMaplibre() {}
+      public contourProtocolUrl = () => 'contour://test';
     },
   },
 }));

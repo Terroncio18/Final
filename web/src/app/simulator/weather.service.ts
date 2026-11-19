@@ -41,14 +41,14 @@ export interface Observation {
  */
 @Injectable({ providedIn: 'root' })
 export class WeatherService {
-  readonly observation = signal<Observation | null>(null);
-  readonly loading = signal(false);
-  readonly failed = signal(false);
+  public readonly observation = signal<Observation | null>(null);
+  public readonly loading = signal(false);
+  public readonly failed = signal(false);
 
   private token = 0;
 
   /** Asks again, whether or not there is an answer already: this is «refresh». */
-  load(country: 'ES' | 'PT', point: Point): void {
+  public load(country: 'ES' | 'PT', point: Point): void {
     const mine = (this.token += 1);
     this.loading.set(true);
     this.failed.set(false);
@@ -74,7 +74,7 @@ export class WeatherService {
       });
   }
 
-  clear(): void {
+  public clear(): void {
     this.token += 1;
     this.observation.set(null);
     this.loading.set(false);

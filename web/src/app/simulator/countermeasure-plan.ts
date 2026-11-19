@@ -183,40 +183,40 @@ export function lengthM(points: readonly Point[]): number {
  */
 export class CountermeasurePlan {
   /** What will be handed to the model. Only ever replaced whole. */
-  readonly measures = signal<readonly Countermeasure[]>([]);
+  public readonly measures = signal<readonly Countermeasure[]>([]);
   /** The tool in the hand, if any. */
-  readonly kind = signal<CountermeasureKind | null>(null);
+  public readonly kind = signal<CountermeasureKind | null>(null);
   /** The vertices clicked so far of a line not yet finished. */
-  readonly draft = signal<readonly Point[]>([]);
-  readonly selected = signal<string | null>(null);
-  readonly note = signal<PlanNote | null>(null);
-  readonly minute = signal(0);
+  public readonly draft = signal<readonly Point[]>([]);
+  public readonly selected = signal<string | null>(null);
+  public readonly note = signal<PlanNote | null>(null);
+  public readonly minute = signal(0);
   /**
    * The minute each crew stopped for safety (12.19), by measure id: the
    * model's answer, set by whoever holds the result.
    */
-  readonly crewStops = signal<ReadonlyMap<string, number>>(new Map());
+  public readonly crewStops = signal<ReadonlyMap<string, number>>(new Map());
   /**
    * The measures deployed after the cursor. A decision taken now, in the past,
    * leaves them behind: they were decided on a fire that will no longer be
    * the one computed (§11.38).
    */
-  readonly later = computed(() =>
+  public readonly later = computed(() =>
     this.measures().filter((measure) => (measure.startMin ?? 0) > this.minute()),
   );
   /** Set when the user accepted that the next measure added drops `later`. */
-  readonly discarding = signal(false);
+  public readonly discarding = signal(false);
   /**
    * A last say on a measure about to be added, from whoever knows the fire:
    * why it cannot go there, or null. Mop-up is refused on an intense front
    * and where nothing has burned (§11.40).
    */
-  guard: ((measure: Countermeasure) => string | null) | null = null;
-  readonly hasEditable = computed(() =>
+  public guard: ((measure: Countermeasure) => string | null) | null = null;
+  public readonly hasEditable = computed(() =>
     this.measures().some((m) => (m.startMin ?? 0) >= this.minute()),
   );
 
-  isLocked(id: string): boolean {
+  public isLocked(id: string): boolean {
     const measure = this.measures().find((m) => m.id === id);
     return !!measure && (measure.startMin ?? 0) < this.minute();
   }
@@ -224,9 +224,9 @@ export class CountermeasurePlan {
   private nextId = 1;
 
   /** The values the tool in the hand was set to; the defaults if none. */
-  readonly settings = signal<ToolSettings | null>(null);
+  public readonly settings = signal<ToolSettings | null>(null);
 
-  readonly tool = computed(() => {
+  public readonly tool = computed(() => {
     const kind = this.kind();
     if (!kind) return null;
     const settings = this.settings() ?? defaultSettings(kind);
@@ -234,14 +234,14 @@ export class CountermeasurePlan {
   });
 
   /** The measures still at work, and the discharges that are done (§11.40). */
-  readonly openRows = computed(() => this.rows().filter((row) => !row.finished));
-  readonly finishedRows = computed(() => this.rows().filter((row) => row.finished));
+  public readonly openRows = computed(() => this.rows().filter((row) => !row.finished));
+  public readonly finishedRows = computed(() => this.rows().filter((row) => row.finished));
 
   /** A line needs two points to be one. */
-  readonly canFinish = computed(() => this.draft().length >= 2);
+  public readonly canFinish = computed(() => this.draft().length >= 2);
 
   /** Each measure in the words the list uses. */
-  readonly rows = computed(() => {
+  public readonly rows = computed(() => {
     const counts = new Map<CountermeasureKind, number>();
     const whole = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 0 });
     const one = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
@@ -356,7 +356,7 @@ export class CountermeasurePlan {
    * Takes a tool, or puts it down if it was the one in the hand. With
    * `discard`, the next measure added takes the later ones off the plan.
    */
-  begin(kind: CountermeasureKind, discard = false, settings?: ToolSettings): void {
+  public begin(kind: CountermeasureKind, discard = false, settings?: ToolSettings): void {
     const same = this.kind() === kind && !settings;
     this.draft.set([]);
     this.kind.set(same ? null : kind);
@@ -366,7 +366,7 @@ export class CountermeasurePlan {
   }
 
   /** Escape: the line being drawn is thrown away and the tool put down. */
-  cancel(): void {
+  public cancel(): void {
     this.draft.set([]);
     this.kind.set(null);
     this.settings.set(null);
@@ -380,7 +380,7 @@ export class CountermeasurePlan {
    * domain it is refused aloud, not dropped: a click that does nothing looks
    * like a broken tool.
    */
-  click(point: Point, bounds: Bounds): void {
+  public click(point: Point, bounds: Bounds): void {
     const tool = this.tool();
     if (!tool) return;
     if (!inside(point, bounds)) {
@@ -411,7 +411,7 @@ export class CountermeasurePlan {
    * Takes the last vertex back; with none left, the measure is given up and
    * the tool put down. It is what the right button does (§11.39).
    */
-  undo(): void {
+  public undo(): void {
     if (this.draft().length <= 1) {
       this.cancel();
       return;
@@ -420,7 +420,7 @@ export class CountermeasurePlan {
   }
 
   /** Turns the line drawn into a measure. The tool stays, for the next one. */
-  finish(): void {
+  public finish(): void {
     const kind = this.kind();
     if (!kind) return;
     if (!this.canFinish()) {
@@ -430,7 +430,7 @@ export class CountermeasurePlan {
     if (this.add(kind, this.draft())) this.cancel();
   }
 
-  remove(id: string): void {
+  public remove(id: string): void {
     if (this.isLocked(id)) {
       this.historyNote();
       return;
@@ -442,7 +442,7 @@ export class CountermeasurePlan {
     if (this.selected() === id) this.selected.set(null);
   }
 
-  clear(): void {
+  public clear(): void {
     this.cancel();
     const retained = this.measures().filter((m) => this.isLocked(m.id));
     if (retained.length === this.measures().length && retained.length) {
@@ -453,12 +453,12 @@ export class CountermeasurePlan {
     this.selected.set(null);
   }
 
-  select(id: string | null): void {
+  public select(id: string | null): void {
     this.selected.set(id && this.measures().some((measure) => measure.id === id) ? id : null);
   }
 
   /** False, and a note saying why, if the value is not one the grid can hold. */
-  setWidth(id: string, value: number): boolean {
+  public setWidth(id: string, value: number): boolean {
     if (!Number.isFinite(value) || value < WIDTH_LIMITS.min || value > WIDTH_LIMITS.max) {
       this.note.set({
         text: `L’amplada ha d’anar de ${WIDTH_LIMITS.min} a ${WIDTH_LIMITS.max} m: la graella és de 30 m i no resol franges més estretes.`,
@@ -469,7 +469,7 @@ export class CountermeasurePlan {
     return this.patch(id, { widthM: Math.round(value) });
   }
 
-  setDuration(id: string, value: number): boolean {
+  public setDuration(id: string, value: number): boolean {
     if (!Number.isFinite(value) || value < DURATION_LIMITS.min || value > DURATION_LIMITS.max) {
       this.note.set({
         text: `La durada ha d’anar de ${DURATION_LIMITS.min} a ${DURATION_LIMITS.max} minuts.`,
@@ -480,7 +480,7 @@ export class CountermeasurePlan {
     return this.patch(id, { durationMin: Math.round(value) });
   }
 
-  setStrength(id: string, percent: number): boolean {
+  public setStrength(id: string, percent: number): boolean {
     if (!Number.isFinite(percent) || percent < 0 || percent > 95) {
       this.note.set({ text: 'La reducció experimental ha d’anar de 0 a 95 %.', failed: true });
       return false;
@@ -494,7 +494,7 @@ export class CountermeasurePlan {
    * What falls outside the domain is left out and counted aloud, the same as
    * when the domain moves under a plan.
    */
-  replace(measures: readonly Countermeasure[], bounds: Bounds | null): void {
+  public replace(measures: readonly Countermeasure[], bounds: Bounds | null): void {
     const renumbered = measures.map((measure, i) => ({ ...measure, id: `m${i + 1}` }));
     const checked = parseCountermeasures(renumbered);
     if (typeof checked === 'string') {
@@ -516,7 +516,7 @@ export class CountermeasurePlan {
    * A measure half outside would be a strip the model clips where the reader
    * cannot see why, so it goes whole; and it never goes silently.
    */
-  confine(bounds: Bounds | null): void {
+  public confine(bounds: Bounds | null): void {
     this.draft.set([]);
     const plan = this.measures();
     if (!plan.length) return;
@@ -567,14 +567,14 @@ export class CountermeasurePlan {
     return done;
   }
 
-  setLiquid(
+  public setLiquid(
     id: string,
     field: 'litresPerPass' | 'passes' | 'passIntervalMin',
     value: number,
   ): boolean {
     return this.patch(id, { [field]: value });
   }
-  setRemaining(id: string, percent: number): boolean {
+  public setRemaining(id: string, percent: number): boolean {
     return this.patch(id, { fuelRemaining: percent / 100 });
   }
 

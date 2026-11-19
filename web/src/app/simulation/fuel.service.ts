@@ -5,13 +5,13 @@ import type { Point } from './point';
 
 @Injectable({ providedIn: 'root' })
 export class FuelService {
-  readonly grid = signal<FuelGrid | null>(null);
-  readonly reading = signal(false);
-  readonly error = signal<string | null>(null);
+  public readonly grid = signal<FuelGrid | null>(null);
+  public readonly reading = signal(false);
+  public readonly error = signal<string | null>(null);
   private controller?: AbortController;
   private key = '';
 
-  async read(point: Point, retry = false): Promise<void> {
+  public async read(point: Point, retry = false): Promise<void> {
     const bounds = domainAround(point),
       key = bounds.join(',');
     if (key === this.key && !retry) return;
@@ -49,7 +49,7 @@ export class FuelService {
     }
   }
 
-  clear(): void {
+  public clear(): void {
     this.controller?.abort();
     this.controller = undefined;
     this.key = '';

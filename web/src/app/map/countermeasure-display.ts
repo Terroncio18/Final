@@ -139,7 +139,7 @@ export class CountermeasureDisplay {
   };
 
   /** Puts the layers up. The style must have loaded: wait for MapService.ready. */
-  attach(map: MapLibreMap, onSelect: (id: string | null) => void): void {
+  public attach(map: MapLibreMap, onSelect: (id: string | null) => void): void {
     if (this.map === map) return;
     this.detach();
     this.map = map;
@@ -240,7 +240,7 @@ export class CountermeasureDisplay {
   }
 
   /** The plan, with one of its measures marked as the selected one. */
-  setMeasures(measures: readonly DrawnMeasure[], selected: string | null): void {
+  public setMeasures(measures: readonly DrawnMeasure[], selected: string | null): void {
     const features = measures
       .map((measure) =>
         shape(measure.points, measure.widthM, measure.disc, {
@@ -260,7 +260,7 @@ export class CountermeasureDisplay {
    * segment is seen before it is committed. For a point tool the pointer alone
    * is the preview: the disc that a click would leave.
    */
-  setDraft(draft: DrawnDraft | null): void {
+  public setDraft(draft: DrawnDraft | null): void {
     this.drawing = draft !== null;
     if (!draft) {
       this.write(DRAFT_SOURCE, EMPTY);
@@ -298,7 +298,7 @@ export class CountermeasureDisplay {
   }
 
   /** Takes down what attach() put up. Safe on a map already removed. */
-  detach(): void {
+  public detach(): void {
     const map = this.map;
     this.map = null;
     this.onSelect = null;

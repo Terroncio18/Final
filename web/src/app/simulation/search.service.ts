@@ -137,8 +137,8 @@ export class SearchService {
   /** Empty until the file is in, so the field can say it is waiting. */
   private readonly entries = signal<readonly Entry[]>([]);
 
-  readonly ready = computed(() => this.entries().length > 0);
-  readonly failed = signal(false);
+  public readonly ready = computed(() => this.entries().length > 0);
+  public readonly failed = signal(false);
 
   private asked = false;
 
@@ -151,7 +151,7 @@ export class SearchService {
    * also the honest moment, because it is the first evidence that the field is
    * what the user came for.
    */
-  load(): void {
+  public load(): void {
     if (this.asked) return;
     this.asked = true;
 
@@ -197,7 +197,7 @@ export class SearchService {
    * well under a frame; a trie would be a structure to maintain and a second
    * description of the same ranking.
    */
-  matches(query: string): readonly Match[] {
+  public matches(query: string): readonly Match[] {
     const wanted = fold(query.trim());
     if (wanted.length < SHORTEST) return [];
 

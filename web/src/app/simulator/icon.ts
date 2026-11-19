@@ -76,7 +76,7 @@ export function iconOr(name: string, fallback: IconName): IconName {
   `,
 })
 export class Icon {
-  readonly name = input.required<IconName>();
+  public readonly name = input.required<IconName>();
 
   protected readonly path = computed(() => ICONS[this.name()]);
 }

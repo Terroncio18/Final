@@ -27,7 +27,7 @@ import { LevelsService } from './levels.service';
   template: '<router-outlet />',
 })
 export class SimulationFlow {
-  constructor() {
+  public constructor() {
     const maps = inject(MapService);
     const levels = inject(LevelsService);
 

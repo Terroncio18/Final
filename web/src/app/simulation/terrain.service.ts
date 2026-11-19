@@ -13,14 +13,14 @@ import { readTerrain, type Terrain } from './terrain';
  */
 @Injectable({ providedIn: 'root' })
 export class TerrainService {
-  readonly terrain = signal<Terrain | null>(null);
-  readonly reading = signal(false);
-  readonly failed = signal(false);
+  public readonly terrain = signal<Terrain | null>(null);
+  public readonly reading = signal(false);
+  public readonly failed = signal(false);
 
   private token = 0;
   private last: string | null = null;
 
-  read(point: Point): void {
+  public read(point: Point): void {
     const key = formatPoint(point);
     if (key === this.last) return;
     this.last = key;
@@ -45,7 +45,7 @@ export class TerrainService {
   }
 
   /** Forgets everything, so leaving and coming back reads again. */
-  clear(): void {
+  public clear(): void {
     this.token += 1;
     this.last = null;
     this.terrain.set(null);

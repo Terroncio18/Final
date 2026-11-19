@@ -24,7 +24,7 @@ export class MapView {
   private readonly hotspots = inject(HotspotsService);
 
   // The `:scope` route parameter, bound by withComponentInputBinding().
-  readonly scope = input<string>();
+  public readonly scope = input<string>();
 
   // The route accepts any text, so an unknown scope falls back to the default.
   private readonly view = computed<ViewId>(() => {
@@ -80,7 +80,7 @@ export class MapView {
     };
   });
 
-  constructor() {
+  public constructor() {
     // Runs before the map exists on a cold load, which is why MapService keeps
     // the work and replays it once the style is in.
     effect(() => {

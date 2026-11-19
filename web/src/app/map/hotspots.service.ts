@@ -49,7 +49,7 @@ export class HotspotsService {
       ).length ?? 0,
   );
 
-  constructor() {
+  public constructor() {
     effect(() => this.load(this.range()));
     effect(() => this.maps.setHotspotDensity(this.countInScope()));
   }

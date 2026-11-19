@@ -8,14 +8,14 @@
  */
 export class FireAppearance {
   /** Reused RGBA buffer, suitable for one ImageData kept by the caller. */
-  readonly pixels: Uint8ClampedArray<ArrayBuffer>;
+  public readonly pixels: Uint8ClampedArray<ArrayBuffer>;
 
   private readonly active: Uint32Array;
   private readonly variation: Uint8Array;
   private count = 0;
   private minute = Number.NaN;
 
-  constructor(private readonly arrival: Float32Array) {
+  public constructor(private readonly arrival: Float32Array) {
     this.pixels = new Uint8ClampedArray(arrival.length * 4);
     this.active = new Uint32Array(arrival.length);
     this.variation = new Uint8Array(arrival.length);
@@ -27,7 +27,7 @@ export class FireAppearance {
     }
   }
 
-  get activeCellCount(): number {
+  public get activeCellCount(): number {
     return this.count;
   }
 
@@ -36,7 +36,7 @@ export class FireAppearance {
    * An unchanged simulation minute only repaints the warm cells. Setting
    * motion=false freezes the shimmer but still allows timeline scrubbing.
    */
-  paint(minute: number, seconds = 0, motion = true): Uint8ClampedArray<ArrayBuffer> {
+  public paint(minute: number, seconds = 0, motion = true): Uint8ClampedArray<ArrayBuffer> {
     if (!Number.isFinite(minute) || !Number.isFinite(seconds)) {
       throw new RangeError('Fire presentation needs finite clock values.');
     }

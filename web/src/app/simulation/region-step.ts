@@ -56,7 +56,7 @@ export class RegionStep {
     this.maps.focusRegion(id);
   }
 
-  constructor() {
+  public constructor() {
     this.regions.load();
 
     // Back from a later step: nothing is chosen here, so nothing is outlined

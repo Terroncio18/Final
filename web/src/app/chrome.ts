@@ -15,5 +15,5 @@ import { Injectable, signal } from '@angular/core';
  */
 @Injectable({ providedIn: 'root' })
 export class Chrome {
-  readonly visible = signal(true);
+  public readonly visible = signal(true);
 }

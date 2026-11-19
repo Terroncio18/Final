@@ -48,12 +48,12 @@ export class IgnitionStep {
   /** Only in the template once there is a point, so it is not required. */
   private readonly relief = viewChild<ElementRef<HTMLCanvasElement>>('relief');
 
-  readonly region = input.required<string>();
-  readonly province = input.required<string>();
-  readonly municipality = input.required<string>();
+  public readonly region = input.required<string>();
+  public readonly province = input.required<string>();
+  public readonly municipality = input.required<string>();
 
   /** The `@lon,lat` segment, absent until something has been clicked. */
-  readonly point = input<string>();
+  public readonly point = input<string>();
 
   protected readonly chosen = computed(() => this.municipalities.find(this.municipality()));
 
@@ -118,7 +118,7 @@ export class IgnitionStep {
     cell: CELL_M,
   };
 
-  constructor() {
+  public constructor() {
     this.provinces.load();
 
     effect(() => {

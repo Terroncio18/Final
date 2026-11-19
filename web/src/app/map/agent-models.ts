@@ -22,12 +22,12 @@ const metal = 0x78858a;
 
 // Each factory owns its resources so fading or disposing one agent cannot affect another.
 class Parts {
-  readonly root = new THREE.Group();
+  public readonly root = new THREE.Group();
   private readonly materials = new Map<number, THREE.MeshLambertMaterial>();
   private readonly boxGeometry = new THREE.BoxGeometry(1, 1, 1);
   private readonly sphereGeometry = new THREE.SphereGeometry(1, 8, 6);
 
-  material(color: number): THREE.MeshLambertMaterial {
+  public material(color: number): THREE.MeshLambertMaterial {
     let material = this.materials.get(color);
     if (!material) {
       material = new THREE.MeshLambertMaterial({ color, flatShading: true });
@@ -36,26 +36,31 @@ class Parts {
     return material;
   }
 
-  mesh(geometry: THREE.BufferGeometry, color: number, at: Point, parent = this.root): THREE.Mesh {
+  public mesh(
+    geometry: THREE.BufferGeometry,
+    color: number,
+    at: Point,
+    parent = this.root,
+  ): THREE.Mesh {
     const mesh = new THREE.Mesh(geometry, this.material(color));
     mesh.position.set(...at);
     parent.add(mesh);
     return mesh;
   }
 
-  box(size: Point, at: Point, color: number, parent = this.root): THREE.Mesh {
+  public box(size: Point, at: Point, color: number, parent = this.root): THREE.Mesh {
     const mesh = this.mesh(this.boxGeometry, color, at, parent);
     mesh.scale.set(...size);
     return mesh;
   }
 
-  ellipsoid(size: Point, at: Point, color: number, parent = this.root): THREE.Mesh {
+  public ellipsoid(size: Point, at: Point, color: number, parent = this.root): THREE.Mesh {
     const mesh = this.mesh(this.sphereGeometry, color, at, parent);
     mesh.scale.set(...size);
     return mesh;
   }
 
-  rod(
+  public rod(
     from: Point,
     to: Point,
     radius: number,
@@ -79,7 +84,7 @@ class Parts {
   }
 
   // An extruded side profile gives the boat a keel and the fins crisp silhouettes.
-  profile(outline: [number, number][], width: number, at: Point, color: number): THREE.Mesh {
+  public profile(outline: [number, number][], width: number, at: Point, color: number): THREE.Mesh {
     const shape = new THREE.Shape(outline.map(([x, z]) => new THREE.Vector2(x, z)));
     const geometry = new THREE.ExtrudeGeometry(shape, {
       depth: width,
@@ -91,7 +96,7 @@ class Parts {
     return this.mesh(geometry, color, at);
   }
 
-  wing(
+  public wing(
     span: number,
     rootChord: number,
     tipChord: number,
@@ -117,7 +122,7 @@ class Parts {
     return this.mesh(geometry, color, at);
   }
 
-  pivot(name: string, at: Point): THREE.Group {
+  public pivot(name: string, at: Point): THREE.Group {
     const group = new THREE.Group();
     group.name = name;
     group.position.set(...at);
@@ -125,7 +130,7 @@ class Parts {
     return group;
   }
 
-  propeller(at: Point, radius: number): void {
+  public propeller(at: Point, radius: number): void {
     const propeller = this.pivot('propeller', at);
     // Geometry is offset around a local X pivot, leaving rotation.x free for the layer.
     for (let i = 0; i < 3; i++) {
@@ -141,7 +146,7 @@ class Parts {
     this.rod([-0.14, 0, 0], [0.26, 0, 0], 0.23, white, propeller, 0.07);
   }
 
-  finish(): THREE.Group {
+  public finish(): THREE.Group {
     // Some designs use only one primitive; release the unused factory geometries too.
     const used = new Set<THREE.BufferGeometry>();
     this.root.traverse((child) => {

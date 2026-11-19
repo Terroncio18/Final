@@ -69,7 +69,7 @@ export class PlacesService {
    *
    * `within` is `[west, south, east, north]`, the order the domain is in.
    */
-  load(province: string, within?: readonly [number, number, number, number]): void {
+  public load(province: string, within?: readonly [number, number, number, number]): void {
     const key = province + (within ? '@' + within.join(',') : '');
     if (this.asked === key) return;
     this.asked = key;
@@ -101,7 +101,7 @@ export class PlacesService {
   }
 
   /** Takes the names off the map, and forgets which province was asked for. */
-  release(): void {
+  public release(): void {
     this.asked = null;
     this.maps.setPlaces(null);
   }

@@ -27,8 +27,8 @@ export class MunicipalityStep {
   private readonly levels = inject(LevelsService);
 
   /** The two segments above, bound by withComponentInputBinding(). */
-  readonly region = input.required<string>();
-  readonly province = input.required<string>();
+  public readonly region = input.required<string>();
+  public readonly province = input.required<string>();
 
   protected readonly failed = this.municipalities.failed;
 
@@ -48,7 +48,7 @@ export class MunicipalityStep {
     this.province().startsWith('PT') ? 'una freguesia' : 'un municipi',
   );
 
-  constructor() {
+  public constructor() {
     this.provinces.load();
 
     effect(() => {

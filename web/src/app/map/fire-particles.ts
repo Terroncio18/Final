@@ -162,10 +162,10 @@ function compile(gl: WebGL2RenderingContext, vertex: string, fragment: string): 
 }
 
 export class FireParticles implements CustomLayerInterface {
-  readonly id: string;
-  readonly type = 'custom' as const;
+  public readonly id: string;
+  public readonly type = 'custom' as const;
   /** `3d`, so the layer is drawn against the terrain's depth. */
-  readonly renderingMode = '3d' as const;
+  public readonly renderingMode = '3d' as const;
 
   private map: MapLibreMap | null = null;
   private flames: WebGLProgram | null = null;
@@ -196,12 +196,12 @@ export class FireParticles implements CustomLayerInterface {
   /** False under `prefers-reduced-motion`: nothing rises, so nothing is drawn. */
   private motion = true;
 
-  constructor(id: string) {
+  public constructor(id: string) {
     this.id = id;
   }
 
   /** The cells the fire is in now. With none, the layer draws nothing. */
-  setEmitters(emitters: Emitters | null): void {
+  public setEmitters(emitters: Emitters | null): void {
     // After a spell with no fire every particle is born afresh, rather than
     // carrying on from wherever the last fire left it.
     if (!this.emitters || !this.motion) {
@@ -213,27 +213,27 @@ export class FireParticles implements CustomLayerInterface {
   }
 
   /** `towardsDeg` is where the wind goes; it is not turned again here. */
-  setWind(towardsDeg: number, kmh: number): void {
+  public setWind(towardsDeg: number, kmh: number): void {
     const towards = (towardsDeg * Math.PI) / 180;
     this.windEast = Math.sin(towards);
     this.windNorth = Math.cos(towards);
     this.windKmh = kmh;
   }
 
-  setMotion(on: boolean): void {
+  public setMotion(on: boolean): void {
     if (this.motion === on) return;
     this.motion = on;
     this.lastFrame = performance.now();
     this.map?.triggerRepaint();
   }
 
-  reset(): void {
+  public reset(): void {
     this.flamePhase.fill(2);
     this.smokePhase.fill(2);
     this.sampledEmitters = null;
   }
 
-  onAdd(map: MapLibreMap, gl: WebGL2RenderingContext): void {
+  public onAdd(map: MapLibreMap, gl: WebGL2RenderingContext): void {
     this.map = map;
     // A shader that will not build on some card must cost the flames and not
     // the map: the layer then draws nothing, and the raster underneath still
@@ -250,7 +250,7 @@ export class FireParticles implements CustomLayerInterface {
     }
   }
 
-  onRemove(_map: MapLibreMap, gl: WebGL2RenderingContext): void {
+  public onRemove(_map: MapLibreMap, gl: WebGL2RenderingContext): void {
     gl.deleteProgram(this.flames);
     gl.deleteProgram(this.smoke);
     gl.deleteBuffer(this.buffer);
@@ -258,7 +258,7 @@ export class FireParticles implements CustomLayerInterface {
     this.map = null;
   }
 
-  render(gl: WebGL2RenderingContext, options: CustomRenderMethodInput): void {
+  public render(gl: WebGL2RenderingContext, options: CustomRenderMethodInput): void {
     const emitters = this.emitters;
     if (!emitters || !this.flames || !this.smoke) return;
 

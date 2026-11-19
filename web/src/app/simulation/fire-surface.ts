@@ -95,14 +95,14 @@ void main(){
 
 /** GPU interpolation before colour, at twice the grid resolution. */
 export class FireSurface {
-  readonly canvas = document.createElement('canvas');
+  public readonly canvas = document.createElement('canvas');
   private readonly gl: WebGL2RenderingContext;
   private readonly program: WebGLProgram;
   private readonly texture: WebGLTexture;
   private readonly uniforms: Record<string, WebGLUniformLocation | null> = {};
   private readonly extent: [number, number, number, number];
 
-  constructor(
+  public constructor(
     arrival: Float32Array,
     private readonly horizon: number,
   ) {
@@ -177,7 +177,7 @@ export class FireSurface {
    * `metresPerPixel` is the ground under one screen pixel, and sets how wide
    * the forecast lines are drawn: under two pixels across, whatever the zoom.
    */
-  paint(minute: number, seconds: number, forecast: boolean, metresPerPixel = CELL_M): void {
+  public paint(minute: number, seconds: number, forecast: boolean, metresPerPixel = CELL_M): void {
     const gl = this.gl;
     if (gl.isContextLost()) return;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -197,13 +197,15 @@ export class FireSurface {
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
-  bounds(domain: readonly [number, number, number, number]): [number, number, number, number] {
+  public bounds(
+    domain: readonly [number, number, number, number],
+  ): [number, number, number, number] {
     const [w, s, e, n] = domain,
       [left, top, right, bottom] = this.extent;
     return [w + left * (e - w), n - bottom * (n - s), w + right * (e - w), n - top * (n - s)];
   }
 
-  dispose(): void {
+  public dispose(): void {
     this.gl.deleteTexture(this.texture);
     this.gl.deleteProgram(this.program);
     this.gl.getExtension('WEBGL_lose_context')?.loseContext();

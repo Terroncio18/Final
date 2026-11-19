@@ -61,10 +61,10 @@ interface Flight {
  * changes the fire.
  */
 export class Agents3D implements CustomLayerInterface {
-  readonly id: string;
-  readonly type = 'custom' as const;
+  public readonly id: string;
+  public readonly type = 'custom' as const;
   /** Drawn against the terrain's depth, so a ridge hides what is behind it. */
-  readonly renderingMode = '3d' as const;
+  public readonly renderingMode = '3d' as const;
 
   private map: MapLibreMap | null = null;
   private renderer: THREE.WebGLRenderer | null = null;
@@ -76,7 +76,7 @@ export class Agents3D implements CustomLayerInterface {
   private flights: Flight[] = [];
   private motion = true;
 
-  constructor(id: string) {
+  public constructor(id: string) {
     this.id = id;
     // Flat colours read best with plenty of light from all round and one sun.
     // three.js counts light in physical units, so a Lambert surface reflects
@@ -87,7 +87,7 @@ export class Agents3D implements CustomLayerInterface {
     this.scene.add(sun);
   }
 
-  onAdd(map: MapLibreMap, gl: WebGL2RenderingContext): void {
+  public onAdd(map: MapLibreMap, gl: WebGL2RenderingContext): void {
     this.map = map;
     try {
       this.renderer = new THREE.WebGLRenderer({
@@ -104,7 +104,7 @@ export class Agents3D implements CustomLayerInterface {
     }
   }
 
-  onRemove(): void {
+  public onRemove(): void {
     for (const { model } of this.ground.values()) disposeModel(model);
     for (const flight of this.flights) {
       disposeModel(flight.model);
@@ -118,7 +118,7 @@ export class Agents3D implements CustomLayerInterface {
   }
 
   /** Who is on the ground now; figures come and go with the list. */
-  setGround(agents: readonly GroundAgent[]): void {
+  public setGround(agents: readonly GroundAgent[]): void {
     this.groundAgents = agents;
     const wanted = new Set(agents.map((a) => a.id));
     for (const [id, figure] of this.ground)
@@ -143,7 +143,7 @@ export class Agents3D implements CustomLayerInterface {
   }
 
   /** An aircraft makes one pass now, in real time (§11.50). */
-  fly(pass: Pass): void {
+  public fly(pass: Pass): void {
     if (!this.motion) return;
     const model = buildModel(pass.kind);
     const curtain = buildDropCurtain(pass.liquid);
@@ -157,19 +157,19 @@ export class Agents3D implements CustomLayerInterface {
   }
 
   /** Every pass in the air is put away: a new fire, or another minute. */
-  land(): void {
+  public land(): void {
     for (const flight of this.flights) this.dispose(flight);
     this.flights = [];
     this.map?.triggerRepaint();
   }
 
   /** Under `prefers-reduced-motion` there are no passes and rotors stand still. */
-  setMotion(on: boolean): void {
+  public setMotion(on: boolean): void {
     this.motion = on;
     if (!on) this.land();
   }
 
-  render(gl: WebGL2RenderingContext, options: CustomRenderMethodInput): void {
+  public render(gl: WebGL2RenderingContext, options: CustomRenderMethodInput): void {
     const map = this.map,
       renderer = this.renderer;
     if (!map || !renderer || (!this.ground.size && !this.flights.length)) return;

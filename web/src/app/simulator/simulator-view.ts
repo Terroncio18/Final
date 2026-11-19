@@ -306,13 +306,13 @@ export class SimulatorView {
   /** The element MapLibre takes over. This screen owns its map (§2.20). */
   private readonly container = viewChild.required<ElementRef<HTMLDivElement>>('container');
 
-  readonly region = input.required<string>();
-  readonly province = input.required<string>();
-  readonly municipality = input.required<string>();
-  readonly point = input.required<string>();
+  public readonly region = input.required<string>();
+  public readonly province = input.required<string>();
+  public readonly municipality = input.required<string>();
+  public readonly point = input.required<string>();
 
   /** The `?ignicions=` parameter: where the fire starts, if anywhere yet. */
-  readonly ignicions = input<string>();
+  public readonly ignicions = input<string>();
 
   protected readonly ready = this.maps.ready;
   protected readonly countermeasures = COUNTERMEASURE_GROUPS;
@@ -1229,7 +1229,7 @@ export class SimulatorView {
     return null;
   }
 
-  constructor() {
+  public constructor() {
     this.plan.guard = (measure) => this.mopUpGuard(measure);
     // Where each crew stopped for safety, as the model computed it (12.19).
     effect(() => this.plan.crewStops.set(this.result()?.crewStops ?? new Map()));

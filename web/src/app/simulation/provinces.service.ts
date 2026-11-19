@@ -33,14 +33,14 @@ export class ProvincesService {
   private readonly maps = inject(MapService);
 
   /** Empty until the file is in. The step says it is waiting. */
-  readonly provinces = signal<readonly Province[]>([]);
+  public readonly provinces = signal<readonly Province[]>([]);
 
   /** True when the file could not be read, so the step can say so. */
-  readonly failed = signal(false);
+  public readonly failed = signal(false);
 
   private asked = false;
 
-  load(): void {
+  public load(): void {
     if (this.asked) return;
     this.asked = true;
 
@@ -65,12 +65,12 @@ export class ProvincesService {
   }
 
   /** The provinces or islands of one region, in the file's own order. */
-  of(region: string): readonly Province[] {
+  public of(region: string): readonly Province[] {
     return this.provinces().filter((province) => province.region === region);
   }
 
   /** The one a URL code names, or nothing if it names none. */
-  find(id: string): Province | undefined {
+  public find(id: string): Province | undefined {
     return this.provinces().find((province) => province.id === id);
   }
 }

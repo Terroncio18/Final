@@ -838,8 +838,8 @@ describe('simulator screen', () => {
     vi.stubGlobal(
       'URL',
       class extends URL {
-        static override createObjectURL = createURL;
-        static override revokeObjectURL = vi.fn();
+        public static override createObjectURL = createURL;
+        public static override revokeObjectURL = vi.fn();
       },
     );
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
@@ -1068,8 +1068,8 @@ describe('simulator screen', () => {
     vi.stubGlobal(
       'URL',
       class extends URL {
-        static override createObjectURL = () => 'blob:scenario';
-        static override revokeObjectURL = vi.fn();
+        public static override createObjectURL = () => 'blob:scenario';
+        public static override revokeObjectURL = vi.fn();
       },
     );
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});

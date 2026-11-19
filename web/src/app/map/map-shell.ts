@@ -47,7 +47,7 @@ export class MapShell {
 
   protected readonly ready = this.maps.ready;
 
-  constructor() {
+  public constructor() {
     // afterNextRender runs once the DOM exists, and only in the browser, which
     // is exactly what MapLibre needs. A plain constructor would be too early.
     afterNextRender(() => this.maps.create(this.container().nativeElement));
