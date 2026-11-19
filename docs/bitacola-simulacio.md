@@ -2935,6 +2935,27 @@ globals, nou casos repartits entre `simulator-view.ts`, el model i
 `hotspot-range.ts`—, una expressió regular amb *backtracking* a
 `scenario.ts` (L303) i un camp sense etiqueta a `simulator-view.html` (L390).
 
+**La primera anàlisi des d'aquí, a les 12:03 del 19/11/2026.** L'escàner va
+pujar 118 fitxers i va llegir els dos informes de cobertura sencers: cap avís
+de camins que no es resolen, que era justament el risc que el reescriptor de
+camins evita. El panell diu ara 15.000 línies de codi —no 20.000, perquè el
+mode automàtic comptava també dades i proves—, porta de qualitat passada,
+**cobertura 43,1 %**, duplicació 0,0 %, seguretat A, mantenibilitat A i
+fiabilitat D amb 23 problemes, sis més que abans perquè ara s'hi analitza tota
+l'API.
+
+La cobertura per fitxer diu el mateix que la §11.54 amb els números de Sonar,
+que compta línies i condicions i no sentències: `fuel-treatments` 98,0 %,
+`countermeasures` 96,3, `fire-spread` 95,6, `spotting` 95,4, `fire-display`
+95,3, `wind` i `scenario` 95,0, `countermeasure-plan` 94,9, `fire-emitters`
+94,4, `fuel-data` 91,1, `point` 88,9, `agents` 87,8 i `rothermel` 83,3. A zero,
+el mapa, el 3D, els passos del formulari i **tota l'API**, que no envia
+cobertura. La xifra global de 43,1 % és la suma honesta d'això.
+
+El token va viatjar només com a variable d'entorn d'una sola crida i no és
+enlloc del repositori. Un token que hagi passat per un xat o un correu s'ha de
+revocar i tornar a generar: són quinze segons a *My Account → Security*.
+
 ---
 
 ## 12. Decisions pendents
