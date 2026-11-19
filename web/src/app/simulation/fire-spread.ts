@@ -952,7 +952,7 @@ function measure(
     perimeter[minute] = (open * CELL_M * (Math.PI / 4)) / 1000;
     heading[minute] =
       sumE[minute] === 0 && sumN[minute] === 0
-        ? NaN
+        ? Number.NaN
         : ((Math.atan2(sumE[minute], sumN[minute]) * 180) / Math.PI + 360) % 360;
   }
 

@@ -48,7 +48,7 @@ export class FireField {
   private readonly active: Uint32Array;
   private readonly lattice = new Float32Array(LATTICE * LATTICE);
   private count = 0;
-  private minute = NaN;
+  private minute = Number.NaN;
 
   constructor(private readonly arrival: Float32Array) {
     const cells = arrival.length;

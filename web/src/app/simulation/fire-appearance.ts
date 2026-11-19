@@ -13,7 +13,7 @@ export class FireAppearance {
   private readonly active: Uint32Array;
   private readonly variation: Uint8Array;
   private count = 0;
-  private minute = NaN;
+  private minute = Number.NaN;
 
   constructor(private readonly arrival: Float32Array) {
     this.pixels = new Uint8ClampedArray(arrival.length * 4);

@@ -147,7 +147,7 @@ async function datasets(): Promise<FuelDataset[]> {
     throw e;
   }
   const result: FuelDataset[] = [];
-  for (const name of names.sort()) {
+  for (const name of names.sort((a, b) => a.localeCompare(b))) {
     if (!/^[a-z0-9-]+$/.test(name)) continue;
     try {
       const data = JSON.parse(

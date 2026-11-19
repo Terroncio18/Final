@@ -97,7 +97,7 @@ export function today(): Day {
 
 /** `2024-08-01` and nothing else: no `2024-8-1`, no instants, no text. */
 export function isDay(value: unknown): value is Day {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !isNaN(Date.parse(value));
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
 }
 
 interface Span {
@@ -187,7 +187,7 @@ export async function earliest(): Promise<Day | null> {
   const starts = FIRMS_PLATFORMS.flatMap((platform) =>
     [platform.sp, platform.nrt].map((source) => table.get(source)?.min).filter(isDay),
   );
-  return starts.length ? starts.sort()[0]! : null;
+  return starts.length ? starts.reduce((first, day) => (day < first ? day : first), starts[0]!) : null;
 }
 
 /**
@@ -318,5 +318,5 @@ export async function fetchHotspots(from: Day, to: Day): Promise<HotspotAnswer> 
   if (failures.length) console.warn('[firms] partial answer —', failures.join(' · '));
 
   features.sort((a, b) => b.properties.frp - a.properties.frp);
-  return { body: { type: 'FeatureCollection', features }, sources: [...answered].sort() };
+  return { body: { type: 'FeatureCollection', features }, sources: [...answered].sort((a, b) => a.localeCompare(b)) };
 }

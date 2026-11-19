@@ -1069,7 +1069,7 @@ export class SimulatorView {
 
     let fastest = 0;
     let hottest = 0;
-    let bearing = NaN;
+    let bearing = Number.NaN;
     for (let m = minute; m >= Math.max(minute - 10, 0); m -= 1) {
       if (rate[m] > fastest) fastest = rate[m];
       if (intensity[m] > hottest) hottest = intensity[m];
@@ -1548,9 +1548,9 @@ export class SimulatorView {
         lastPaint = -Infinity,
         lastEmitters = -Infinity;
       let visualSeconds = 0,
-        emittersMinute = NaN,
-        previousMinute = NaN;
-      let paintedMinute = NaN,
+        emittersMinute = Number.NaN,
+        previousMinute = Number.NaN;
+      let paintedMinute = Number.NaN,
         paintedScale: number | undefined,
         paintedForecast: boolean | undefined,
         motionWas: boolean | undefined;
@@ -2028,7 +2028,7 @@ export class SimulatorView {
   /** A field of the modal. A percentage is kept as the fraction it stands for. */
   protected setSetting(field: keyof ToolSettings, event: Event): void {
     const input = event.target as HTMLInputElement;
-    const typed = input.value.trim() === '' ? NaN : Number(input.value.replace(',', '.'));
+    const typed = input.value.trim() === '' ? Number.NaN : Number(input.value.replace(',', '.'));
     const value = field === 'fuelRemaining' ? typed / 100 : typed;
     this.configuring.update((config) =>
       config ? { ...config, settings: { ...config.settings, [field]: value }, error: null } : null,

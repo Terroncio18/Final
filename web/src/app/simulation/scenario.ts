@@ -300,6 +300,6 @@ export function scenarioFileName(name: string): string {
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/^-|-$/g, '');
   return `ignislab-${slug || 'escenari'}.txt`;
 }

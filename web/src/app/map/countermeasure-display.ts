@@ -1,5 +1,6 @@
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
 import type { Feature, FeatureCollection } from 'geojson';
+import { writeSource } from './source-data';
 
 type Point = readonly [number, number];
 
@@ -313,6 +314,6 @@ export class CountermeasureDisplay {
   }
 
   private write(source: string, data: FeatureCollection): void {
-    (this.map?.getSource(source) as GeoJSONSource | undefined)?.setData(data);
+    writeSource(this.map?.getSource(source) as GeoJSONSource | undefined, data);
   }
 }

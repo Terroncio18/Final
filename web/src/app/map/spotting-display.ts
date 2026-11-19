@@ -3,6 +3,7 @@ import type { FeatureCollection } from 'geojson';
 import { domainAround, GRID } from '../simulation/domain';
 import type { Point } from '../simulation/point';
 import type { SpotIgnition } from '../simulation/spotting';
+import { writeSource } from './source-data';
 
 export function spotPoint(cell: number, centre: Point): [number, number] {
   const [w, s, e, n] = domainAround(centre);
@@ -39,7 +40,7 @@ export class SpottingDisplay {
           'circle-stroke-width': 2,
         },
       });
-    } else (map.getSource('spot-ignitions') as GeoJSONSource).setData(data);
+    } else writeSource(map.getSource('spot-ignitions') as GeoJSONSource, data);
   }
   detach(): void {
     if (this.map?.getLayer('spot-ignitions')) this.map.removeLayer('spot-ignitions');

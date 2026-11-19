@@ -186,7 +186,7 @@ async function fromIpma(): Promise<Observation[]> {
   const hours = (await response.json()) as Record<string, Record<string, IpmaRow | null>>;
 
   const found = new Map<string, Observation>();
-  for (const hour of Object.keys(hours).sort().reverse()) {
+  for (const hour of Object.keys(hours).sort((a, b) => b.localeCompare(a))) {
     for (const [id, row] of Object.entries(hours[hour] ?? {})) {
       if (found.has(id) || !row) continue;
       const station = stations.get(id);

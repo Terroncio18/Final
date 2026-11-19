@@ -37,6 +37,7 @@ import {
 import { FireParticles, type Emitters } from './fire-particles';
 import { addSpawnMarker, type SpawnMarker } from './spawn-marker';
 import type { Agents3D } from './agents-3d';
+import { writeSource } from './source-data';
 import type { GroundAgent, Pass } from '../simulation/agents';
 
 /**
@@ -513,7 +514,7 @@ export class MapService {
 
       if (!data) return;
       const source = map.getSource(MUNICIPALITIES_SOURCE) as GeoJSONSource | undefined;
-      source?.setData(data);
+      writeSource(source, data);
     });
   }
 
@@ -569,7 +570,7 @@ export class MapService {
   setHotspots(data: FeatureCollection): void {
     this.withStyle((map) => {
       const source = map.getSource(HOTSPOTS_SOURCE) as GeoJSONSource | undefined;
-      source?.setData(data);
+      writeSource(source, data);
     });
   }
 
@@ -703,7 +704,7 @@ export class MapService {
   setPlaces(data: FeatureCollection | null): void {
     this.withStyle((map) => {
       const source = map.getSource(PLACES_SOURCE) as GeoJSONSource | undefined;
-      source?.setData(data ?? { type: 'FeatureCollection', features: [] });
+      writeSource(source, data ?? { type: 'FeatureCollection', features: [] });
     });
   }
 
@@ -761,7 +762,7 @@ export class MapService {
   setDomain(ring: readonly (readonly [number, number])[] | null): void {
     this.withStyle((map) => {
       const source = map.getSource(DOMAIN_SOURCE) as GeoJSONSource | undefined;
-      source?.setData({
+      writeSource(source, {
         type: 'FeatureCollection',
         features: ring ? [domainFeature(ring), maskFeature(ring)] : [],
       });
@@ -1248,7 +1249,7 @@ export class MapService {
     const hits = map.queryRenderedFeatures(box, { layers: [LAYERS.hotspots] });
     if (!hits.length) return null;
 
-    return hits.reduce((best, hit) => (frpOf(hit) > frpOf(best) ? hit : best));
+    return hits.reduce((best, hit) => (frpOf(hit) > frpOf(best) ? hit : best), hits[0]!);
   }
 
   destroy(): void {
