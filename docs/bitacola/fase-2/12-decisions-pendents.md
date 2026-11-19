@@ -1,5 +1,18 @@
 # 12. Decisions pendents
 
+- **12.29. Dues coses que les proves de l'API han trobat.** Surten de la
+  §11.58, i són totes dues de validació, no de càlcul. (a) `isDay()` accepta
+  el **30 de febrer**: l'expressió regular hi passa i `Date` el fa rodar a l'1
+  de març en lloc de refusar-lo. FIRMS contesta un dia així sense cap fila, de
+  manera que es llegeix com un dia sense focs i no com un error; estrènyer-ho
+  seria comparar la data analitzada amb la cadena. (b) L'**hora d'AEMET** es
+  llegeix com a local: `fint` ve sense zona i `new Date()` hi posa la del
+  servidor, mentre que la banda d'IPMA hi afegeix una `Z` a mà perquè sap que
+  és UTC. AEMET també publica en UTC, de manera que l'hora de l'observació va
+  una hora enrere a l'hivern i dues a l'estiu. Cap de les dues s'ha tocat:
+  canviar una validació i una hora és una decisió, i les proves diuen avui el
+  que el codi fa.
+
 - **12.28. Si hi va un linter.** Surt de la 12.27. Avui no n'hi ha cap: només
   Prettier, que ordena però no judica. ESLint amb `angular-eslint` i
   `typescript-eslint` caçaria el que el formatador no veu —promeses sense

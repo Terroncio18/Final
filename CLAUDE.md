@@ -21,11 +21,15 @@ monorepo: cada meitat té el seu `package.json` i s'hi entra per separat.
 ## Ordres
 
 ```
-cd web && npm test              # 120 proves del model + 64 d'Angular
+cd web && npm test              # les proves del model i les d'Angular
 cd web && npm run build
-cd web && npm run test:coverage # cobertura, i deixa l'lcov a punt per a Sonar
 cd web && npx prettier --check .
-cd api && npm run test:fuels
+cd api && npm test              # les de l'API, que llegeixen src/ i no dist/
+
+# La cobertura, a cada meitat. Deixa l'lcov a punt per a Sonar, amb els
+# camins des de l'arrel; l'escàner es llança des de l'arrel (§11.55).
+cd web && npm run test:coverage
+cd api && npm run test:coverage
 ```
 
 ## Com es treballa aquí

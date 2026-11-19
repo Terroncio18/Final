@@ -8,7 +8,7 @@
     "watch": "ng build --watch --configuration development",
     "test": "npm run test:simulation && ng test",
     "test:simulation": "vitest run src/app/simulation",
-    "test:coverage": "npm run test:simulation -- --coverage && ng test --configuration coverage && node scripts/lcov-paths.mjs",
+    "test:coverage": "npm run test:simulation -- --coverage && ng test --configuration coverage && node ../scripts/lcov-paths.mjs web coverage/model/lcov.info coverage/web/lcov.info",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "data:regions": "node scripts/fetch-regions.mjs",

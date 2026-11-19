@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import Fastify from "fastify";
 import {
@@ -8,9 +8,9 @@ import {
   tileKeys,
   worldCoverModel,
   UNKNOWN,
-} from "../dist/fuel-grid.js";
-import { worldCoverTile } from "../dist/fuels.js";
-import { registerFuelRoutes } from "../dist/fuel-routes.js";
+} from "../src/fuel-grid.js";
+import { worldCoverTile } from "../src/fuels.js";
+import { registerFuelRoutes } from "../src/fuel-routes.js";
 
 test("bbox accepts mainland and islands, rejects malformed or unbounded work", () => {
   for (const bbox of [

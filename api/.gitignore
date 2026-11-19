@@ -4,3 +4,4 @@ data/fuels/
 .env
 .env.*
 !.env.example
+coverage/
