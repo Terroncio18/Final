@@ -91,6 +91,35 @@ escamparia coses que es llegeixen juntes al llarg de mil línies. O s'hi aplica
 igualment, o la regla val per blocs dins del fitxer, o el que cal no és
 reordenar sinó partir el component. Decidir-ho és part de la fase 5.
 
+## 2. Cap membre sense dir qui el pot veure
+
+**Res dins d'una classe es queda sense `private`, `protected` o `public`.**
+TypeScript deixa posar `readonly nom = signal(0)` i entendre-ho com a públic,
+però «públic per omissió» vol dir que ningú no ho ha decidit: qui llegeix no
+sap si és part del contracte de la classe o és que algú no hi va pensar. Si
+ho és, que ho digui.
+
+```ts
+private readonly maps = inject(MapService);   // de dins
+protected readonly compassTurn = computed(…);  // per a la plantilla
+public readonly loading = signal(false);       // per a qui faci servir la classe
+```
+
+En una classe d'Angular els tres tenen un sentit propi i no és cap formalitat:
+`protected` és el que veu la plantilla i no el món, i `private` és el que es
+pot canviar sense mirar qui més ho fa servir.
+
+**On som avui**, mirat el 19/11/2026 sobre `web/src/app`: dels camps, 295 duen
+modificador i **79 no**; dels mètodes, 160 el duen i **240 no**. Són 31
+fitxers. Part dels que no en duen són obligats per una interfície de fora
+—`id`, `type`, `renderingMode` i `onAdd` de `CustomLayerInterface`, a
+`map/agents-3d.ts` i `map/fire-particles.ts`—: aquests passen a `public`
+explícit, que és el que ja són.
+
+Això no és feina de llegir-s'ho tot: és la regla
+`@typescript-eslint/explicit-member-accessibility`, que un linter comprova i
+arregla sol. És un argument a favor de la 12.28.
+
 ## Per decidir
 
 Surten de llegir `map/hotspots.service.ts` junts, el 19/11/2026. Cap no s'ha
