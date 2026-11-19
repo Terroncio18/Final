@@ -132,6 +132,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.59** El combustible es prova amb un ràster de mentida
 - **11.60** El servidor es parteix en dos per a poder preguntar-li
 - **11.61** Un dia que no existeix i una hora que no era
+- **11.62** La interfície també es prova, i la porta es posa verda
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):
