@@ -93,7 +93,8 @@ reordenar sinó partir el component. Decidir-ho és part de la fase 5.
 
 ## 2. Cap membre sense dir qui el pot veure
 
-**Res dins d'una classe es queda sense `private`, `protected` o `public`.**
+**Res dins d'una classe es queda sense `private`, `protected` o `public`:
+ni els camps ni els mètodes.**
 TypeScript deixa posar `readonly nom = signal(0)` i entendre-ho com a públic,
 però «públic per omissió» vol dir que ningú no ho ha decidit: qui llegeix no
 sap si és part del contracte de la classe o és que algú no hi va pensar. Si
@@ -118,7 +119,25 @@ explícit, que és el que ja són.
 
 Això no és feina de llegir-s'ho tot: és la regla
 `@typescript-eslint/explicit-member-accessibility`, que un linter comprova i
-arregla sol. És un argument a favor de la 12.28.
+arregla sol —els 319 membres, amb una ordre—. És un argument a favor de la
+12.28.
+
+## 3. Els imports, tots seguits
+
+**Un sol bloc, sense cap línia en blanc enmig.** Les separacions d'avui no
+diuen el mateix a tot arreu —en un fitxer separen el que ve de fora del que és
+nostre, en un altre separen Angular de la resta— i una ratlla que no vol dir
+sempre el mateix no val la pena. Tot seguit es llegeix d'una ullada i no s'ha
+d'endevinar què vol dir el forat.
+
+L'ordre dins del bloc es queda com està: primer el que ve de fora —Angular,
+MapLibre, Fastify— i després el que és nostre, dels més generals als més
+propers. Prettier no els ordena, de manera que això ho sosté qui escriu.
+
+**On som avui**: de 101 fitxers amb imports, **37 tenen línies en blanc** al
+mig del bloc, gairebé sempre una.
+
+
 
 ## Per decidir
 
@@ -138,3 +157,11 @@ aplicat encara.
   ja es fa, només cal escriure-ho.
 - **Les llengües.** Comentaris i noms en anglès; pantalla, bitàcola i manuals
   en català. També es fa ja.
+- **Índexs per a escurçar els imports.** Plantejat per Pere el 19/11/2026 com
+  a cosa de més endavant: un `index.ts` per carpeta que reexporti el que en
+  surt, de manera que un import llarg passi a ser `from '../simulation'`. El
+  que cal mirar abans de fer-ho: a Angular, un índex que ho reexporta tot pot
+  arrossegar codi cap al paquet inicial i desfer la separació en trossos que
+  avui deixa el simulador i les figures 3D fora de la primera càrrega (1,5 MB
+  contra 0,7 MB). Val la pena per carpeta tancada —`simulation/` i `map/` ho
+  són—, i mesurant el paquet abans i després.
