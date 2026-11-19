@@ -142,6 +142,39 @@ mig del bloc, gairebé sempre una.
 
 
 
+## 4. Res de codi espagueti
+
+**Una funció fa una cosa, cap en una pantalla i no s'endinsa més de dos o tres
+nivells.** Si per a saber què fa cal recordar en quina branca s'és, la funció
+ja és massa gran. Els camins curts —comprovar el que no val i sortir al
+principi— abans que un `else` que tanca cent línies més avall.
+
+El termòmetre és la complexitat: **cap funció per sobre de 15**. No és
+l'objectiu, és el senyal d'alarma; una funció de 14 també pot ser
+inintel·ligible. Ho comprova sol el linter (`complexity: ['error', 15]`) i
+també Sonar, amb la seva complexitat cognitiva.
+
+**On és l'espagueti, avui.** De 329 funcions amb nom, **13 passen de 15**, i
+quatre són les que de debò pesen:
+
+| Funció | Complexitat | Línies |
+| --- | --- | --- |
+| `simulation/fire-spread.ts` · `spreadRun()` | ~185 | 483 |
+| `simulation/countermeasures.ts` · `finite()` | ~91 | 153 |
+| `simulator/simulator-view.ts` · `constructor()` | ~84 | 443 |
+| `simulation/scenario.ts` · `readScenario()` | ~52 | 123 |
+
+Per fitxer, Sonar diu el mateix: `fire-spread.ts` (complexitat cognitiva 365),
+`simulator-view.ts` (285) i `countermeasures.ts` (199) són els tres que
+concentren el problema.
+
+**Un avís abans de desfer el primer**: `spreadRun()` és el bucle que recorre
+la graella cel·la a cel·la —1.024² cel·les— i partir-lo en funcions petites es
+paga en temps de càlcul. Aquí la claredat i la velocitat estiren cap a
+costats diferents, i la §11.36 diu que el càlcul ha d'anar per sota del segon.
+Es parteix, però mesurant abans i després; si costa massa, el que es fa és
+deixar-lo sencer i explicar per què, que també és una decisió.
+
 ## Per decidir
 
 Surten de llegir `map/hotspots.service.ts` junts, el 19/11/2026. Cap no s'ha
