@@ -1,5 +1,18 @@
 # 12. Decisions pendents
 
+- **12.30. Si el servidor es parteix en dos per a poder provar-lo.** Ve de la
+  §11.59. `server.ts` fa tres coses en carregar-se: construeix l'aplicació,
+  hi penja les rutes i es posa a escoltar. La tercera és la que impedeix
+  provar les altres dues, perquè importar el fitxer obre un port. El que es
+  proposa és separar-lo —un `app.ts` que construeixi i exporti l'aplicació, i
+  un `server.ts` que l'importi i cridi `listen()`—, que és el que faria
+  provable la validació del rang de dates, els tres camins de
+  `/api/hotspots`, les capçaleres d'edat i la validació de `/api/weather`:
+  unes 190 línies que avui són l'únic 0 % de l'API. `npm start` seguiria
+  apuntant a `dist/server.js`. L'alternativa és deixar-lo sense provar i
+  dir-ho a la memòria, que també és una resposta: és muntatge, i el que
+  decideix de debò —el model, el combustible, les dates— ja està provat.
+
 - **12.29. Dues coses que les proves de l'API han trobat.** Surten de la
   §11.58, i són totes dues de validació, no de càlcul. (a) `isDay()` accepta
   el **30 de febrer**: l'expressió regular hi passa i `Date` el fa rodar a l'1

@@ -129,6 +129,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.56** La bitàcola és un fitxer per decisió
 - **11.57** Els avisos de Sonar, a zero
 - **11.58** L'API es prova, i la cobertura es mesura sobre el TypeScript
+- **11.59** El combustible es prova amb un ràster de mentida
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):
