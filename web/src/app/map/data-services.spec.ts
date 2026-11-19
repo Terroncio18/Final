@@ -387,11 +387,11 @@ describe('geographic and observation services', () => {
     vi.spyOn(TestBed.inject(StudyArea), 'inside').mockImplementation(async (f) => f);
     fetcher.mockResolvedValue(response(collection(features), 200, { 'x-earliest': '2012-01-01' }));
     const service = TestBed.inject(HotspotsService);
-    expect(service.count()).toBe(0);
+    expect(service.countInScope()).toBe(0);
     TestBed.tick();
     await settle();
     TestBed.tick();
-    expect(service.count()).toBe(1);
+    expect(service.countInScope()).toBe(1);
     expect(service.earliest()).toBe('2012-01-01');
     expect(service.loading()).toBe(false);
     expect(maps.setHotspotColourBy).toHaveBeenLastCalledWith('date');

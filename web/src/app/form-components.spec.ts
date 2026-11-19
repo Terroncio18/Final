@@ -111,7 +111,7 @@ describe('form, navigation and overview components', () => {
     range: ReturnType<typeof signal<{ from: string; to: string }>>;
     loading: ReturnType<typeof signal<boolean>>;
     failed: ReturnType<typeof signal<boolean>>;
-    count: ReturnType<typeof signal<number>>;
+    countInScope: ReturnType<typeof signal<number>>;
     earliest: ReturnType<typeof signal<string | null>>;
     choose: ReturnType<typeof vi.fn>;
   };
@@ -148,7 +148,7 @@ describe('form, navigation and overview components', () => {
       range: signal({ from: '2024-08-01', to: '2024-08-03' }),
       loading: signal(false),
       failed: signal(false),
-      count: signal(3),
+      countInScope: signal(3),
       earliest: signal<string | null>(null),
       choose: vi.fn(),
     };
