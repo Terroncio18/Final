@@ -101,6 +101,7 @@ test('an official map wins over the estimate, and both are named', async () => {
   assert.equal(grid.estimatedCells, 0);
   assert.deepEqual(grid.models, [{ id: 4, cells: CELLS }]);
   assert.deepEqual(grid.runs, [4, 1, CELLS], 'model 4, official');
+  assert.equal(fromUrl.mock.calls.length, 0, 'full official coverage never asks WorldCover');
   // Only the official one: with nothing estimated left, WorldCover is not cited.
   assert.deepEqual(
     grid.sources.map((source) => source.label),
@@ -190,4 +191,33 @@ test('the same box asked twice at once is one job, and a third box is busy', asy
   // And once they are done, there is room again.
   const after = await fuelGrid([2.75, 39.55, 2.8, 39.6], SIZE);
   assert.equal(after.estimatedCells, CELLS);
+});
+
+test('official coverage remains usable when WorldCover is unavailable', async () => {
+  await dataset('canarias', 7);
+  fromUrl.mockRejectedValue(new Error('WorldCover is down'));
+  const { fuelGrid } = await fuels();
+  const grid = await fuelGrid([...BOUNDS], SIZE);
+  assert.equal(grid.officialCells, CELLS);
+  assert.equal(grid.unknownCells, 0);
+  assert.deepEqual(grid.warnings, []);
+  assert.equal(fromUrl.mock.calls.length, 0);
+});
+
+test('adding an official dataset invalidates an already cached estimated domain', async () => {
+  const { fuelGrid } = await fuels();
+  assert.equal((await fuelGrid([...BOUNDS], SIZE)).estimatedCells, CELLS);
+  await dataset('valencia', 6);
+  const grid = await fuelGrid([...BOUNDS], SIZE);
+  assert.equal(grid.officialCells, CELLS);
+  assert.deepEqual(grid.runs, [6, 1, CELLS]);
+});
+
+test('a higher priority map wins while its unknown pixels preserve lower priority data', async () => {
+  await dataset('regional', 7, 20);
+  await dataset('base', 4, 10);
+  await dataset('holes', UNKNOWN, 30);
+  const { fuelGrid } = await fuels();
+  const grid = await fuelGrid([...BOUNDS], SIZE);
+  assert.deepEqual(grid.runs, [7, 1, CELLS]);
 });

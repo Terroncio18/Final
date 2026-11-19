@@ -1,5 +1,9 @@
 # Combustibles cartografiados para IgnisLab
 
+Ampliación del 19/11/2026 en la rama `codex/combustibles-oficiales`:
+[Asturias, Navarra, Valencia y cinco islas canarias integradas y probadas](FUENTES-OFICIALES.md).
+El estado histórico de las fuentes que aparece debajo corresponde al 14/11.
+
 Investigación de Codex, 14/11/2026. Fuentes consultadas y servicios comprobados en
 esa fecha. **La integración posterior ya está implementada**: consultar
 [IMPLEMENTACION.md](IMPLEMENTACION.md) para ejecutar, importar datos y entender

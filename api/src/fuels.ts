@@ -74,6 +74,20 @@ async function readWorldCover(
     dy = (n - s) / size;
   for (let lat = Math.floor(s / 3) * 3; lat < n; lat += 3) {
     for (let lon = Math.floor(w / 3) * 3; lon < e; lon += 3) {
+      // Official coverage must not depend on the availability of the fallback.
+      let needsFallback = false;
+      for (let row = 0; row < size && !needsFallback; row++) {
+        const y = n - (row + 0.5) * dy;
+        if (y < lat || y >= lat + 3) continue;
+        for (let col = 0; col < size; col++) {
+          const x = w + (col + 0.5) * dx;
+          if (x >= lon && x < lon + 3 && quality[row * size + col] !== 1) {
+            needsFallback = true;
+            break;
+          }
+        }
+      }
+      if (!needsFallback) continue;
       const id = worldCoverTile(lon, lat);
       const url = `${WC_ROOT}ESA_WorldCover_10m_2021_v200_${id}_Map.tif`;
       const signal = AbortSignal.timeout(60000);
@@ -122,6 +136,7 @@ async function readWorldCover(
                 Number(values[py * (x1 - x0) + px]),
               );
               const i = row * size + col;
+              if (quality[i] === 1) continue;
               models[i] = model;
               quality[i] = model === UNKNOWN ? 0 : 2;
             }
@@ -222,7 +237,9 @@ export async function fuelGrid(
 ): Promise<FuelResponse> {
   const maps = await datasets();
   const key = createHash("sha256")
-    .update(JSON.stringify([FUEL_VERSION, bounds, size, maps]))
+    .update(
+      JSON.stringify([FUEL_VERSION, "official-first-v1", bounds, size, maps]),
+    )
     .digest("hex");
   const cacheDir = join(FUEL_DATA_DIR, "cache");
   const path = join(cacheDir, `${key}.json.gz`);
@@ -243,10 +260,10 @@ export async function fuelGrid(
       quality = new Uint8Array(size * size);
     const warnings: string[] = [];
     const sources: FuelResponse["sources"] = [];
-    await readWorldCover(bounds, size, models, quality, warnings);
     for (const data of maps)
       if (await overlay(data, bounds, size, models, quality))
         sources.push(data);
+    await readWorldCover(bounds, size, models, quality, warnings);
     let officialCells = 0,
       estimatedCells = 0,
       unknownCells = 0,

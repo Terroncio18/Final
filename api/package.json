@@ -8,6 +8,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage && node ../scripts/lcov-paths.mjs api coverage/lcov.info",
     "fuels:prepare": "npm run build && node scripts/prepare-fuels.mjs",
+    "fuels:official": "npm run build && node scripts/prepare-official-fuels.mjs",
+    "fuels:verify": "vitest run --config vitest.live.config.ts",
     "start": "node --env-file=.env dist/server.js",
     "dev": "tsc --watch --preserveWatchOutput & node --env-file=.env --watch dist/server.js"
   },

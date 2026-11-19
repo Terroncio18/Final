@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import { open } from "shapefile";
 import proj4 from "proj4";
 import { unzipSync } from "fflate";
+import { prepareFuelRaster } from "../dist/fuel-raster.js";
 import {
   paintPolygon,
   tileKeys,
@@ -27,6 +28,8 @@ const args = Object.fromEntries(
   }),
 );
 const dataDir = resolve(process.env.FUEL_DATA_DIR ?? "data/fuels");
+if (!Number.isFinite(Number(args.priority ?? 10)))
+  throw new Error("Invalid priority");
 let input = args.input;
 if (args.region) {
   // Names are the MITECO download IDs; explicit allowlist prevents arbitrary remote fetches.
@@ -116,7 +119,7 @@ if (
   !args.attribution
 ) {
   throw new Error(
-    "Required: --input=file.shp|geojson (or --region=illesbalears) --id=slug --label=name --url=source --date=reference-date --attribution=credit. Optional --crs=EPSG:25831 --field=MODCOMB",
+    "Required: --input=file.shp|geojson|tif (or --region=illesbalears) --id=slug --label=name --url=source --date=reference-date --attribution=credit. Optional --crs=EPSG:25831 --field=MODCOMB",
   );
 }
 const folder = join(dataDir, "datasets", args.id);
@@ -210,7 +213,20 @@ function add(feature) {
   if (features % 10000 === 0)
     console.log({ features, assigned, tiles: keys.size });
 }
-if (extname(input).toLowerCase() === ".shp") {
+let raster;
+if (/\.tiff?$/i.test(input)) {
+  raster = await prepareFuelRaster(
+    input,
+    (key, values) => {
+      writeFileSync(join(folder, `${key}.bin`), values);
+      keys.add(key);
+    },
+    args.crs,
+    args["exclude-values"] ? args["exclude-values"].split(",").map(Number) : [],
+  );
+  assigned = raster.assigned;
+  missing = raster.missing;
+} else if (extname(input).toLowerCase() === ".shp") {
   const reader = await open(input, undefined, {
     encoding: args.encoding ?? "windows-1252",
   });
@@ -227,8 +243,19 @@ if (extname(input).toLowerCase() === ".shp") {
 }
 for (const [key, value] of buffers)
   writeFileSync(join(folder, `${key}.bin`), value);
-if (!assigned)
+if (!assigned || !keys.size)
   throw new Error("No valid Anderson models; dataset not published.");
+if (args["expected-features"] && features !== Number(args["expected-features"]))
+  throw new Error(
+    `Incomplete download: expected ${args["expected-features"]} features, received ${features}. Dataset not published.`,
+  );
+const components = /\.shp$/i.test(input)
+  ? [
+      input,
+      input.replace(/\.shp$/i, ".dbf"),
+      input.replace(/\.shp$/i, ".prj"),
+    ].filter(existsSync)
+  : [input];
 const manifest = {
   id: args.id,
   label: args.label,
@@ -243,6 +270,26 @@ const manifest = {
   tileSize: TILE_SIZE,
   tileDegrees: 0.125,
   sampling: "pixel-centre, even-odd polygons",
+  ...(raster
+    ? {
+        sourceCrs: raster.sourceCrs,
+        sourceResolution: raster.sourceResolution,
+        sampling: raster.sampling,
+      }
+    : {}),
+  ...(args.license ? { license: args.license } : {}),
+  ...(args["legend-url"] ? { legendUrl: args["legend-url"] } : {}),
+  ...(args["archive-sha256"] ? { archiveSha256: args["archive-sha256"] } : {}),
+  ...(args["archive-mode"] ? { archiveMode: args["archive-mode"] } : {}),
+  ...(args["exclude-values"]
+    ? { excludedSourceValues: args["exclude-values"].split(",").map(Number) }
+    : {}),
+  inputComponents: Object.fromEntries(
+    components.map((path) => [
+      basename(path),
+      createHash("sha256").update(readFileSync(path)).digest("hex"),
+    ]),
+  ),
   features,
   assigned,
   missing,

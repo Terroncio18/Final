@@ -1,5 +1,9 @@
 # Combustibles por celda: implementación
 
+**Ampliación 19/11/2026:** [fuentes oficiales fuera de Baleares](FUENTES-OFICIALES.md),
+con preparación automática, GeoTIFF y pruebas integradas. El inventario de esta
+página describe la implementación inicial del 14/11.
+
 14/11/2026 · `Pere/Final`. La API, la carga del visor y el motor están conectados.
 
 ## Qué está disponible

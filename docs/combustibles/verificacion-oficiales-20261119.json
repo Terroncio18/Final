@@ -1,0 +1,407 @@
+{
+  "checkedAt": "2026-11-19T17:28:23.135Z",
+  "records": [
+    {
+      "label": "Asturias (Somiedo)",
+      "centre": [
+        -6.25,
+        43.1
+      ],
+      "bounds": [
+        -6.438972507751571,
+        42.96201940352138,
+        -6.061027492248429,
+        43.23798059647862
+      ],
+      "size": 1024,
+      "officialCells": 377408,
+      "estimatedCells": 671168,
+      "unknownCells": 0,
+      "officialPercent": 35.99,
+      "elapsedMs": 1430,
+      "cacheMs": 172,
+      "sources": [
+        {
+          "label": "CETEMAS / Principat d’Astúries · Rothermel LiDAR 25 m",
+          "sourceUrl": "https://www.cetemas.es/wp-content/uploads/2026/05/Mapa_mcb_2cob-1.zip",
+          "sourceDate": "LiDAR 2020 (2a cobertura) · MFE/IFN4 2009–2010",
+          "attribution": "© CETEMAS / Gobierno del Principado de Asturias · CC BY · reprojectat i mostrejat"
+        },
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "label": "Tenerife",
+      "centre": [
+        -16.45,
+        28.36
+      ],
+      "bounds": [
+        -16.60679962350343,
+        28.22201940352138,
+        -16.293200376496568,
+        28.49798059647862
+      ],
+      "size": 1024,
+      "officialCells": 334560,
+      "estimatedCells": 714016,
+      "unknownCells": 0,
+      "officialPercent": 31.91,
+      "elapsedMs": 1208,
+      "cacheMs": 338,
+      "sources": [
+        {
+          "label": "Govern de Canàries · Tenerife · NFFL 25 m",
+          "sourceUrl": "https://www.gobiernodecanarias.org/medioambiente/descargas/Biodiversidad/modelos_combustibles/TENERIFE.zip",
+          "sourceDate": "Metodologia 2015 · LiDAR 2011–2013; edició del fitxer no declarada",
+          "attribution": "© Gobierno de Canarias · GRAFCAN / AGRESTA"
+        },
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "label": "Gran Canaria",
+      "centre": [
+        -15.6,
+        27.96
+      ],
+      "bounds": [
+        -15.756214741807602,
+        27.82201940352138,
+        -15.443785258192397,
+        28.09798059647862
+      ],
+      "size": 1024,
+      "officialCells": 731072,
+      "estimatedCells": 317504,
+      "unknownCells": 0,
+      "officialPercent": 69.72,
+      "elapsedMs": 1315,
+      "cacheMs": 320,
+      "sources": [
+        {
+          "label": "Govern de Canàries · Gran Canaria · NFFL 25 m",
+          "sourceUrl": "https://www.gobiernodecanarias.org/medioambiente/descargas/Biodiversidad/modelos_combustibles/GRAN%20CANARIA.zip",
+          "sourceDate": "Metodologia 2015 · LiDAR 2011–2013; edició del fitxer no declarada",
+          "attribution": "© Gobierno de Canarias · GRAFCAN / AGRESTA"
+        },
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "label": "La Palma",
+      "centre": [
+        -17.85,
+        28.71
+      ],
+      "bounds": [
+        -18.00732131102691,
+        28.57201940352138,
+        -17.692678688973093,
+        28.84798059647862
+      ],
+      "size": 1024,
+      "officialCells": 439806,
+      "estimatedCells": 608770,
+      "unknownCells": 0,
+      "officialPercent": 41.94,
+      "elapsedMs": 1797,
+      "cacheMs": 360,
+      "sources": [
+        {
+          "label": "Govern de Canàries · La Palma · NFFL 25 m",
+          "sourceUrl": "https://www.gobiernodecanarias.org/medioambiente/descargas/Biodiversidad/modelos_combustibles/LA%20PALMA.zip",
+          "sourceDate": "Metodologia 2015 · LiDAR 2011–2013; edició del fitxer no declarada",
+          "attribution": "© Gobierno de Canarias · GRAFCAN / AGRESTA"
+        },
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "label": "La Gomera",
+      "centre": [
+        -17.24,
+        28.12
+      ],
+      "bounds": [
+        -17.396447255317664,
+        27.98201940352138,
+        -17.083552744682333,
+        28.25798059647862
+      ],
+      "size": 1024,
+      "officialCells": 346207,
+      "estimatedCells": 702369,
+      "unknownCells": 0,
+      "officialPercent": 33.02,
+      "elapsedMs": 1137,
+      "cacheMs": 134,
+      "sources": [
+        {
+          "label": "Govern de Canàries · La Gomera · NFFL 25 m",
+          "sourceUrl": "https://www.gobiernodecanarias.org/medioambiente/descargas/Biodiversidad/modelos_combustibles/GOMERA.zip",
+          "sourceDate": "Metodologia 2015 · LiDAR 2011–2013; edició del fitxer no declarada",
+          "attribution": "© Gobierno de Canarias · GRAFCAN / AGRESTA"
+        },
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "label": "El Hierro",
+      "centre": [
+        -18,
+        27.73
+      ],
+      "bounds": [
+        -18.155883837495384,
+        27.59201940352138,
+        -17.844116162504616,
+        27.86798059647862
+      ],
+      "size": 1024,
+      "officialCells": 182710,
+      "estimatedCells": 865866,
+      "unknownCells": 0,
+      "officialPercent": 17.42,
+      "elapsedMs": 1841,
+      "cacheMs": 84,
+      "sources": [
+        {
+          "label": "Govern de Canàries · El Hierro · NFFL 25 m",
+          "sourceUrl": "https://www.gobiernodecanarias.org/medioambiente/descargas/Biodiversidad/modelos_combustibles/HIERRO.zip",
+          "sourceDate": "Metodologia 2015 · LiDAR 2011–2013; edició del fitxer no declarada",
+          "attribution": "© Gobierno de Canarias · GRAFCAN / AGRESTA"
+        },
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "label": "Valencia (Serra)",
+      "centre": [
+        -0.5,
+        39.68
+      ],
+      "bounds": [
+        -0.6792834799249756,
+        39.54201940352138,
+        -0.3207165200750244,
+        39.81798059647862
+      ],
+      "size": 1024,
+      "officialCells": 447905,
+      "estimatedCells": 600671,
+      "unknownCells": 0,
+      "officialPercent": 42.72,
+      "elapsedMs": 1213,
+      "cacheMs": 260,
+      "sources": [
+        {
+          "label": "ICV / Generalitat Valenciana · PATFOR Rothermel",
+          "sourceUrl": "https://terramapas.icv.gva.es/0506_PATFOR?service=WFS&version=2.0.0&request=GetFeature&typeNames=Regulacion.Incendios.Combustible&outputFormat=shp",
+          "sourceDate": "PATFOR · any de referència del fitxer no declarat",
+          "attribution": "© Generalitat Valenciana · Institut Cartogràfic Valencià · CC BY"
+        },
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "label": "Navarra (Irati)",
+      "centre": [
+        -1.1,
+        42.98
+      ],
+      "bounds": [
+        -1.2886032780588041,
+        42.84201940352138,
+        -0.9113967219411961,
+        43.11798059647862
+      ],
+      "size": 1024,
+      "officialCells": 626205,
+      "estimatedCells": 422371,
+      "unknownCells": 0,
+      "officialPercent": 59.72,
+      "elapsedMs": 1172,
+      "cacheMs": 120,
+      "sources": [
+        {
+          "label": "SITNA / IDENA · Navarra · Rothermel LiDAR",
+          "sourceUrl": "https://idena.navarra.es/descargas/FOREST_Pol_ModeCombus.zip",
+          "sourceDate": "2019 · actualització LiDAR del mapa de 2005",
+          "attribution": "© Gobierno de Navarra · SITNA / IDENA · LIFE-IP NAdapta-CC · CC BY 4.0"
+        },
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "label": "Mallorca (Sóller)",
+      "centre": [
+        2.72,
+        39.75
+      ],
+      "bounds": [
+        2.5405344835276384,
+        39.61201940352138,
+        2.899465516472362,
+        39.88798059647862
+      ],
+      "size": 1024,
+      "officialCells": 410097,
+      "estimatedCells": 638479,
+      "unknownCells": 0,
+      "officialPercent": 39.11,
+      "elapsedMs": 1189,
+      "cacheMs": 91,
+      "sources": [
+        {
+          "label": "IDEIB · IV Inventari Forestal",
+          "sourceUrl": "https://ideib.caib.es/geoserveis/rest/services/public/GOIB_InvForestal_IB/MapServer/1",
+          "sourceDate": "IFN4 · consulta 2026-10-19",
+          "attribution": "Govern de les Illes Balears–SITIBSA"
+        },
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "label": "Madrid (control)",
+      "centre": [
+        -3.7,
+        40.42
+      ],
+      "bounds": [
+        -3.881240532155326,
+        40.28201940352138,
+        -3.5187594678446743,
+        40.55798059647862
+      ],
+      "size": 1024,
+      "officialCells": 0,
+      "estimatedCells": 1048576,
+      "unknownCells": 0,
+      "officialPercent": 0,
+      "elapsedMs": 1317,
+      "cacheMs": 185,
+      "sources": [
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "label": "Portugal (control)",
+      "centre": [
+        -8.25,
+        39.62
+      ],
+      "bounds": [
+        -8.42912795487737,
+        39.48201940352138,
+        -8.07087204512263,
+        39.75798059647862
+      ],
+      "size": 1024,
+      "officialCells": 0,
+      "estimatedCells": 1048576,
+      "unknownCells": 0,
+      "officialPercent": 0,
+      "elapsedMs": 1179,
+      "cacheMs": 300,
+      "sources": [
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    },
+    {
+      "label": "Lanzarote (control)",
+      "centre": [
+        -13.6,
+        29.02
+      ],
+      "bounds": [
+        -13.757791216963431,
+        28.88201940352138,
+        -13.442208783036568,
+        29.15798059647862
+      ],
+      "size": 1024,
+      "officialCells": 0,
+      "estimatedCells": 1048576,
+      "unknownCells": 0,
+      "officialPercent": 0,
+      "elapsedMs": 1022,
+      "cacheMs": 119,
+      "sources": [
+        {
+          "label": "ESA WorldCover 2021 · estimació Anderson v2",
+          "sourceUrl": "https://esa-worldcover.org/en/data-access",
+          "sourceDate": "2021",
+          "attribution": "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0"
+        }
+      ],
+      "warnings": []
+    }
+  ]
+}
