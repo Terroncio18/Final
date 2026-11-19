@@ -2916,6 +2916,25 @@ Comprovat: que tots els camins que el fitxer anomena existeixen i que les
 línies `SF:` dels dos informes es resolen des de l'arrel. **L'escàner no s'ha
 executat**: demana el token i el compte, i puja el codi a un servei de fora.
 
+**Mirat al navegador el mateix dia**, amb el projecte ja importat. El projecte
+és `Terroncio18_Final` a l'organització `terroncio18` —les dues claus del
+fitxer són les bones—, el repositori és públic i l'anàlisi automàtica ja està
+apagada, de manera que l'escàner no se la trobarà al davant. La primera
+anàlisi, la automàtica de les 11:53, dona 20.000 línies de codi, la porta de
+qualitat passada, 0,1 % de duplicació, 17 problemes —1 h 35 min de feina
+estimada— i la **cobertura buida**, que és el que té el mode automàtic: no
+llegeix informes `lcov`. D'aquí que la xifra de la §11.54 no hi sigui fins que
+l'escàner no s'executi des d'aquí.
+
+Dels 17 problemes, cinc són el mateix i són els únics que poden ser un error
+de debò: un `sort()` sense funció de comparació a
+`api/scripts/prepare-fuels.mjs`, a `api/src/firms.ts` —dues vegades—, a
+`api/src/fuels.ts` i a `api/src/weather.ts`, que ordena com si tot fossin
+lletres. La resta és convenció —`Number.NaN` i `Number.isNaN` en lloc dels
+globals, nou casos repartits entre `simulator-view.ts`, el model i
+`hotspot-range.ts`—, una expressió regular amb *backtracking* a
+`scenario.ts` (L303) i un camp sense etiqueta a `simulator-view.html` (L390).
+
 ---
 
 ## 12. Decisions pendents
