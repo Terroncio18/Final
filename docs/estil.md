@@ -69,17 +69,20 @@ export class HotspotsService {
 }
 ```
 
-No té entrades ni sortides perquè és un servei. Avui el fitxer barreja els
-punts 3 i 4 —`range` i `count` són entre els senyals— i `asked` queda a sota
-de tot l'estat, tocant al constructor.
+No té entrades ni sortides perquè és un servei. **És el fitxer on es va
+aplicar primer**, el 19/11/2026, i serveix d'exemple: abans barrejava els
+punts 3 i 4 —`range` i `count` eren entre els senyals—, i de passada se li van
+posar els modificadors de la regla 2 i es va tancar el bloc d'imports de la
+regla 3. Vint-i-dues línies canviades, cap de comportament, i les 281 proves
+segueixen passant.
 
 </details>
 
 ### Qui no la compleix, avui
 
 Mirat el 19/11/2026 sobre les 37 classes de `web/src/app`: **30 ja la
-compleixen** i 7 barregen els grups. Són `map/hotspots.service.ts`,
-`map/map-view.ts`, `simulation/ignition-step.ts`, `simulation/search.service.ts`,
+compleixen** i 7 barregen els grups. La primera, `map/hotspots.service.ts`, ja
+està feta; queden `map/map-view.ts`, `simulation/ignition-step.ts`, `simulation/search.service.ts`,
 `simulator/countermeasure-plan.ts`, `top-bar/range-picker.ts` i
 `simulator/simulator-view.ts`. A cinc d'elles és moure dues o tres línies.
 

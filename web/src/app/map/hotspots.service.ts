@@ -3,7 +3,6 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
 import type { FeatureCollection } from 'geojson';
-
 import { HOTSPOTS_URL } from './map.config';
 import { MapService } from './map.service';
 import { StudyArea } from './study-area';
@@ -42,25 +41,37 @@ export class HotspotsService {
     { initialValue: null },
   );
 
+  public readonly loading = signal(false);
+  public readonly failed = signal(false);
+
+  /** What the last answer carried once it was cut to the study area. */
+  private readonly answer = signal<FeatureCollection | null>(null);
+
+  /**
+   * The first date FIRMS holds anything for, once it has said so.
+   *
+   * It bounds the date fields. Without it, a range in 2005 would come back
+   * empty and the map would read as «nothing burned in Spain in 2005» rather
+   * than «VIIRS was not in orbit yet».
+   */
+  public readonly earliest = signal<string | null>(null);
+
+  /** Counts the requests, so a slow answer cannot overwrite a newer one. */
+  private asked = 0;
+
   /**
    * What the address bar is asking for.
    *
    * Compared by value: every navigation produces a new object, and without
    * this, walking into the form would re-ask FIRMS for the same month.
    */
-  readonly range = computed<Range>(
+  public readonly range = computed<Range>(
     () => {
       this.navigated();
       return rangeFrom(this.router.parseUrl(this.router.url).queryParams);
     },
     { equal: sameRange },
   );
-
-  readonly loading = signal(false);
-  readonly failed = signal(false);
-
-  /** What the last answer carried once it was cut to the study area. */
-  private readonly answer = signal<FeatureCollection | null>(null);
 
   /**
    * How many of them are in the territory being looked at.
@@ -70,24 +81,12 @@ export class HotspotsService {
    * camera. «6.799 focus» over a view of the Canaries would be claiming the
    * islands burned the way Iberia did.
    */
-  readonly count = computed(
+  public readonly count = computed(
     () =>
       this.answer()?.features.filter(
         (feature) => feature.properties?.['scope'] === this.maps.scope(),
       ).length ?? 0,
   );
-
-  /**
-   * The first date FIRMS holds anything for, once it has said so.
-   *
-   * It bounds the date fields. Without it, a range in 2005 would come back
-   * empty and the map would read as «nothing burned in Spain in 2005» rather
-   * than «VIIRS was not in orbit yet».
-   */
-  readonly earliest = signal<string | null>(null);
-
-  /** Counts the requests, so a slow answer cannot overwrite a newer one. */
-  private asked = 0;
 
   constructor() {
     effect(() => this.load(this.range()));
@@ -100,7 +99,7 @@ export class HotspotsService {
   }
 
   /** Puts a range in the address bar. Everything else follows from there. */
-  choose(range: Range): void {
+  public choose(range: Range): void {
     void this.router.navigate([], {
       queryParams: paramsFor(range),
       queryParamsHandling: 'merge',
@@ -108,7 +107,7 @@ export class HotspotsService {
   }
 
   /** Back to the portada's own range, which writes no parameters. */
-  reset(): void {
+  public reset(): void {
     this.choose(defaultRange());
   }
 
