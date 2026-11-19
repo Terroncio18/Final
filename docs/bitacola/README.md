@@ -127,6 +127,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.54** La cobertura de les proves es mesura
 - **11.55** SonarQube Cloud llegeix el que les proves mesuren
 - **11.56** La bitàcola és un fitxer per decisió
+- **11.57** Els avisos de Sonar, a zero
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):
