@@ -9,9 +9,13 @@ export default defineConfig({
       provider: 'v8',
       // Every model file counts, so one that no test touches is a zero and not
       // an absence.
-      include: ['src/app/simulation/**/*.ts'],
+      include: [
+        'src/main.ts',
+        'src/app/simulation/{agents,bounds,countermeasures,domain,fire-appearance,fire-display,fire-distances,fire-emitters,fire-field,fire-spread,fire-surface,fuel-data,fuel-treatments,fuel.service,point,point-locator,rothermel,scenario,slope-classes,spotting,terrain,terrain.service,wind}.ts',
+        'src/app/map/{agents-3d,fire-particles}.ts',
+      ],
       exclude: ['**/*.spec.ts'],
-      reporter: ['text', 'html', 'lcovonly'],
+      reporter: ['text', 'html', 'lcovonly', 'json'],
       reportsDirectory: 'coverage/model',
     },
   },

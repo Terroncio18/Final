@@ -6,6 +6,7 @@ import {
   effect,
   ElementRef,
   inject,
+  InjectionToken,
   input,
   signal,
   untracked,
@@ -83,6 +84,12 @@ import {
 } from './countermeasure-plan';
 import { Icon, iconOr } from './icon';
 import { WeatherService } from './weather.service';
+
+/** The computation boundary: the view owns cancellation and publication, the model owns spread. */
+export const SIMULATE_FIRE = new InjectionToken<typeof spread>('simulate fire', {
+  providedIn: 'root',
+  factory: () => spread,
+});
 
 /**
  * What the analysis column can show, and whether it does on a first visit.
@@ -282,6 +289,7 @@ function crewView(kind: CrewKind) {
   host: { '(document:keydown.escape)': 'cancelTool()' },
 })
 export class SimulatorView {
+  private readonly simulate = inject(SIMULATE_FIRE);
   private readonly maps = inject(MapService);
   /** How far the compass needle turns: north on screen is minus the bearing. */
   protected readonly compassTurn = computed(() => `rotate(${-this.maps.bearing()}deg)`);
@@ -1850,7 +1858,7 @@ export class SimulatorView {
     const measures = this.plan.measures();
 
     try {
-      const result = await spread(
+      const result = await this.simulate(
         {
           elevation: terrain.elevation,
           bed,
