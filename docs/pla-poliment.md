@@ -2,134 +2,250 @@
 
 Demanat per Pere el 19/11/2026, abans del manual d'usuari: deixar l'aplicació
 acabada —provada, sense codi mort, amb un estil únic i llegible, optimitzada,
-documentada i publicada—. Aquest fitxer és el contracte entre els qui hi
-treballen: Pere, Claude i Codex. **Qui agafa una fase hi posa el seu nom aquí
-abans de començar**, i l'estat quan la deixa.
+documentada i publicada—. **Es fa en diverses sessions**, de manera que aquest
+fitxer és la memòria del pla: què toca, qui el té i on s'ha quedat.
 
 La xarxa de seguretat ja hi és: 97,9 % de cobertura i 0 avisos de Sonar
 (§11.62). Esborrar i refer coses té avui un cost que fa un mes no tenia.
 
-## Les regles de treballar-hi dos alhora
+## Com es comença una sessió
+
+1. Llegir aquest fitxer sencer, que és curt, i mirar la taula d'estat.
+2. Triar **una** fase que tingui les seves dependències fetes, escriure el nom
+   de qui l'agafa a la taula, i no agafar-ne dues.
+3. Treballar només als fitxers de la fase. Si cal tocar-ne un de fora, dir-ho
+   a la taula abans.
+4. Acabar en verd: proves, compilació, `prettier --check` i, des d'avui, el
+   linter. Commit. I **actualitzar la taula d'estat abans de plegar**, encara
+   que la fase quedi a mitges: on s'ha arribat i què queda.
+
+### Les regles de treballar-hi dos alhora
 
 1. **Dos no toquen mai el mateix fitxer al mateix temps.** El repartiment és
-   per carpetes, no per tasques: `web/src/app/{map,simulator,top-bar,hotspot-panel}`
-   d'una banda, `web/src/app/simulation` i `api/` de l'altra.
-2. **Qui acaba una fase, commiteja i avisa.** Res de deixar fitxers oberts:
-   la feina de Codex del 19/11 es va quedar sense desar i va caldre rescatar-la
-   (§11.62).
-3. **Cada fase acaba en verd**: les proves passen, compila i `prettier --check`
-   no diu res. Si una fase deixa alguna cosa vermella, no està acabada.
-4. **El que es decideixi, a la bitàcola**, com sempre: fitxer nou a `fase-2/`
-   i una línia a l'índex.
+   per carpetes: `web/src/app/{map,simulator,top-bar,hotspot-panel}` d'una
+   banda, `web/src/app/simulation` i `api/` de l'altra.
+2. **Qui acaba, commiteja i avisa.** La feina de Codex del 19/11 es va quedar
+   sense desar i va caldre rescatar-la (§11.62).
+3. **El que es decideixi, a la bitàcola**: fitxer nou a `fase-2/` i una línia
+   a l'índex. Les regles d'estil, a [`estil.md`](estil.md).
 
-## Les fases
+## Estat
 
-| # | Fase | Depèn de | Es pot partir |
-| --- | --- | --- | --- |
-| 0 | El full d'estil | — | No: l'ha d'escriure un de sol |
-| 1 | Inventari del que sobra i del que fa mal | — | **Sí**: web i api alhora |
-| 2 | Provar l'aplicació sencera | — | És de Pere, amb guió |
-| 3 | Arreglar el que surti de l'1 i el 2 | 1, 2 | Sí, si les llistes no es creuen |
-| 4 | Treure el codi mort | 1 | Sí, per carpetes |
-| 5 | Passar-hi el full d'estil | 0, 4 | Sí, per carpetes, mai el mateix fitxer |
-| 6 | Optimitzacions | 1, 2 | Sí, si no toca el que toca la 5 |
-| 7 | Prova global final, amb UI | 3, 4, 5, 6 | És de Pere |
-| 8 | Manuals i README | 7 (els esborranys, abans) | Sí: un manual cadascú |
-| 9 | Publicar | 8, i una decisió | No |
-| 10 | Sonar i tancament | 9 | No |
+| # | Fase | Depèn de | Estat | Qui |
+| --- | --- | --- | --- | --- |
+| 0 | El full d'estil | — | **A mitges**: 4 regles escrites, 5 decisions obertes | Claude |
+| 0b | El linter | 0 | **A mitges**: muntat a `web/`, falta `api/` i els guions | Claude |
+| 1 | Inventari | — | Per començar | — |
+| 2 | Provar l'aplicació sencera | — | Per començar (guió per escriure amb Pere) | — |
+| 3 | Errors | 1, 2 | Per començar | — |
+| 4 | Codi mort | 1 | Per començar | — |
+| 5 | Estil | 0, 0b, 4 | Per començar (1 fitxer de 37 fet, com a mostra) | — |
+| 6 | Optimitzacions | 1, 2 | Per començar | — |
+| 7 | Prova global final | 3, 4, 5, 6 | Per començar | — |
+| 8 | Manuals i README | 7 | Per començar | — |
+| 9 | Publicar | 8 + decisió | **Bloquejada per una decisió** | — |
+| 10 | Sonar i tancament | 9 | Per començar | — |
 
-**Les independents de veritat són la 1 i la 2**: es poden fer avui i alhora,
-i les dues només llegeixen. Tot el que ve després menja de les seves llistes.
+**Les independents de debò són la 1 i la 2**: es poden fer avui, alhora, i les
+dues només llegeixen. La 0 i la 0b també són independents de tot.
 
-### 0. El full d'estil
+---
 
-Un document curt —`docs/estil.md`— que digui com és un fitxer d'aquest
-projecte. Primer el que val per a tots: l'ordre de dins (capçalera que diu què
-fa i per què, imports, tipus, constants, el que s'exporta, els ajudants a
-sota), que els comentaris expliquin **per què** i no què, que no hi hagi
-abreviatures ni noms d'una lletra, que una funció càpiga a la pantalla i que
-el que sigui llest es deixi per al que no es pot fer d'una altra manera.
-Després, les variacions per tipus: servei d'Angular, component, prova,
-plantilla HTML, CSS, script `.mjs`, configuració. Prettier ja decideix les
-cometes i les comes; això és l'altra meitat, la que una eina no pot mirar.
+## Fase 0 — El full d'estil
 
-### 1. Inventari
+**Qui**: un de sol, perquè és un document. **Depèn de**: res.
+**Acaba quan**: les cinc decisions obertes estan escrites com a regla.
 
-Només llegir i escriure dues llistes a `docs/`. Què s'hi busca: codi mort
-—fitxers que ningú importa, exports que ningú fa servir, branques impossibles,
-`TODO` vells—, duplicació, funcions massa llargues o massa llestes, noms que
-menteixen, dependències que no es fan servir, i on es gasta el temps i els
-bytes. **Surt d'aquí la 12.15**: `fire-field.ts` i `fire-appearance.ts` tenen
-proves però no els fa servir ningú, i cal decidir si es treuen o es queden com
-a alternativa.
+Fet: [`estil.md`](estil.md) amb quatre regles —l'ordre de dins d'una classe,
+cap membre sense `private`/`protected`/`public`, els imports en un bloc, i res
+de codi espagueti amb el llindar de 15—, cadascuna amb la mesura de com està
+el projecte avui.
 
-### 2. Provar l'aplicació sencera
+Queda **decidir** (són a «Per decidir» del mateix document):
 
-La fa Pere al navegador, amb un guió escrit abans: cada pantalla, cada camí i
-els casos lletjos —sense clau de FIRMS, sense dades de combustible, sense
-xarxa, una detecció al mar, un domini a la frontera, la finestra estreta—.
-Surt una llista de defectes, cadascun amb com reproduir-lo.
+1. **Com es diu «aquesta resposta ja no la vull»**: comptador, clau del que
+   s'ha demanat, o `AbortController`. Avui n'hi ha tres maneres.
+2. **Cadena de promeses o `async`/`await`**.
+3. **Com es diu «això no l'espero»**: `void` o un ajudant que enganxi el
+   `catch`.
+4. **Els comentaris.** Pere vol codi sense comentaris. S'ha fet la prova a
+   `map/hotspots.service.ts`, que ha passat de 182 a 117 línies sense perdre
+   res que no sigui a la bitàcola —es perd el punter, no el coneixement—. Cal
+   decidir si es fa a tot el repositori; si es fa, **la portada de la fase 1
+   s'ha d'esmenar**, perquè diu que el codi cita els números de les decisions
+   als comentaris.
+5. **Els `simulator-view.ts` i `countermeasure-plan.ts`**, que agrupen l'estat
+   per tema i no per tipus: s'hi aplica la regla 1 igualment, val per blocs, o
+   el que cal és partir el component.
 
-### 3. Errors
+## Fase 0b — El linter
 
-El que diguin la 1 i la 2, ordenat per si trenca o només molesta. Cada arreglo
-amb la seva prova, que per això n'hi ha.
+**Qui**: un de sol. **Depèn de**: 0. **Acaba quan**: `npm run lint` existeix a
+les dues meitats, és verd, i la 12.28 està tancada a la bitàcola.
 
-### 4. Codi mort
+Fet a `web/`: ESLint 10 amb `eslint.config.mjs` —regles recomanades de
+TypeScript i d'Angular, accessibilitat de plantilles, i les dues regles
+nostres: `explicit-member-accessibility` i `complexity: 15`, més
+`no-floating-promises`—. La primera passada va donar 278 problemes; 233 eren
+membres sense modificador i ja estan posats, amb les proves i la compilació en
+verd (`83b48b2`).
 
-Treure. Amb el 97,9 % cobert, si després de treure una cosa les proves
-segueixen verdes i la pantalla també, no feia falta. El que es tregui s'escriu
-a la bitàcola: a la memòria hi ha d'anar **el que es va provar i no es va
-quedar**, que és la part que explica les decisions.
+Queda:
 
-### 5. Estil
+1. **El mateix a `api/`**: instal·lar, configurar sense la part d'Angular, i
+   arreglar el que surti.
+2. **`npm run lint`** a les dues meitats, i afegir-lo a `CLAUDE.md` i a la
+   llista d'ordres de cada fase.
+3. **Els 40 avisos que queden a `web/`**, que no són soroll:
+   - 20 `no-explicit-any`;
+   - 15 `complexity`, que són la fase 5;
+   - 3 `no-unused-vars`, que són **codi mort de debò** i van a la fase 4;
+   - 5 d'accessibilitat a plantilles —elements amb `click` que no es poden
+     enfocar ni fer servir amb el teclat—, que van a la fase 3;
+   - 1 expressió sense efecte.
+4. **Tancar la 12.28** amb una secció que digui què vigila el linter i què no.
 
-Passar el full de la fase 0 per tot el codi. És la fase que toca més fitxers,
-i per això va després de la 4 —no es poleix el que s'ha de treure— i per
-carpetes separades. No canvia comportament: les proves han de passar sense
-tocar-les.
+## Fase 1 — Inventari
 
-### 6. Optimitzacions
+**Qui**: es pot partir en dos, `web/` i `api/`. **Depèn de**: res.
+**Acaba quan**: hi ha dues llistes a `docs/`, ordenades per gravetat, cada
+entrada amb fitxer i línia.
 
-Amb números al davant, no d'intuïció. Candidats que ja es veuen: el paquet
-inicial és d'1,5 MB —abans de les dades—, `web/public/data` són 25 MB de
-geometria que es publiquen tal qual, i el cau de combustible de l'API té una
-política de neteja que no s'ha mesurat mai amb el disc ple.
+Només llegir. Què s'hi busca:
 
-### 7. Prova global final
+1. **Codi mort**: fitxers que ningú importa, exports que ningú fa servir,
+   branques impossibles, `TODO` vells. Els 3 `no-unused-vars` del linter són
+   el començament, no el final: el linter no veu un fitxer sencer que ningú
+   importa.
+2. **La 12.15**: `fire-field.ts` i `fire-appearance.ts` tenen proves i no els
+   fa servir ningú. Decidir si es treuen o es queden com a alternativa sense
+   WebGL2.
+3. **Duplicació**: el mateix càlcul escrit dues vegades, el mateix patró
+   resolt de tres maneres (com el de la decisió 1 de la fase 0).
+4. **Noms que menteixen** i funcions que fan dues coses.
+5. **Dependències**: les que no es fan servir, i les que pesen al paquet.
+6. **On es va el temps i els bytes**: el paquet inicial és d'1,5 MB,
+   `web/public/data` són 25 MB que es publiquen tal qual.
 
-El mateix guió de la 2, sencer, amb tot ja arreglat. I la suite automàtica, la
-compilació i Sonar. És la porta de la 8.
+## Fase 2 — Provar l'aplicació sencera
 
-### 8. Manuals i README
+**Qui**: Pere al navegador; el guió s'escriu amb ell abans.
+**Depèn de**: res. **Acaba quan**: hi ha una llista de defectes, cadascun amb
+com reproduir-lo i què s'esperava.
 
-El manual d'usuari és la pendent 12.18 i ha de dir el que la pantalla no diu
-(§11.34): què fa cada eina, les hipòtesis del model i que això no serveix per
-a decidir en una emergència. Al costat, un manual d'instal·lació —claus,
-dades preparades, ordres— i els README del repositori, que avui no n'hi ha
-cap a l'arrel.
+El guió ha de cobrir, com a mínim:
 
-### 9. Publicar
+1. **La portada**: focus actius, la llegenda, triar dates i presets, el
+   comptador per territori, obrir una detecció i el botó que porta al
+   simulador.
+2. **El formulari**: els quatre nivells, el cercador, l'enllaç compartit, el
+   botó enrere.
+3. **El simulador**: posar ignicions, el vent, el combustible —oficial i
+   estimat—, les contramesures, les brigades, els mitjans aeris, la vista 3D,
+   desar i carregar un escenari.
+4. **Els casos lletjos**: sense clau de FIRMS, sense dades de combustible
+   preparades, sense xarxa, FIRMS caigut, una detecció al mar, un domini a la
+   frontera, un escenari antic, la finestra estreta i el mòbil.
 
-**Aquí hi ha una decisió abans de res**, i és la que pot moure la resta del
-pla: a Vercel hi va bé el `web/`, que és estàtic, però **l'API no hi encaixa
-tal com és**. És un servidor Fastify que viu, i a Vercel seria una funció que
-neix i mor a cada petició: perdria els tres caus que té en memòria —les
-deteccions, la taula de disponibilitat, les observacions—, el cau en disc del
-combustible (`api/data/cache`) i el comptador que limita a dues preparacions
-alhora. A més, els 21 MB de dades de combustible preparades no són al
-repositori.
+## Fase 3 — Errors
 
-Les tres sortides, i cap és dolenta:
+**Qui**: es pot partir si les llistes no es creuen. **Depèn de**: 1 i 2.
+**Acaba quan**: tot el que trenca està arreglat i amb la seva prova, i el que
+només molesta està arreglat o escrit com a pendent amb el motiu.
 
-- **El web a Vercel i l'API en un servidor que viu** (Render, Fly, Railway, una
-  màquina). És el que menys toca el codi: el que canvia és d'on penja `/api`.
-- **Tot a Vercel**, amb l'API com a funcions: s'ha de decidir on viuen les
-  dades i què es fa amb els caus. Toca codi i la memòria ho ha d'explicar.
-- **Només el web a Vercel**, amb l'API apagada i les dades congelades per a la
-  demostració. Barat, però deixa de ser una aplicació que respon.
+Ja hi ha cinc entrades segures, les d'accessibilitat del linter.
 
-### 10. Sonar i tancament
+## Fase 4 — Codi mort
 
-L'últim escàner, el panell per a la memòria i una etiqueta a la versió que es
+**Qui**: per carpetes. **Depèn de**: 1. **Va abans de la 5**: no es poleix el
+que s'ha de treure. **Acaba quan**: no queda res de la llista de la fase 1 i
+les proves segueixen verdes.
+
+El que es tregui s'escriu a la bitàcola: a la memòria hi ha d'anar **el que es
+va provar i no es va quedar**, que és la part que explica les decisions.
+
+## Fase 5 — Estil
+
+**Qui**: per carpetes, i mai el mateix fitxer que un altre.
+**Depèn de**: 0, 0b i 4. **Acaba quan**: el linter és verd sense excepcions i
+els fitxers segueixen el full d'estil.
+
+1. **L'ordre de dins de les classes**: queden sis de 37 —`map/map-view.ts`,
+   `simulation/ignition-step.ts`, `simulation/search.service.ts`,
+   `top-bar/range-picker.ts`, i els dos grans, segons què es decideixi—.
+2. **Els imports**: 37 fitxers de 101 tenen línies en blanc al mig del bloc.
+3. **Els comentaris**, segons la decisió 4 de la fase 0.
+4. **L'espagueti**, que són quinze funcions i quatre de grosses:
+
+   | Funció | Complexitat | Línies |
+   | --- | --- | --- |
+   | `simulation/fire-spread.ts` · `spreadRun()` | ~185 | 483 |
+   | `simulation/countermeasures.ts` · `finite()` | ~91 | 153 |
+   | `simulator/simulator-view.ts` · `constructor()` | ~84 | 443 |
+   | `simulation/scenario.ts` · `readScenario()` | ~52 | 123 |
+
+   **Avís**: `spreadRun()` és el bucle que recorre 1.024² cel·les i partir-lo
+   es paga en temps. La §11.36 demana que el càlcul vagi per sota del segon:
+   es parteix mesurant abans i després, i si costa massa es deixa sencer i
+   s'explica per què.
+5. **Els 20 `no-explicit-any`**, un per un: alguns són frontera de debò
+   —GeoJSON, respostes de fora— i volen un tipus a l'entrada, no un `any`
+   escampat.
+
+## Fase 6 — Optimitzacions
+
+**Qui**: per carpetes, si no toca el que toca la 5. **Depèn de**: 1 i 2.
+**Acaba quan**: cada canvi té el número d'abans i el de després.
+
+Candidats que ja es veuen: el paquet inicial d'1,5 MB, els 25 MB de
+`web/public/data` publicats tal qual, i la política de neteja del cau de
+combustible de l'API, que no s'ha mesurat mai amb el disc ple.
+
+## Fase 7 — Prova global final
+
+**Qui**: Pere. **Depèn de**: 3, 4, 5 i 6. **Acaba quan**: el guió de la fase 2
+passa sencer, la suite automàtica és verda, el linter també, i Sonar no diu
+res nou.
+
+## Fase 8 — Manuals i README
+
+**Qui**: es pot partir, un manual cadascú. **Depèn de**: 7 per a les captures;
+els esborranys es poden començar abans. **Acaba quan**: els tres documents són
+al repositori i la 12.18 està tancada.
+
+1. **Manual d'usuari** (12.18): què fa cada secció i cada eina, les hipòtesis
+   del model —combustible estimat, foc de superfície, retenció i assecat de
+   les descàrregues, brases experimentals— i que **el simulador no serveix per
+   a prendre decisions d'emergència**. És el que la pantalla no diu (§11.34).
+2. **Manual d'instal·lació**: claus d'AEMET i FIRMS, les dades preparades de
+   combustible —21 MB que no són al repositori—, les ordres de les dues
+   meitats, i què cal per a publicar-ho.
+3. **README**: un a l'arrel —avui no n'hi ha cap—, i un per meitat si cal.
+
+## Fase 9 — Publicar
+
+**Qui**: un de sol. **Depèn de**: 8 i **d'una decisió que cal prendre abans**.
+
+A Vercel hi va bé el `web/`, que és estàtic. **L'API no hi encaixa tal com
+és**: és un Fastify que viu, i a Vercel seria una funció que neix i mor a cada
+petició. Perdria els tres caus en memòria —deteccions, taula de
+disponibilitat, observacions—, el cau en disc del combustible
+(`api/data/cache`) i el comptador que limita a dues preparacions alhora. A
+més, els 21 MB de dades preparades no són al repositori.
+
+Les tres sortides:
+
+- **El web a Vercel i l'API en un servidor que viu** (Render, Fly, Railway,
+  una màquina). És el que menys toca el codi: només canvia d'on penja `/api`.
+- **Tot a Vercel**, amb l'API com a funcions: cal decidir on viuen les dades i
+  què es fa amb els caus. Toca codi, i la memòria ho ha d'explicar.
+- **Només el web**, amb les dades congelades per a la demostració. Barat, però
+  deixa de ser una aplicació que respon.
+
+Sigui quina sigui: les claus no es publiquen, i el CORS i l'origen de `/api`
+s'han de refer.
+
+## Fase 10 — Sonar i tancament
+
+L'últim escàner, el panell per a la memòria, i una etiqueta a la versió que es
 defensa.
