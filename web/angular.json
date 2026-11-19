@@ -74,6 +74,14 @@
           "builder": "@angular/build:unit-test",
           "options": {
             "exclude": ["app/simulation/**"]
+          },
+          "configurations": {
+            "coverage": {
+              "coverage": true,
+              "coverageInclude": ["src/app/**/*.ts"],
+              "coverageExclude": ["src/app/simulation/**", "**/*.spec.ts"],
+              "coverageReporters": ["text", "html", "lcovonly"]
+            }
           }
         }
       }

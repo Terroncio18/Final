@@ -2801,9 +2801,93 @@ de Sóller dona ES53, ES532 i ES_07061, la mateixa adreça que el formulari. Les
 120 proves de simulació i les 64 d'Angular, i la compilació sense avisos. **Al
 navegador no s'ha mirat**: ho prova Pere.
 
+### 11.54. La cobertura de les proves es mesura
+
+Demanat per Pere el 19/11/2026, amb la pregunta de si calia SonarQube per a
+mirar-la, que és la 12.27.
+
+- **Qui la mesura**: `@vitest/coverage-v8`, el proveïdor que vitest ja sap fer
+  servir. Una ordre per família de proves: `npm run test:coverage` al web
+  —primer la crida directa a vitest, que són les proves del model, i després
+  `ng test --configuration coverage`, les d'Angular— i
+  `npm run test:fuels:coverage` a l'API.
+- **On viu la configuració**: `web/vitest.config.ts` per a la crida directa i
+  una configuració `coverage` al *target* de proves d'`angular.json` per al
+  *builder*. Són dos llocs perquè el *builder* d'Angular no llegeix el
+  `vitest.config.ts`: la seva opció `runnerConfig` val fals si no es demana.
+  I els patrons del *builder* compten des de l'arrel del projecte
+  (`src/app/**/*.ts`), no des de `src` com els de les proves.
+- **Cada fitxer compta, provat o no**: `include` és la carpeta sencera i no
+  els fitxers que les proves carreguen, de manera que un fitxer que ningú no
+  prova surt amb un zero en lloc de desaparèixer de la llista. Els informes
+  HTML van a `coverage/`, que ja era al `.gitignore`; també es genera
+  l'`lcov`, que és el que demanaria un Sonar (12.27).
+
+**Les xifres del 19/11/2026**, en sentències:
+
+| Què | Cobertura |
+| --- | --- |
+| El model de foc, els setze fitxers de càlcul de `simulation` | 95,1 % (1.520/1.599) |
+| Tota la carpeta `simulation`, model i formulari | 63,5 % (1.529/2.406) |
+| La resta de `src/app`: mapa, simulador i barres | 23,6 % (633/2.680) |
+| L'API, els tres mòduls que carrega la prova de combustibles | 38,3 % de línies |
+
+- **El model està provat**: `fire-emitters`, `fire-appearance` i
+  `fire-distances` al 100 %; `fuel-treatments` 97,9; `fire-display` 97,8;
+  `countermeasures` 97,7; `fire-spread` 96,2; `agents` 95,5; `spotting` 95,1;
+  `rothermel` 93,8; `scenario` 93,1; `wind` 90,9; `fuel-data` 89,8. Més avall
+  queden `point` 82,6, `domain` 81,8 i `bounds` 44,1, que són geometria i
+  domini, i on les proves entren per una banda sola.
+- **El que surt a zero dins de `simulation` no és el model**: són els passos
+  del formulari i els seus serveis —`region-step`, `province-step`,
+  `municipality-step`, `ignition-step`, `search-box`, els sis `*.service.ts` i
+  `simulation-flow`—, `terrain.ts`, `slope-classes.ts` i els dos pintors que
+  no pinten de la 12.15, `fire-field.ts` (0 de 123 sentències) i
+  `fire-surface.ts` (0 de 64). `point-locator.ts` es queda al 25 %: la prova
+  de la §11.53 entra pel rectangle i no pel contorn ni per la lectura dels
+  fitxers de municipis.
+- **A la interfície, el que es pot provar sense navegador està provat**:
+  `countermeasure-plan.ts` 97,7 %, que és la lògica del pla de mesures.
+  Després `map.style` 72,2; `hotspot-range` 64,9; `hotspots.service` 47,7;
+  `range-picker` 36,1; `map.service` 12,0; i a zero `simulator-view.ts` —2.159
+  línies—, `agents-3d.ts`, `hotspot-panel`, `map-view`, `map-shell` i els
+  serveis del simulador. MapLibre i three.js volen un navegador, i aquesta
+  part la prova Pere a mà.
+- **A l'API**: `fuel-grid.js` 93,9 %, `fuel-routes.js` 59,4 % i `fuels.js`
+  8,2 % —el preparador de dades, que la prova no exercita—. Les rutes dels
+  punts d'aigua, dels llacs i dels parcs de bombers no tenen cap prova. La
+  cobertura de Node informa sobre `dist/`, el JavaScript compilat, i no sobre
+  `src/`.
+- **La frontera no és el 100 %**: és què es pot provar sense navegador. Dir la
+  xifra global de tot el web seria dir una altra cosa, perquè barrejaria el
+  model amb 7.700 línies de mapa i de 3D que no es proven amb aquestes eines.
+
+**Efecte secundari.** Instal·lar el proveïdor ha pujat vitest de 5.0.5 a
+5.1.1, dins del rang `^5.0.0` que el `package.json` ja declarava. Les 120
+proves del model, les 64 d'Angular i les 6 de l'API segueixen passant i la
+compilació no dona avisos. L'avís de `npm audit` sobre vite 8.3.0 ve de dins
+de `@angular/build` i ja hi era.
+
+Comprovat: les tres ordres de cobertura, les proves senceres,
+`prettier --check` i la compilació.
+
 ---
 
 ## 12. Decisions pendents
+
+- **12.27. Si la qualitat del codi es mesura amb SonarQube.** Preguntat per
+  Pere el 19/11/2026. La cobertura no el necessita: la dona vitest, i Sonar
+  llegiria el mateix `lcov` que la §11.54 ja genera. El que hi afegiria és
+  anàlisi pròpia —duplicació, complexitat ciclomàtica, *code smells*,
+  *security hotspots*—, un historial per *commit* i un panell d'on sortirien
+  una captura i una taula per a la memòria. El que costaria: SonarCloud és
+  gratuït només amb el repositori públic, i en privat és de pagament;
+  SonarQube Community en local vol Docker, Java i uns 3 GB de memòria. Si es
+  fa, la via barata és SonarCloud amb el repositori públic, un
+  `sonar-project.properties` i l'escàner llançat a mà un parell de vegades,
+  no a cada *commit*, i després del manual (12.18). Queda per decidir també
+  si abans hi va un linter: avui no n'hi ha cap, i ESLint amb
+  `angular-eslint` caçaria errors que el formatador no veu.
 
 - **12.16. Calibrar els coeficients de les contramesures.** Ve de la §11.27,
   i s'amplia a la §11.31. Les reduccions dels escenaris antics, la retenció
@@ -2958,7 +3042,8 @@ navegador no s'ha mirat**: ho prova Pere.
   ningú: el primer és la petjada exacta cel·la a cel·la, el segon el camp
   continu que `fire-surface.ts` ha substituït. O es treuen, o un d'ells es
   queda com a alternativa per a qui no tingui WebGL2, que avui es queda sense
-  dibuix del terra.
+  dibuix del terra. La cobertura del 19/11/2026 ho confirma: cap dels
+  dos no el toca ningú (§11.54).
 
 - ~~**12.13. Quin model és l'arbrat de WorldCover.**~~ Resolta el 14/11/2026
   a la §11.21: es queda el 8. El que es plantejava: la taula hi posa el 8,

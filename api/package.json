@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "test:fuels": "npm run build && node --test tests/fuels.test.mjs",
+    "test:fuels:coverage": "npm run build && node --test --experimental-test-coverage --test-coverage-exclude=tests/** tests/fuels.test.mjs",
     "fuels:prepare": "npm run build && node scripts/prepare-fuels.mjs",
     "start": "node --env-file=.env dist/server.js",
     "dev": "tsc --watch --preserveWatchOutput & node --env-file=.env --watch dist/server.js"
