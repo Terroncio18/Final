@@ -1,0 +1,23 @@
+<div class="layer-menu">
+  <h3>CAPES DEL MAPA</h3>
+  <label>
+    <input type="checkbox" [checked]="relief()" (change)="relief.set(!relief())" />
+    Relleu
+  </label>
+  <label>
+    <input type="checkbox" [checked]="contours()" (change)="contours.set(!contours())" />
+    Corbes de nivell
+  </label>
+  <label>
+    <input type="checkbox" [checked]="labels()" (change)="labels.set(!labels())" />
+    Topònims
+  </label>
+  <label>
+    <input type="checkbox" [checked]="slopes()" (change)="slopes.set(!slopes())" />
+    Pendents
+  </label>
+  <label>
+    <input type="checkbox" [checked]="forecasts()" (change)="forecasts.set(!forecasts())" />
+    Previsió +1 / +3 / +6 h
+  </label>
+</div>

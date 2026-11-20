@@ -363,6 +363,11 @@ describe('simulator screen', () => {
     c['slopes'].set(true);
     await fixture.whenStable();
     expect(maps.setSlopes).toHaveBeenLastCalledWith('data:image/png;slope', domainAround(centre));
+    c['layersOpen'].set(true);
+    await fixture.whenStable();
+    fixture.nativeElement.querySelectorAll('app-layer-menu input')[3].click();
+    expect(c['slopes']()).toBe(false);
+    c['slopes'].set(true);
     c['recentre']();
     c['zoom'](-1);
     c['focusSpot'](centreCell);

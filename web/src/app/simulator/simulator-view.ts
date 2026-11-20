@@ -75,6 +75,7 @@ import {
 } from './countermeasure-plan';
 import { AnalysisPanel } from './analysis-panel';
 import { Icon, iconOr } from './icon';
+import { LayerMenu } from './layer-menu';
 import { ToolSettingsModal, type ToolConfig } from './tool-settings';
 import { WeatherService } from './weather.service';
 
@@ -225,7 +226,7 @@ function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
 
 @Component({
   selector: 'app-simulator-view',
-  imports: [RouterLink, Icon, ToolSettingsModal, AnalysisPanel],
+  imports: [RouterLink, Icon, ToolSettingsModal, AnalysisPanel, LayerMenu],
   templateUrl: './simulator-view.html',
   styleUrls: ['./simulator-view.css', './countermeasures.css'],
   // Escape puts down whatever tool is in the hand, wherever the focus is.

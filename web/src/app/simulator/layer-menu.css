@@ -1,0 +1,58 @@
+/* The map's layer menu.
+ *
+ * Its own rules, moved here from simulator-view.css, and a copy of the
+ * console's focus ring, which simulator-view.css keeps for the rest of the
+ * screen. Everything is in the order it had there, so the cascade comes out
+ * the same. The colours are the console's custom properties, which reach in
+ * from its host.
+ */
+
+/* The host adds no box: the menu is placed on the map panel, as it was. */
+:host {
+  display: contents;
+}
+
+/* ---- The menu's own ---- */
+
+.layer-menu {
+  position: absolute;
+  z-index: 6;
+  top: 18px;
+  right: 65px;
+  padding: 17px;
+  background: #16232cf5;
+  border: 1px solid #435661;
+  border-radius: 6px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 30px #0006;
+}
+
+.layer-menu h3 {
+  margin: 0 0 12px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #b1bdc6;
+}
+
+.layer-menu label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 12px 0;
+  font-size: 12px;
+  color: #b3c0cb;
+  cursor: pointer;
+}
+
+.layer-menu input {
+  width: 14px;
+  height: 14px;
+  accent-color: #f79c65;
+}
+
+/* ---- Copied from simulator-view.css ---- */
+
+input:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+}
