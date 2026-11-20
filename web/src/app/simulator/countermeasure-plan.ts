@@ -165,6 +165,125 @@ export function lengthM(points: readonly Point[]): number {
   return total;
 }
 
+/** The litres a discharge carries, defaulted the way the model itself does. */
+function liquidTotals(measure: Countermeasure): {
+  litresPerPass: number;
+  passes: number;
+  passIntervalMin: number;
+  totalLitres: number;
+} {
+  const litresPerPass = measure.litresPerPass ?? 0;
+  const passes = measure.passes ?? 1;
+  return {
+    litresPerPass,
+    passes,
+    passIntervalMin: measure.passIntervalMin ?? 10,
+    totalLitres: litresPerPass * passes,
+  };
+}
+
+/** `T + HH:MM:SS` for a start given in minutes, with whatever seconds it carries. */
+function formatDeployment(start: number): string {
+  return `T + ${Math.floor(start / 60)
+    .toString()
+    .padStart(2, '0')}:${Math.floor(start % 60)
+    .toString()
+    .padStart(2, '0')}:${Math.floor((start * 60) % 60)
+    .toString()
+    .padStart(2, '0')}`;
+}
+
+/** What the crew of a ground measure is doing, or null for a measure with none (12.19). */
+function crewStatusLabel(
+  stopped: number | undefined,
+  minute: number,
+  working: number,
+  head: ReturnType<typeof crewHead>,
+  built: number,
+): string {
+  if (stopped !== undefined && minute >= stopped) return `Aturada per seguretat · ${built} %`;
+  if (minute < working) return 'En camí';
+  return head.done ? 'Feta' : `En construcció · ${built} %`;
+}
+
+/**
+ * How far a ground crew has got, and what the status column says of it
+ * (12.19): built fraction and its label, or no progress for a measure that
+ * has none.
+ */
+function crewProgress(
+  measure: Countermeasure,
+  minute: number,
+  start: number,
+  metres: number,
+  stopped: number | undefined,
+): { readonly built: number; readonly crewStatus: string | null } {
+  if (measure.crewSize === undefined) return { built: 0, crewStatus: null };
+  const working = workStart(measure) ?? start;
+  const head = crewHead(measure, minute, stopped);
+  const built = metres > 0 ? Math.min(100, Math.round((head.builtM / metres) * 100)) : 0;
+  return { built, crewStatus: crewStatusLabel(stopped, minute, working, head, built) };
+}
+
+/** The status column: scheduled, the crew's own word, a pass count, or whether it has lapsed. */
+function statusLabel(
+  start: number,
+  minute: number,
+  crewStatus: string | null,
+  liquid: boolean,
+  measure: Countermeasure,
+  completed: number,
+  expired: boolean,
+): string {
+  if (start > minute) return 'Programada';
+  if (crewStatus) return crewStatus;
+  if (liquid) return `${completed}/${measure.passes} passades · humectació`;
+  return expired ? 'Caducada' : 'Desplegada';
+}
+
+/** The shape column: a point, or a length in metres or kilometres. */
+function shapeLabel(
+  geometry: 'line' | 'point',
+  metres: number,
+  whole: Intl.NumberFormat,
+  one: Intl.NumberFormat,
+): string {
+  if (geometry === 'point') return 'Descàrrega puntual';
+  return metres >= 1000 ? `${one.format(metres / 1000)} km` : `${whole.format(metres)} m`;
+}
+
+/** The crew line: effectives, rate and arrival, or empty for a measure with none. */
+function crewTextLabel(
+  measure: Countermeasure,
+  whole: Intl.NumberFormat,
+  one: Intl.NumberFormat,
+  crew: boolean,
+): string {
+  if (!crew) return '';
+  const unit = measure.kind === 'mop-up' ? 'ha/h' : 'm/h';
+  return `${whole.format(measure.crewSize!)} efectius × ${one.format(measure.ratePerPerson!)} ${unit} · arribada ${whole.format(measure.arrivalMin!)} min`;
+}
+
+/** The effect column: what a discharge leaves, a clearing's residue, or a line's own terms. */
+function effectLabel(
+  measure: Countermeasure,
+  whole: Intl.NumberFormat,
+  liquid: boolean,
+  removal: boolean,
+  backfire: boolean,
+  barrier: boolean,
+  percent: number,
+): string {
+  if (liquid)
+    return `${whole.format(measure.litresPerPass!)} L × ${measure.passes} · cada ${measure.passIntervalMin} min`;
+  if (removal) return `${Math.round(measure.fuelRemaining! * 100)} % de combustible restant`;
+  if (backfire) return 'Ignició en desplegar-la';
+  if (barrier) return 'Barrera permanent';
+  return measure.durationMin > 0
+    ? `−${percent} % de propagació, ${measure.durationMin} min`
+    : `−${percent} % de propagació, permanent`;
+}
+
 /**
  * The countermeasure plan and the drawing in progress, away from the map and
  * from the template.
@@ -244,113 +363,73 @@ export class CountermeasurePlan {
     const counts = new Map<CountermeasureKind, number>();
     const whole = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 0 });
     const one = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
-    // eslint-disable-next-line complexity -- pending (docs/estil.md §4): one label per kind of measure; waits for the component to be split.
-    return this.measures().map((measure) => {
-      const entry = catalogEntry(measure.kind);
-      const ordinal = (counts.get(measure.kind) ?? 0) + 1;
-      counts.set(measure.kind, ordinal);
-      const metres = lengthM(measure.points);
-      const percent = Math.round(measure.strength * 100);
-      const backfire = measure.kind === 'backfire';
-      const barrier = BARRIERS.has(measure.kind);
-      const start = measure.startMin ?? 0;
-      const liquid = measure.litresPerPass !== undefined;
-      const removal = measure.fuelRemaining !== undefined;
-      const aircraft =
-        measure.kind in AIRCRAFT ? AIRCRAFT[measure.kind as keyof typeof AIRCRAFT] : null;
-      const completed = liquid
-        ? Math.max(
-            0,
-            Math.min(
-              measure.passes!,
-              Math.floor((this.minute() - start) / measure.passIntervalMin!) + 1,
-            ),
-          )
-        : 0;
-      const expired = measure.durationMin > 0 && this.minute() >= start + measure.durationMin;
-      const crew = measure.crewSize !== undefined;
-      const working = workStart(measure) ?? start;
-      const stopped = this.crewStops().get(measure.id);
-      const head = crew ? crewHead(measure, this.minute(), stopped) : null;
-      const built =
-        head && metres > 0 ? Math.min(100, Math.round((head.builtM / metres) * 100)) : 0;
-      const crewStatus = !head
-        ? null
-        : stopped !== undefined && this.minute() >= stopped
-          ? `Aturada per seguretat · ${built} %`
-          : this.minute() < working
-            ? 'En camí'
-            : head.done
-              ? 'Feta'
-              : `En construcció · ${built} %`;
-      return {
-        id: measure.id,
-        locked: start < this.minute(),
-        deployed: start,
-        deployment: `T + ${Math.floor(start / 60)
-          .toString()
-          .padStart(2, '0')}:${Math.floor(start % 60)
-          .toString()
-          .padStart(2, '0')}:${Math.floor((start * 60) % 60)
-          .toString()
-          .padStart(2, '0')}`,
-        finished: (lastPass(measure) ?? Infinity) < this.minute(),
-        crew,
-        built,
-        status:
-          start > this.minute()
-            ? 'Programada'
-            : crewStatus
-              ? crewStatus
-              : liquid
-                ? `${completed}/${measure.passes} passades · humectació`
-                : expired
-                  ? 'Caducada'
-                  : 'Desplegada',
-        name: `${entry.label} ${ordinal}`,
-        colour: entry.color,
-        icon: entry.icon,
-        shape:
-          entry.geometry === 'point'
-            ? 'Descàrrega puntual'
-            : metres >= 1000
-              ? `${one.format(metres / 1000)} km`
-              : `${whole.format(metres)} m`,
-        liquid,
-        litresPerPass: measure.litresPerPass ?? 0,
-        passes: measure.passes ?? 1,
-        passIntervalMin: measure.passIntervalMin ?? 10,
-        capacityL: liquidCapacity(measure.kind),
-        aircraft,
-        remainingPercent: Math.round((measure.fuelRemaining ?? 1) * 100),
-        removal,
-        totalLitres: (measure.litresPerPass ?? 0) * (measure.passes ?? 1),
-        crewText: crew
-          ? `${whole.format(measure.crewSize!)} efectius × ${one.format(measure.ratePerPerson!)} ${
-              measure.kind === 'mop-up' ? 'ha/h' : 'm/h'
-            } · arribada ${whole.format(measure.arrivalMin!)} min`
-          : '',
-        effect: liquid
-          ? `${whole.format(measure.litresPerPass!)} L × ${measure.passes} · cada ${measure.passIntervalMin} min`
-          : removal
-            ? `${Math.round(measure.fuelRemaining! * 100)} % de combustible restant`
-            : backfire
-              ? 'Ignició en desplegar-la'
-              : barrier
-                ? 'Barrera permanent'
-                : measure.durationMin > 0
-                  ? `−${percent} % de propagació, ${measure.durationMin} min`
-                  : `−${percent} % de propagació, permanent`,
-        widthM: measure.widthM,
-        widthEditable: true,
-        strengthPercent: percent,
-        strengthEditable: !liquid && !removal && !backfire && !barrier,
-        widthLabel: entry.geometry === 'point' ? 'Diàmetre' : 'Amplada',
-        durationMin: measure.durationMin,
-        durationEditable: !liquid && measure.durationMin > 0,
-      };
-    });
+    return this.measures().map((measure) => this.describeMeasure(measure, whole, one, counts));
   });
+
+  /** One measure, in the words the list uses; `counts` keeps the ordinal per kind across calls. */
+  private describeMeasure(
+    measure: Countermeasure,
+    whole: Intl.NumberFormat,
+    one: Intl.NumberFormat,
+    counts: Map<CountermeasureKind, number>,
+  ) {
+    const entry = catalogEntry(measure.kind);
+    const ordinal = (counts.get(measure.kind) ?? 0) + 1;
+    counts.set(measure.kind, ordinal);
+    const metres = lengthM(measure.points);
+    const percent = Math.round(measure.strength * 100);
+    const backfire = measure.kind === 'backfire';
+    const barrier = BARRIERS.has(measure.kind);
+    const start = measure.startMin ?? 0;
+    const liquid = measure.litresPerPass !== undefined;
+    const removal = measure.fuelRemaining !== undefined;
+    const aircraft =
+      measure.kind in AIRCRAFT ? AIRCRAFT[measure.kind as keyof typeof AIRCRAFT] : null;
+    const minute = this.minute();
+    const completed = liquid
+      ? Math.max(
+          0,
+          Math.min(measure.passes!, Math.floor((minute - start) / measure.passIntervalMin!) + 1),
+        )
+      : 0;
+    const expired = measure.durationMin > 0 && minute >= start + measure.durationMin;
+    const crew = measure.crewSize !== undefined;
+    const stopped = this.crewStops().get(measure.id);
+    const { built, crewStatus } = crewProgress(measure, minute, start, metres, stopped);
+    const liquids = liquidTotals(measure);
+    return {
+      id: measure.id,
+      locked: start < minute,
+      deployed: start,
+      deployment: formatDeployment(start),
+      finished: (lastPass(measure) ?? Infinity) < minute,
+      crew,
+      built,
+      status: statusLabel(start, minute, crewStatus, liquid, measure, completed, expired),
+      name: `${entry.label} ${ordinal}`,
+      colour: entry.color,
+      icon: entry.icon,
+      shape: shapeLabel(entry.geometry, metres, whole, one),
+      liquid,
+      litresPerPass: liquids.litresPerPass,
+      passes: liquids.passes,
+      passIntervalMin: liquids.passIntervalMin,
+      capacityL: liquidCapacity(measure.kind),
+      aircraft,
+      remainingPercent: Math.round((measure.fuelRemaining ?? 1) * 100),
+      removal,
+      totalLitres: liquids.totalLitres,
+      crewText: crewTextLabel(measure, whole, one, crew),
+      effect: effectLabel(measure, whole, liquid, removal, backfire, barrier, percent),
+      widthM: measure.widthM,
+      widthEditable: true,
+      strengthPercent: percent,
+      strengthEditable: !liquid && !removal && !backfire && !barrier,
+      widthLabel: entry.geometry === 'point' ? 'Diàmetre' : 'Amplada',
+      durationMin: measure.durationMin,
+      durationEditable: !liquid && measure.durationMin > 0,
+    };
+  }
 
   /**
    * Takes a tool, or puts it down if it was the one in the hand. With
