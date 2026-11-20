@@ -1,0 +1,249 @@
+/* The «Meteorologia» block: its own rules, moved here from
+ * simulator-view.css in the order they had there, and a copy of the console's
+ * range, which simulator-view.css keeps for the timeline. What it shares with
+ * the other blocks of the column is in config-section.css, listed before this.
+ */
+
+/* ---- The block's own ---- */
+
+.wind-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 8px;
+}
+
+.wind-rose {
+  position: relative;
+  flex-shrink: 0;
+  width: 92px;
+  height: 92px;
+  font-size: 9px;
+  color: #71808d;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.wind-rose:focus-visible {
+  outline: 2px solid #f95;
+}
+
+.wind-rose > span:not(.wind-needle) {
+  position: absolute;
+}
+
+.north,
+.south {
+  left: 43px;
+}
+.north {
+  top: 0;
+}
+.south {
+  bottom: 0;
+}
+.east,
+.west {
+  top: 40px;
+}
+.east {
+  right: 0;
+}
+.west {
+  left: 0;
+}
+
+.rose-rings {
+  position: absolute;
+  inset: 14px;
+  border: 1px solid #3a4650;
+  border-radius: 50%;
+  background:
+    linear-gradient(transparent 49%, #32404b 50%, transparent 51%),
+    linear-gradient(90deg, transparent 49%, #32404b 50%, transparent 51%);
+}
+
+.rose-rings::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border: 1px dashed #3b4a55;
+  border-radius: 50%;
+}
+
+.wind-needle {
+  position: absolute;
+  inset: 5px;
+}
+
+.wind-number {
+  margin: 2px 0;
+  font:
+    650 28px Manrope,
+    sans-serif;
+}
+
+.wind-number small {
+  margin-left: 6px;
+  font:
+    11px 'DM Sans',
+    sans-serif;
+  color: #8f9ba7;
+}
+
+.slider-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0 8px;
+  font-size: 12px;
+  color: #aeb8c2;
+}
+
+.slider-label > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  --icon-size: 13px;
+}
+
+.slider-label app-icon {
+  color: #8399aa;
+}
+
+.slider-label output {
+  font-size: 12px;
+  font-weight: 550;
+  color: #e0e5e9;
+}
+
+/* ---- Copied from simulator-view.css ---- */
+
+input[type='range'] {
+  --fill: 50%;
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin: 0;
+  appearance: none;
+  background: linear-gradient(to right, var(--orange) var(--fill), #35404b var(--fill));
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  background: var(--orange);
+  border: 2px solid #ffc08f;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px #fa884414;
+}
+
+/* ---- The block's own ---- */
+
+.blue-range {
+  --orange: #79a5c9;
+}
+
+.blue-range::-webkit-slider-thumb {
+  border-color: #bad6ee;
+}
+
+.range-bounds {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 7px;
+  font-size: 9px;
+  color: #657585;
+}
+
+/* The two origins of the weather, as one control with two positions. */
+.mode-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 2px;
+  margin-bottom: 10px;
+  background: #121a21;
+  border: 1px solid #35414e;
+  border-radius: 5px;
+}
+
+.mode-switch button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 4px;
+  font: inherit;
+  font-size: 11px;
+  color: #8e9ba8;
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+  --icon-size: 13px;
+}
+
+.mode-switch button.on {
+  color: #f1f6f8;
+  background: #365465;
+}
+
+.source-card {
+  margin-bottom: 12px;
+  padding: 9px;
+  background: #1f2933;
+  border: 1px solid #34404a;
+  border-radius: 5px;
+}
+
+.source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.source-card .terrain-facts {
+  margin-top: 6px;
+}
+
+.ghost-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px;
+  font: inherit;
+  font-size: 11px;
+  color: #a7b4c0;
+  background: none;
+  border: 1px solid #35414e;
+  border-radius: 4px;
+  cursor: pointer;
+  --icon-size: 13px;
+}
+
+/* Read and not set: with the weather coming from a station, the sliders show
+   a value and take none. */
+.weather-values.locked {
+  opacity: 0.55;
+}
+
+.weather-values.locked input,
+.weather-values.locked select {
+  cursor: not-allowed;
+}
+
+.ghost-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

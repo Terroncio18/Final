@@ -1,0 +1,25 @@
+/* The «Escenaris» block: its own rules, moved here from simulator-view.css
+ * in the order they had there. What it shares with the other blocks of the
+ * column is in config-section.css, listed before this.
+ */
+
+.scenario-now {
+  padding: 8px 9px;
+  background: #1f2933;
+  border: 1px solid #34404a;
+  border-radius: 5px;
+}
+
+.scenario-now span {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 9px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #8f9ca6;
+}
+
+.scenario-now strong {
+  font-weight: 500;
+  color: #d5dce2;
+}

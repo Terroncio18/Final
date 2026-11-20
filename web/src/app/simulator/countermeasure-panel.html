@@ -1,0 +1,185 @@
+<!-- Deploy at the playback cursor; earlier fire history is preserved. -->
+<details class="fold control-section" open>
+  <summary>
+    <h3>
+      CONTRAMESURES
+      @if (plan().measures().length) {
+        <span class="tiny-tag">{{ plan().measures().length }} AL PLA</span>
+      }
+    </h3>
+  </summary>
+  @for (group of countermeasures; track group.title) {
+    <h4>{{ group.title }}</h4>
+    <div class="measure-grid">
+      @for (measure of group.items; track measure.kind) {
+        <button
+          type="button"
+          [class.active]="plan().kind() === measure.kind"
+          [attr.aria-pressed]="plan().kind() === measure.kind"
+          [style.--measure]="measure.color"
+          [title]="measure.note"
+          [disabled]="computing()"
+          (click)="pickMeasure.emit(measure.kind)"
+        >
+          <app-icon [name]="measure.icon" />
+          <span>
+            {{ measure.label }}
+            <small>{{ measure.note }}</small>
+          </span>
+        </button>
+      }
+    </div>
+  }
+
+  @if (pastWarning(); as warning) {
+    <div class="past-warning">
+      <p class="terrain-note measure-note failed" role="alert">
+        Si modifiques l'escenari,
+        {{
+          warning.count === 1
+            ? 'la mesura posterior que estava guardada s’eliminarà.'
+            : 'les ' + warning.count + ' mesures posteriors que estaven guardades s’eliminaran.'
+        }}
+      </p>
+      <div class="tools-row">
+        <button type="button" (click)="confirmPast.emit()">Continuar</button>
+        <button type="button" (click)="cancelPast.emit()">Cancel·lar</button>
+      </div>
+    </div>
+  }
+
+  @if (plan().tool(); as active) {
+    <div class="measure-drawing" [style.--measure]="active.color">
+      <p class="tool-hint">
+        <strong>{{ active.label }}.</strong>
+        @if (active.geometry === 'point') {
+          Clic esquerre: aplicar · clic dret: cancel·lar.
+        } @else {
+          Clic esquerre: vèrtex · clic dret: treure l’últim.
+        }
+      </p>
+      <div class="tools-row">
+        <button type="button" (click)="cancelTool.emit()">Cancel·lar (Esc)</button>
+      </div>
+    </div>
+  }
+
+  @if (plan().note(); as note) {
+    <p
+      class="terrain-note measure-note"
+      [class.failed]="note.failed"
+      [attr.role]="note.failed ? 'alert' : 'status'"
+    >
+      {{ note.text }}
+    </p>
+  }
+  @if (planStale()) {
+    <p class="terrain-note measure-note" role="status">
+      Previsió actualitzada. Es conserva el foc anterior al canvi. Prem reproduir per continuar des
+      d'aquest minut.
+    </p>
+  }
+
+  @if (plan().rows().length) {
+    <ul class="measure-list">
+      @for (row of plan().openRows(); track row.id) {
+        <li [class.selected]="plan().selected() === row.id" [style.--measure]="row.colour">
+          <div class="measure-head">
+            <button
+              type="button"
+              class="measure-name"
+              [attr.aria-pressed]="plan().selected() === row.id"
+              [title]="'Ressaltar ' + row.name + ' al mapa'"
+              (click)="plan().select(plan().selected() === row.id ? null : row.id)"
+            >
+              <span class="measure-dot"></span>
+              <span>
+                <strong>{{ row.name }}</strong>
+                <small>{{ row.shape }} · {{ row.effect }}</small>
+                @if (row.crew) {
+                  <small>{{ row.crewText }}</small>
+                }
+                <small>{{ row.deployment }} · {{ row.status }}</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              class="measure-remove"
+              [attr.aria-label]="'Suprimir ' + row.name"
+              title="Suprimir"
+              [disabled]="computing() || row.locked"
+              (click)="removeMeasure.emit(row.id)"
+            >
+              ×
+            </button>
+          </div>
+          @if (row.liquid) {
+            <p class="terrain-note">Total: {{ row.totalLitres }} L</p>
+            @if (row.aircraft; as aircraft) {
+              <p class="terrain-note">
+                <a [href]="aircraft.source" target="_blank" rel="noopener noreferrer"
+                  >{{ aircraft.name }} · capacitat {{ aircraft.capacityL }} L</a
+                >
+              </p>
+            }
+          }
+        </li>
+      }
+    </ul>
+    <!-- The discharges already made: out of the way, not out of the plan
+         (§11.40). -->
+    @if (plan().finishedRows().length) {
+      <details class="measure-finished">
+        <summary>Acabades ({{ plan().finishedRows().length }})</summary>
+        <ul class="measure-list">
+          @for (row of plan().finishedRows(); track row.id) {
+            <li [style.--measure]="row.colour">
+              <div class="measure-head">
+                <span class="measure-name">
+                  <span class="measure-dot"></span>
+                  <span>
+                    <strong>{{ row.name }}</strong>
+                    <small>{{ row.effect }}</small>
+                    <small>{{ row.deployment }}</small>
+                  </span>
+                </span>
+              </div>
+            </li>
+          }
+        </ul>
+      </details>
+    }
+    <div class="tools-row measure-clear">
+      <button
+        type="button"
+        [disabled]="computing() || !plan().hasEditable()"
+        (click)="clearMeasures.emit()"
+      >
+        <app-icon name="trash" /> Suprimir les editables
+      </button>
+    </div>
+  } @else {
+    <p class="empty-list">Cap contramesura al pla.</p>
+  }
+</details>
+
+@if (treatedCell(); as cell) {
+  <section class="control-section" aria-label="Combustible tractat">
+    <h3>COMBUSTIBLE TRACTAT</h3>
+    <p class="terrain-note">{{ cell.where }}</p>
+    <dl class="terrain-facts">
+      <div>
+        <dt>Humitat del combustible fi</dt>
+        <dd>{{ cell.moisture }} %</dd>
+      </div>
+      <div>
+        <dt>Càrrega seca</dt>
+        <dd>{{ cell.load }} t/ha</dd>
+      </div>
+      <div>
+        <dt>Combustible restant</dt>
+        <dd>{{ cell.remaining }} %</dd>
+      </div>
+    </dl>
+  </section>
+}

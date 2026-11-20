@@ -1,0 +1,193 @@
+<details class="fold control-section weather" open>
+  <summary>
+    <h3>METEOROLOGIA <app-icon name="wind" /></h3>
+  </summary>
+
+  <!-- Two ways of saying what the weather is, and only one of them is
+       wired: the live one shows where the data will come from and
+       nothing it has not read. -->
+  <div class="mode-switch" role="group" aria-label="Origen de la meteorologia">
+    <button
+      type="button"
+      [disabled]="computing() || !!result()"
+      [class.on]="weatherMode() === 'live'"
+      (click)="weatherMode.set('live')"
+    >
+      <app-icon name="antenna" /> En directe
+    </button>
+    <button
+      type="button"
+      [disabled]="computing() || !!result()"
+      [class.on]="weatherMode() === 'manual'"
+      (click)="weatherMode.set('manual')"
+    >
+      <app-icon name="sliders" /> Manual
+    </button>
+  </div>
+
+  @if (weatherMode() === 'live') {
+    <div class="source-card">
+      <div class="source-head">
+        <strong>{{ weatherSource().name }}</strong>
+        <span class="tiny-tag" [class.warn]="liveState().warn">{{ liveState().tag }}</span>
+      </div>
+      <dl class="terrain-facts">
+        <div>
+          <dt>Estació</dt>
+          <dd>{{ station()?.name ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt>Distància al centre</dt>
+          <dd>{{ station()?.distance ?? '—' }}</dd>
+        </div>
+        <div>
+          <dt>Observació</dt>
+          <dd>{{ station()?.observedAt ?? '—' }}</dd>
+        </div>
+      </dl>
+      <button
+        type="button"
+        class="ghost-button"
+        [disabled]="weatherLoading() || computing() || !!result()"
+        (click)="refreshWeather()"
+      >
+        <app-icon name="reset" /> Actualitzar
+      </button>
+      <p class="terrain-note">{{ liveState().note }}</p>
+    </div>
+  }
+
+  <div class="weather-values" [class.locked]="weatherMode() === 'live'">
+    <div class="wind-summary">
+      <!-- A compass to turn: drag the needle, or use the arrow keys. It is
+           a slider to assistive technology, over the bearing the wind
+           comes from. Locked while an observation is in force. The dial
+           takes the pointer and not the needle (`pointer-events: none`),
+           and `touch-action: none` keeps a finger from scrolling the
+           column instead of turning it. -->
+      <div
+        class="wind-rose"
+        role="slider"
+        aria-label="Direcció d'origen del vent"
+        aria-valuemin="0"
+        aria-valuemax="355"
+        [attr.aria-valuenow]="now().fromDeg"
+        [attr.aria-valuetext]="'Vent ' + fromPhrase() + ', ' + now().fromDeg + '°'"
+        [attr.aria-disabled]="computing() || (weatherMode() === 'live' && !result())"
+        [attr.tabindex]="computing() || (weatherMode() === 'live' && !result()) ? -1 : 0"
+        title="Arrossega l'agulla cap on bufa el vent"
+        (pointerdown)="turnWind($event)"
+        (pointermove)="turnWind($event)"
+        (keydown)="nudgeWind($event)"
+      >
+        <span class="north">N</span>
+        <span class="east">E</span>
+        <span class="south">S</span>
+        <span class="west">O</span>
+        <div class="rose-rings"></div>
+        <!-- The needle points where the wind goes, which is where it
+             takes the fire: the origin plus 180°, and not the origin. -->
+        <svg
+          class="wind-needle"
+          viewBox="-50 -50 100 100"
+          width="82"
+          height="82"
+          fill="#fb995b"
+          stroke="#fb995b"
+          stroke-width="4"
+          pointer-events="none"
+          aria-hidden="true"
+          [style.transform]="'rotate(' + now().towardsDeg + 'deg)'"
+        >
+          <!-- The blunt end: where the wind comes from. -->
+          <circle cx="0" cy="27" r="2" />
+          <line x1="0" y1="27" x2="0" y2="-18" />
+          <path d="M0 -34 L8 -17 L0 -21 L-8 -17 Z" />
+        </svg>
+      </div>
+      <div>
+        <span class="secondary">Vent {{ fromPhrase() }}</span>
+        <div class="wind-number">{{ now().wind }}<small>km/h</small></div>
+        <small class="secondary">
+          Des de {{ from().short }} ({{ now().fromDeg }}°) → cap a {{ towards().short }}
+        </small>
+      </div>
+    </div>
+
+    <label class="slider-label" for="wind">
+      <span>Velocitat del vent</span>
+      <output>{{ now().wind }} km/h</output>
+    </label>
+    <input
+      id="wind"
+      type="range"
+      min="0"
+      max="60"
+      [value]="now().wind"
+      [disabled]="computing() || (weatherMode() === 'live' && !result())"
+      [style.--fill]="fill(now().wind, 0, 60)"
+      (input)="setNumber('wind', $event)"
+    />
+    <div class="range-bounds"><span>0 km/h</span><span>60 km/h</span></div>
+
+    @if (windDraft()) {
+      <div class="tools-row">
+        <button type="button" [disabled]="!canStart()" (click)="applyWind.emit()">
+          Aplicar el vent
+        </button>
+        <button type="button" [disabled]="computing()" (click)="windDraft.set(null)">
+          Cancel·lar canvi
+        </button>
+      </div>
+      <p class="terrain-note" role="status">
+        Canvi pendent a T + {{ elapsed() }} h; reproducció pausada.
+      </p>
+    }
+    @if (windRows().length) {
+      <ul class="start-list" aria-label="Canvis de vent">
+        @for (change of windRows(); track change.startMin) {
+          <li>
+            <span
+              ><strong>T + {{ change.time }} h · {{ change.speedKmh }} km/h</strong>
+              <small
+                >Des de {{ change.origin }} ({{ change.fromDeg }}°) ·
+                {{ change.pending ? 'Programat' : 'Aplicat' }}</small
+              >
+            </span>
+          </li>
+        }
+      </ul>
+    }
+
+    <label class="slider-label" for="humidity">
+      <span><app-icon name="droplet" /> Humitat relativa</span>
+      <output>{{ now().humidity }} %</output>
+    </label>
+    <input
+      id="humidity"
+      class="blue-range"
+      type="range"
+      min="10"
+      max="90"
+      [value]="now().humidity"
+      [disabled]="weatherMode() === 'live'"
+      [style.--fill]="fill(now().humidity, 10, 90)"
+      (input)="setNumber('humidity', $event)"
+    />
+
+    <label class="slider-label" for="temperature">
+      <span><app-icon name="thermometer" /> Temperatura</span>
+      <output>{{ now().temperatureText }} °C</output>
+    </label>
+    <input
+      id="temperature"
+      type="range"
+      min="10"
+      max="45"
+      [value]="now().temperature"
+      [disabled]="weatherMode() === 'live'"
+      [style.--fill]="fill(now().temperature, 10, 45)"
+      (input)="setNumber('temperature', $event)"
+    />
+  </div>
+</details>

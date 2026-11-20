@@ -19,13 +19,12 @@ import { SpottingDisplay, spotPoint } from '../map/spotting-display';
 import { MapService } from '../map/map.service';
 import { PlacesService } from '../map/places.service';
 import {
-  COUNTERMEASURE_CATALOG,
   countermeasureCells,
   MOP_UP_MAX_FLAME_M,
   type CountermeasureKind,
   type Countermeasure,
 } from '../simulation/countermeasures';
-import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from '../simulation/domain';
+import { CELL_M, domainAround, domainRing, GRID } from '../simulation/domain';
 import { groundAgentsAt, passesBetween } from '../simulation/agents';
 import { FireSurface } from '../simulation/fire-surface';
 import { FORECASTS, FORECAST_COLOURS, forecastOffsets } from '../simulation/fire-display';
@@ -74,10 +73,16 @@ import {
   type ToolSettings,
 } from './countermeasure-plan';
 import { AnalysisPanel } from './analysis-panel';
-import { Icon, iconOr } from './icon';
+import { CountermeasurePanel, type PastWarning } from './countermeasure-panel';
+import { DomainPanel } from './domain-panel';
+import { FuelPanel } from './fuel-panel';
+import { Icon } from './icon';
+import { IgnitionPanel } from './ignition-panel';
 import { LayerMenu } from './layer-menu';
+import { ScenarioPanel, type ScenarioNote } from './scenario-panel';
 import { ToolSettingsModal, type ToolConfig } from './tool-settings';
 import { WeatherService } from './weather.service';
+import { compass, trackFill, WeatherPanel, type WindEdit } from './weather-panel';
 
 /** The computation boundary: the view owns cancellation and publication, the model owns spread. */
 export const SIMULATE_FIRE = new InjectionToken<typeof spread>('simulate fire', {
@@ -92,37 +97,6 @@ export const SIMULATE_FIRE = new InjectionToken<typeof spread>('simulate fire', 
  * `@media` rule in simulator-view.css; the two have to move together.
  */
 const NARROW_WORKSPACE_QUERY = '(max-width: 860px)';
-
-/** The eight points of the compass, for naming a bearing. */
-const DIRECTIONS = [
-  { degrees: 0, short: 'N', name: 'nord' },
-  { degrees: 45, short: 'NE', name: 'nord-est' },
-  { degrees: 90, short: 'E', name: 'est' },
-  { degrees: 135, short: 'SE', name: 'sud-est' },
-  { degrees: 180, short: 'S', name: 'sud' },
-  { degrees: 225, short: 'SO', name: 'sud-oest' },
-  { degrees: 270, short: 'O', name: 'oest' },
-  { degrees: 315, short: 'NO', name: 'nord-oest' },
-] as const;
-
-/**
- * The countermeasure tools, in the two groups the panel shows them in.
- *
- * Two groups because they are two kinds of thing: the ground ones are drawn
- * where a crew or a machine works, and the aerial ones are dropped. What each
- * does to the fire is the model's (simulation/countermeasures.ts); this is
- * only the order of the buttons.
- */
-const COUNTERMEASURE_GROUPS = [
-  { id: 'ground', title: 'Mitjans terrestres' },
-  { id: 'air', title: 'Mitjans aeris' },
-].map((group) => ({
-  title: group.title,
-  items: COUNTERMEASURE_CATALOG.filter((entry) => entry.group === group.id).map((entry) => ({
-    ...entry,
-    icon: iconOr(entry.icon, 'ruler'),
-  })),
-}));
 
 /**
  * How far the timeline runs.
@@ -226,7 +200,19 @@ function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
 
 @Component({
   selector: 'app-simulator-view',
-  imports: [RouterLink, Icon, ToolSettingsModal, AnalysisPanel, LayerMenu],
+  imports: [
+    RouterLink,
+    Icon,
+    ToolSettingsModal,
+    AnalysisPanel,
+    LayerMenu,
+    DomainPanel,
+    WeatherPanel,
+    FuelPanel,
+    ScenarioPanel,
+    IgnitionPanel,
+    CountermeasurePanel,
+  ],
   templateUrl: './simulator-view.html',
   styleUrls: ['./simulator-view.css', './countermeasures.css'],
   // Escape puts down whatever tool is in the hand, wherever the focus is.
@@ -259,7 +245,6 @@ export class SimulatorView {
   public readonly ignicions = input<string>();
 
   protected readonly ready = this.maps.ready;
-  protected readonly countermeasures = COUNTERMEASURE_GROUPS;
 
   /**
    * The countermeasure plan and the line being drawn (countermeasure-plan.ts).
@@ -310,23 +295,6 @@ export class SimulatorView {
         distance: Math.round(s.distanceM),
       })),
   );
-  protected readonly treatedCell = computed(() => {
-    const centre = this.ignition();
-    const selected = this.plan.measures().find((m) => m.id === this.plan.selected());
-    const point = this.maps.pointer() ?? selected?.points[0];
-    if (!centre || !point) return null;
-    const cell = cellOf(centre, point);
-    const state =
-      cell === null ? undefined : this.result()?.fuelTreatments?.at(cell, this.minutes());
-    if (!state) return null;
-    const format = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
-    return {
-      where: this.maps.pointer() ? 'Cel·la sota el cursor' : 'Cel·la de la mesura seleccionada',
-      moisture: format.format(state.moisture1h * 100),
-      load: format.format(state.bed.loadTonHa),
-      remaining: Math.round(state.remaining * 100),
-    };
-  });
   /** The domain the plan was last checked against, as the address writes it. */
   private planDomain: string | null = null;
   /** Set after the forecast has been updated for an in-simulation deployment. */
@@ -349,7 +317,7 @@ export class SimulatorView {
     this.windChanges().map((change) => ({
       ...change,
       time: this.clock(change.startMin),
-      origin: this.compass(change.fromDeg).short,
+      origin: compass(change.fromDeg).short,
       pending: change.startMin > this.minutes(),
     })),
   );
@@ -410,6 +378,8 @@ export class SimulatorView {
    */
   protected readonly minutes = signal(0);
   protected readonly speed = signal('1');
+  /** How full the timeline's track is painted (weather-panel.ts). */
+  protected readonly fill = trackFill;
 
   // ---- The simulation. ----
 
@@ -507,34 +477,11 @@ export class SimulatorView {
     };
   });
 
-  /** What the square is, in the three numbers that define it (§2.27). */
+  /** The grid of the square and the side of its cells (§2.27), as the map's badge says them. */
   protected readonly domain = {
-    km: new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 }).format(SIDE_M / 1000),
     grid: GRID,
     cell: CELL_M,
   };
-
-  /**
-   * The ground of the domain, in the figures the form's last step gives.
-   *
-   * The same read and the same rounding as there (§2.28), on purpose: the two
-   * screens name the same square, and a slope that said 25,8° in one and 26° in
-   * the other would be two terrains. Unlike the analysis column, these come
-   * from the elevation and not from SAMPLE.
-   */
-  protected readonly ground = computed(() => {
-    const ground = this.terrain.terrain();
-    if (!ground) return null;
-    const degrees = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
-    return {
-      low: Math.round(ground.minElevation),
-      high: Math.round(ground.maxElevation),
-      mean: degrees.format(ground.meanSlope),
-      max: degrees.format(ground.maxSlope),
-    };
-  });
-
-  protected readonly terrainFailed = this.terrain.failed;
 
   /** Back to the step this screen was opened from, with the point intact. */
   protected readonly back = computed(() => [
@@ -603,130 +550,19 @@ export class SimulatorView {
       : active;
   });
 
-  /** The point of the compass a bearing is nearest to. */
-  private compass(degrees: number) {
-    const index = Math.round((((degrees % 360) + 360) % 360) / 45) % 8;
-    return DIRECTIONS[index];
-  }
-
-  /** Where the wind comes from, by name: a station reports 183° and that is «sud». */
-  protected readonly from = computed(() => this.compass(this.now().fromDeg));
-
-  /** «del nord», but «de l'est» and «de l'oest»: the article gives way to a vowel. */
-  protected readonly fromPhrase = computed(() => {
-    const { name } = this.from();
-    return /^[eo]/.test(name) ? `de l'${name}` : `del ${name}`;
-  });
-
   /**
-   * Where the wind takes the fire. Spelled out because the two readings of
-   * «vent del nord-oest» are 180° apart and only one of them is the fire's.
+   * Which state service speaks for the domain: AEMET for Spain and IPMA for
+   * Portugal (§5). The first segment of the address says which, because a
+   * NUTS code starts with the country.
    */
-  protected readonly towards = computed(() => this.compass(this.now().towardsDeg));
-
-  /**
-   * Who would be asked for the weather here: the country decides.
-   *
-   * AEMET for Spain and IPMA for Portugal, each the state service of its
-   * side of the border (§5). The first segment of the address says which,
-   * because a NUTS code starts with the country.
-   */
-  protected readonly weatherSource = computed(() =>
-    this.country() === 'PT'
-      ? { name: 'IPMA', short: "l'IPMA" }
-      : { name: 'AEMET OpenData', short: "l'AEMET" },
-  );
-
-  private readonly country = computed<'ES' | 'PT'>(() =>
+  protected readonly country = computed<'ES' | 'PT'>(() =>
     this.region().startsWith('PT') ? 'PT' : 'ES',
   );
-
-  protected readonly weatherLoading = this.weather.loading;
-
-  /** The station that is speaking for the domain, in the words the card uses. */
-  protected readonly station = computed(() => {
-    const seen = this.weather.observation();
-    if (!seen) return null;
-    const when = new Intl.DateTimeFormat('ca-ES', {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'UTC',
-    }).format(new Date(seen.observedAt));
-    return {
-      name: seen.station.name,
-      distance:
-        new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 }).format(seen.distanceKm) +
-        ' km',
-      observedAt: `${when} UTC`,
-    };
-  });
-
-  /**
-   * What the live card says about itself: a tag and a sentence.
-   *
-   * Four states and each one says what the figures below are, because that is
-   * the one thing this card must never leave unsaid: an observation, an old
-   * observation, or the manual values standing in for one.
-   */
-  protected readonly liveState = computed(() => {
-    const seen = this.weather.observation();
-    const service = this.weatherSource().short;
-    if (this.weather.loading() && !seen) {
-      return { tag: 'LLEGINT', warn: false, note: `Demanant l'observació a ${service}…` };
-    }
-    if (!seen) {
-      return {
-        tag: 'SENSE CONNEXIÓ',
-        warn: true,
-        note: `No s'ha pogut llegir ${service}. Els valors de sota són els manuals i no una observació.`,
-      };
-    }
-    if (this.weather.failed() || seen.stale) {
-      return {
-        tag: 'DADA ANTIGA',
-        warn: true,
-        note: `${service} no respon ara: es manté la darrera observació llegida.`,
-      };
-    }
-    return {
-      tag: 'EN DIRECTE',
-      warn: false,
-      note: 'Una sola estació parla per tot el domini: la més propera al centre, sense interpolar.',
-    };
-  });
-
-  protected readonly fuelModels = computed(() =>
-    (this.fuels.grid()?.counts ?? []).map(({ id, cells }) => ({
-      id,
-      name: FUEL_MODELS[id].name,
-      share: this.fuelPercent(cells),
-    })),
-  );
-
-  protected fuelPercent(cells: number): string {
-    return `${((100 * cells) / (GRID * GRID)).toLocaleString('ca-ES', { maximumFractionDigits: 1 })} %`;
-  }
-
-  protected retryFuels(): void {
-    const centre = this.ignition();
-    if (centre) void this.fuels.read(centre, true);
-  }
 
   // ---- Scenarios: a text file out, a text file in (§11.26). ----
   protected readonly scenarioName = signal('');
   /** What the last save or load came to, for the line under the buttons. */
-  protected readonly scenarioNote = signal<{
-    text: string;
-    failed: boolean;
-    /** Loaded from an older file: offers to save it again as a current one. */
-    outdated?: boolean;
-  } | null>(null);
-
-  protected setScenarioName(event: Event): void {
-    this.scenarioName.set((event.target as HTMLInputElement).value);
-  }
+  protected readonly scenarioNote = signal<ScenarioNote | null>(null);
 
   /**
    * Writes the scenario to a file the browser downloads.
@@ -852,7 +688,7 @@ export class SimulatorView {
     const measures =
       planned === 1 ? '1 contramesura · ' : planned ? `${planned} contramesures · ` : '';
     return (
-      `${fires} · ${measures}vent ${this.now().wind} km/h ${this.from().short} · ` +
+      `${fires} · ${measures}vent ${this.now().wind} km/h ${compass(this.now().fromDeg).short} · ` +
       `${this.now().humidity} % · ${this.now().temperatureText} °C`
     );
   });
@@ -917,17 +753,6 @@ export class SimulatorView {
         one,
       ),
     };
-  });
-
-  /** How much of the square is ground, which is how much of it can burn. */
-  protected readonly burnableShare = computed(() => {
-    const terrain = this.terrain.terrain();
-    const fuels = this.fuels.grid();
-    if (!terrain || !fuels) return '—';
-    let land = 0;
-    for (let i = 0; i < terrain.elevation.length; i += 1)
-      if (terrain.elevation[i] > 0 && fuels.models[i] >= 1 && fuels.models[i] <= 13) land += 1;
-    return `${Math.round((land / terrain.elevation.length) * 100)} %`;
   });
 
   private readonly unknownLand = computed(() => {
@@ -1031,7 +856,7 @@ export class SimulatorView {
     const back = Math.max(minute - 30, 0);
     const perHour = minute > back ? ((area[minute] - area[back]) / (minute - back)) * 60 : 0;
     const total = result.burnable * ((CELL_M * CELL_M) / 10_000);
-    const towards = Number.isNaN(bearing) ? null : this.compass(bearing);
+    const towards = Number.isNaN(bearing) ? null : compass(bearing);
     // Byram's flame length for that intensity, and the band of the fire
     // characteristics chart it falls in. A stopped front has neither.
     const flame = flameLength(hottest);
@@ -1275,7 +1100,7 @@ export class SimulatorView {
     });
 
     // One tool in the hand at a time: taking a countermeasure puts the
-    // ignition tool down (toggleTool does the reverse).
+    // ignition tool down (the ignition block's toggleTool does the reverse).
     effect(() => {
       if (this.plan.kind()) untracked(() => this.tool.set(null));
     });
@@ -1565,64 +1390,11 @@ export class SimulatorView {
     });
   }
 
-  protected setNumber(which: 'wind' | 'humidity' | 'temperature', event: Event): void {
-    const value = Number((event.target as HTMLInputElement).value);
-    if (this.computing()) return;
-    if (which === 'wind') this.editWind({ speedKmh: value });
-    else ({ humidity: this.humidity, temperature: this.temperature })[which].set(value);
-  }
-
   /**
-   * Turns the compass with the pointer: the needle follows it.
-   *
-   * The needle points where the wind **goes**, so the angle under the pointer
-   * is that, and the bearing kept is the opposite one, where it comes from.
-   * In steps of five degrees: finer than that is more than a hand on a 92 px
-   * dial can mean, and more than one station can tell.
+   * A change of wind from the weather block: before a run it is the wind;
+   * over a computed fire it is a pending change, applied at the cursor.
    */
-  protected turnWind(event: PointerEvent): void {
-    if (this.computing() || (this.weatherMode() === 'live' && !this.result())) return;
-    const dial = event.currentTarget as HTMLElement;
-    if (event.type === 'pointerdown') {
-      // Captured, so the drag carries on outside the dial. A pointer that is
-      // not a live one —a scripted event— cannot be captured, and then the
-      // press still sets the direction; only the drag is lost.
-      try {
-        dial.setPointerCapture(event.pointerId);
-      } catch {
-        /* nothing to follow */
-      }
-      dial.focus();
-    } else if (!dial.hasPointerCapture(event.pointerId)) {
-      return;
-    }
-    const box = dial.getBoundingClientRect();
-    const east = event.clientX - (box.left + box.width / 2);
-    const south = event.clientY - (box.top + box.height / 2);
-    // Too close to the pivot the angle is noise.
-    if (Math.hypot(east, south) < 6) return;
-    const towards = (Math.atan2(east, -south) * 180) / Math.PI;
-    this.editWind({ fromDeg: (((Math.round(towards / 5) * 5 + 180) % 360) + 360) % 360 });
-  }
-
-  /** The same with the keyboard: arrows by five degrees, page keys by a point. */
-  protected nudgeWind(event: KeyboardEvent): void {
-    if (this.computing() || (this.weatherMode() === 'live' && !this.result())) return;
-    const steps: Record<string, number> = {
-      ArrowRight: 5,
-      ArrowUp: 5,
-      ArrowLeft: -5,
-      ArrowDown: -5,
-      PageUp: 45,
-      PageDown: -45,
-    };
-    const step = steps[event.key];
-    if (step === undefined && event.key !== 'Home') return;
-    event.preventDefault();
-    this.editWind({ fromDeg: event.key === 'Home' ? 0 : (this.now().fromDeg + step + 360) % 360 });
-  }
-
-  private editWind(change: Partial<{ speedKmh: number; fromDeg: number }>): void {
+  protected editWind(change: WindEdit): void {
     if (this.computing()) return;
     const next = { speedKmh: this.now().wind, fromDeg: this.now().fromDeg, ...change };
     if (!this.result()) {
@@ -1820,13 +1592,6 @@ export class SimulatorView {
     this.speed.set((event.target as HTMLSelectElement).value);
   }
 
-  /** The same button turns a tool off, which is what makes it a toggle. */
-  protected toggleTool(name: 'ignition'): void {
-    // One tool at a time: a countermeasure half drawn is put down first.
-    this.plan.cancel();
-    this.tool.update((current) => (current === name ? null : name));
-  }
-
   // ---- Countermeasures: the plan is edited here and computed by start(). ----
 
   /**
@@ -1850,7 +1615,7 @@ export class SimulatorView {
    * A new measure asked for in the past, waiting for the user to accept that
    * the measures deployed after the cursor will be taken off (§11.38).
    */
-  protected readonly pastWarning = signal<{ kind: CountermeasureKind; count: number } | null>(null);
+  protected readonly pastWarning = signal<PastWarning | null>(null);
 
   /**
    * The tool being set up in the modal (tool-settings.ts), before it is used
@@ -1938,19 +1703,6 @@ export class SimulatorView {
     this.editPlan(() => this.plan.clear());
   }
 
-  protected setSpottingSeed(event: Event): void {
-    const input = event.target as HTMLInputElement,
-      value = Number(input.value);
-    if (
-      !this.result() &&
-      !this.computing() &&
-      Number.isInteger(value) &&
-      value >= 0 &&
-      value <= 4294967295
-    )
-      this.spottingSeed.set(value);
-    input.value = String(this.spottingSeed());
-  }
   protected focusSpot(cell: number): void {
     const centre = this.ignition();
     if (!centre) return;
@@ -1967,11 +1719,6 @@ export class SimulatorView {
   /** Takes one ignition off; the ones after it are renumbered. */
   protected removeStart(index: number): void {
     this.writeStarts(this.starts().filter((_, i) => i !== index));
-  }
-
-  protected refreshWeather(): void {
-    const centre = this.ignition();
-    if (centre) this.weather.load(this.country(), centre);
   }
 
   protected clearStarts(): void {
@@ -1998,13 +1745,5 @@ export class SimulatorView {
   /** One level in or out. The sandbox's own limits stop it (§11.10). */
   protected zoom(levels: number): void {
     this.maps.zoomBy(levels);
-  }
-
-  /** How full the range's track is painted, as a percentage. */
-  protected fill(value: number, min: number, max: number): string {
-    // Clamped: a station can report 97 % of humidity or 8 °C, outside what the
-    // sliders offer, and the track must not paint past its own ends.
-    const share = Math.min(Math.max((value - min) / (max - min), 0), 1);
-    return `${share * 100}%`;
   }
 }

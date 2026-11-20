@@ -1,0 +1,71 @@
+<details class="fold control-section">
+  <summary>
+    <h3>
+      COMBUSTIBLE
+      @if (fuels.grid(); as grid) {
+        <span class="tiny-tag" [class.warn]="grid.estimatedCells > 0 || grid.unknownCells > 0">
+          {{
+            grid.unknownCells
+              ? 'INCOMPLET'
+              : grid.officialCells
+                ? grid.estimatedCells
+                  ? 'MIXT'
+                  : 'CARTOGRAFIAT'
+                : 'ESTIMAT'
+          }}
+        </span>
+      }
+    </h3>
+  </summary>
+  @if (fuels.reading()) {
+    <p role="status">Llegint els combustibles…</p>
+  }
+  @if (fuels.error(); as error) {
+    <p role="alert">{{ error }}</p>
+  }
+  @if (fuels.error() || fuels.grid()?.unknownCells) {
+    <button type="button" (click)="retryFuels()" [disabled]="fuels.reading()">
+      Torna a carregar
+    </button>
+  }
+  @if (fuels.grid(); as grid) {
+    <dl class="terrain-facts">
+      <div>
+        <dt>Model oficial</dt>
+        <dd>{{ fuelPercent(grid.officialCells) }}</dd>
+      </div>
+      <div>
+        <dt>Model estimat</dt>
+        <dd>{{ fuelPercent(grid.estimatedCells) }}</dd>
+      </div>
+      <div>
+        <dt>Sense dades</dt>
+        <dd>{{ fuelPercent(grid.unknownCells) }}</dd>
+      </div>
+      <div>
+        <dt>Sense combustible</dt>
+        <dd>{{ fuelPercent(grid.nonBurnableCells) }}</dd>
+      </div>
+      <div>
+        <dt>Cel·les que poden cremar</dt>
+        <dd>{{ burnableShare() }}</dd>
+      </div>
+    </dl>
+    @for (model of fuelModels(); track model.id) {
+      <p class="section-lead">
+        <strong>{{ model.id }} · {{ model.name }}</strong> · {{ model.share }}
+      </p>
+    }
+    @for (source of grid.sources; track source.label) {
+      <p class="section-lead">
+        <a [href]="source.sourceUrl" target="_blank" rel="noopener noreferrer">{{
+          source.label
+        }}</a>
+        · {{ source.sourceDate }}<br />{{ source.attribution }}
+      </p>
+    }
+    @for (warning of grid.warnings; track warning) {
+      <p role="status">{{ warning }}</p>
+    }
+  }
+</details>

@@ -1,0 +1,50 @@
+<details class="fold control-section">
+  <summary>
+    <h3>ESCENARIS <app-icon name="folder" /></h3>
+  </summary>
+
+  <div class="scenario-now">
+    <span>Ara</span>
+    <strong>{{ summary() }}</strong>
+  </div>
+
+  <label class="scenario-name">
+    <span class="secondary">Nom de l'escenari</span>
+    <input
+      type="text"
+      placeholder="Per exemple: tramuntana forta"
+      [value]="name()"
+      (input)="setName($event)"
+    />
+  </label>
+  <!-- A scenario is a text file: saving downloads one, loading reads
+       one. The file input is hidden and its button stands for it. -->
+  <div class="tools-row">
+    <button type="button" (click)="saveScenario.emit()"><app-icon name="save" /> Desar</button>
+    <button type="button" (click)="scenarioFile.click()">
+      <app-icon name="folder" /> Carregar
+    </button>
+    <input
+      #scenarioFile
+      id="scenarioFile"
+      aria-label="Fitxer d'escenari"
+      type="file"
+      accept=".txt,text/plain"
+      hidden
+      (change)="loadScenario.emit($event)"
+    />
+  </div>
+
+  @if (note(); as note) {
+    <p class="terrain-note" [attr.role]="note.failed ? 'alert' : 'status'">
+      {{ note.text }}
+    </p>
+    @if (note.outdated) {
+      <div class="tools-row">
+        <button type="button" (click)="saveScenario.emit()">
+          <app-icon name="save" /> Desar actualitzat
+        </button>
+      </div>
+    }
+  }
+</details>

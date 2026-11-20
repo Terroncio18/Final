@@ -1,0 +1,33 @@
+/* The «Àrea d'estudi» block: its own rules, moved here from
+ * simulator-view.css in the order they had there. What it shares with the
+ * other blocks of the column is in config-section.css, listed before this.
+ */
+
+.location-card {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 7px;
+  text-align: left;
+  background: #1f2933;
+  border: 1px solid #34404a;
+  border-radius: 5px;
+}
+
+.location-icon {
+  color: #9baea6;
+  --icon-size: 18px;
+}
+
+.location-card strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.location-card small {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  color: #8f9ca6;
+}
