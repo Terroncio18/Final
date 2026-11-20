@@ -24,7 +24,6 @@ import * as THREE from 'three';
 import { FireParticles, type Emitters } from '../map/fire-particles';
 import { Agents3D } from '../map/agents-3d';
 import { FireSurface } from './fire-surface';
-import { FireField } from './fire-field';
 import { slopeImage } from './slope-classes';
 import { readTerrain, cellOf, groundAt, type Terrain } from './terrain';
 import type { CustomRenderMethodInput, Map as LibreMap } from 'maplibre-gl';
@@ -285,32 +284,6 @@ describe('fire rendering at the graphics boundary', () => {
         expect(gl['deleteProgram']).toHaveBeenCalled();
     });
   }
-
-  it('paints a continuous front, deterministic still frames and cold char when seeking', () => {
-    const arrival = new Float32Array(64).fill(Infinity);
-    for (let row = 0; row < 8; row++)
-      for (let col = 0; col < 8; col++) if (col !== 4) arrival[row * 8 + col] = col * 5;
-    arrival[7] = Infinity;
-    arrival[15] = Infinity;
-    arrival[0] = Infinity;
-    const field = new FireField(arrival);
-    expect(field.paint(-100).every((v) => v === 0)).toBe(true);
-    expect(field.moving).toBe(false);
-    const first = field.paint(10, 0).slice();
-    expect(field.moving).toBe(true);
-    expect(first[4 * 4 + 3]).toBe(0);
-    expect(field.paint(10, 1)).not.toEqual(first);
-    expect(field.paint(10, 10, false)).toEqual(first);
-    field.paint(20, 2);
-    field.paint(50, 3);
-    const char = field.paint(200).slice();
-    expect(field.moving).toBe(false);
-    expect(field.paint(200, 50)).toEqual(char);
-    expect(field.paint(10, 0)).toEqual(first);
-    const isolated = new Float32Array(64).fill(Infinity);
-    isolated[27] = 0;
-    expect(new FireField(isolated).paint(0)[27 * 4 + 3]).toBe(255);
-  });
 
   it('maps slope bands to pixels and copies interior slopes to the border', () => {
     const image = { data: new Uint8ClampedArray(64 * 4) },

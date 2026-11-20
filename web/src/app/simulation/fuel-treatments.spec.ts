@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('./domain', () => ({ GRID: 16, CELL_M: 30, domainAround: () => [0, 0, 16, 16] }));
-import { FuelTreatments, WETTING } from './fuel-treatments';
+import { FuelTreatments } from './fuel-treatments';
 import {
   countermeasureCells,
   crewSchedule,
@@ -92,7 +92,8 @@ describe('water and dry fuel treatment', () => {
       new Map([[m.id, 100]]),
     );
     const kgFine = 0.74 * 0.22417;
-    const dose = ((1000 / (schedule.cells.length * 900)) * WETTING.retainedFraction) / kgFine;
+    // 0.3 is WETTING.retainedFraction (fuel-treatments.ts).
+    const dose = ((1000 / (schedule.cells.length * 900)) * 0.3) / kgFine;
     for (let i = 0; i < schedule.cells.length; i++) {
       const cell = schedule.cells[i],
         activation = schedule.minutes[i];
@@ -114,7 +115,8 @@ describe('water and dry fuel treatment', () => {
       field = new FuelTreatments(centre, [m], moistures);
     const footprint = countermeasureCells(centre, m),
       kgFine = 0.74 * 0.22417;
-    const expected = ((100 / (footprint.length * 900)) * WETTING.retainedFraction) / kgFine;
+    // 0.3 is WETTING.retainedFraction (fuel-treatments.ts).
+    const expected = ((100 / (footprint.length * 900)) * 0.3) / kgFine;
     expect(field.at(cell, 29)).toBeUndefined();
     expect(field.at(cell, 30)!.moisture1h).toBeCloseTo(moistures.dead1 + expected, 10);
     expect(field.at(cell, 40)!.moisture1h).toBeLessThan(field.at(cell, 30)!.moisture1h);
@@ -128,7 +130,8 @@ describe('water and dry fuel treatment', () => {
   it('takes the water as dried off once what is left is negligible, and stops following it', () => {
     const field = new FuelTreatments(centre, [water({ passes: 1 })], moistures);
     const wet = field.at(cell, 35)!;
-    expect(wet.moisture1h).toBeGreaterThan(moistures.dead1 + WETTING.driedMoisture);
+    // 0.001 is WETTING.driedMoisture (fuel-treatments.ts).
+    expect(wet.moisture1h).toBeGreaterThan(moistures.dead1 + 0.001);
     expect(wet.until).toBe(40);
     const dry = field.at(cell, 30 + 60 * 12)!;
     expect(dry.moisture1h).toBe(moistures.dead1);
@@ -144,7 +147,8 @@ describe('water and dry fuel treatment', () => {
       [water({ litresPerPass: 1350, passes: 20, passIntervalMin: 1 })],
       moistures,
     );
-    expect(saturated.at(cell, 50)!.moisture1h).toBeLessThanOrEqual(WETTING.maxMoisture);
+    // 3 is WETTING.maxMoisture (fuel-treatments.ts).
+    expect(saturated.at(cell, 50)!.moisture1h).toBeLessThanOrEqual(3);
   });
   it('removes dry fuel mass without setting fuel to zero or mutating the original model', () => {
     const original = JSON.stringify(FUEL_MODELS[1]);

@@ -9,7 +9,7 @@ import { AEMET_API_KEY, AEMET_OBSERVATIONS, IPMA_OBSERVATIONS, IPMA_STATIONS } f
  * both are turned into, so the browser never learns which one answered beyond
  * the name it shows.
  */
-export interface Observation {
+interface Observation {
   /** Who measured it, as the interface names it. */
   readonly source: 'AEMET' | 'IPMA';
   readonly station: {

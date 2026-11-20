@@ -198,13 +198,9 @@
   multiplicadors, escenaris de la versió 3 i «no hi ha spotting». Cal
   posar-lo al dia amb les §11.29 a §11.31.
 
-- **12.15. Dos pintors que no pinten.** Ve de la §11.22. `fire-appearance.ts`
-  (amb set proves) i `fire-field.ts` són al repositori i no els fa servir
-  ningú: el primer és la petjada exacta cel·la a cel·la, el segon el camp
-  continu que `fire-surface.ts` ha substituït. O es treuen, o un d'ells es
-  queda com a alternativa per a qui no tingui WebGL2, que avui es queda sense
-  dibuix del terra. La cobertura del 19/11/2026 ho confirma: cap dels
-  dos no el toca ningú (§11.54).
+- ~~**12.15. Dos pintors que no pinten.**~~ Resolta el 20/11/2026 a la §11.66:
+  `fire-appearance.ts` i `fire-field.ts` no tenien importador de producció ni
+  eren una alternativa activa; es retiren amb les proves exclusives.
 
 - ~~**12.13. Quin model és l'arbrat de WorldCover.**~~ Resolta el 14/11/2026
   a la §11.21: es queda el 8. El que es plantejava: la taula hi posa el 8,

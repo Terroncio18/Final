@@ -12,11 +12,7 @@ import {
   PLACES_SOURCE,
   SLOPES_SOURCE,
 } from './map.style';
-import {
-  CountermeasureDisplay,
-  type DrawnDraft,
-  type DrawnMeasure,
-} from './countermeasure-display';
+import { CountermeasureDisplay } from './countermeasure-display';
 import { SpottingDisplay, spotPoint } from './spotting-display';
 import { GRID } from '../simulation/domain';
 import type { GroundAgent, Pass } from '../simulation/agents';
@@ -503,12 +499,12 @@ describe('MapService and map overlays', () => {
     display.attach(libre, selected);
     display.attach(libre, selected);
     expect(map.addSource).toHaveBeenCalledTimes(2);
-    const measure: DrawnMeasure = {
+    const measure = {
       id: 'line',
       points: [
         [0, 0],
         [1, 1],
-      ],
+      ] as const,
       widthM: 30,
       colour: '#fff',
       disc: false,
@@ -535,7 +531,7 @@ describe('MapService and map overlays', () => {
     map.queryRenderedFeatures.mockReturnValue([]);
     map.emit('click', event());
     expect(selected).toHaveBeenLastCalledWith(null);
-    const draft: DrawnDraft = { points: [], pointer: null, widthM: 30, colour: '#fff', disc: true };
+    const draft = { points: [], pointer: null, widthM: 30, colour: '#fff', disc: true };
     display.setDraft(draft);
     map.emit('click', event());
     expect(selected).toHaveBeenCalledTimes(3);

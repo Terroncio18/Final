@@ -8,7 +8,7 @@ import { byramIntensity, flameLength } from './rothermel';
  * —for wet fuel to dry, at a line it cannot cross— and what is left is the
  * ember glow on the ground, not a flame.
  */
-export const FLAME_MIN_M = 0.3;
+const FLAME_MIN_M = 0.3;
 /** At and above this length a flame is drawn at its largest. */
 const FLAME_MAX_M = 12;
 /** The smallest flame drawn is this fraction of the largest. */

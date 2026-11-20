@@ -40,7 +40,7 @@ import {
  * the same inputs give the same fire, which is what makes a link reproduce a
  * simulation and not merely describe one.
  */
-export interface SpreadInput {
+interface SpreadInput {
   /** Metres above sea level, GRID × GRID, rows from north to south. */
   readonly elevation: Float32Array;
   readonly bed: FuelBed;

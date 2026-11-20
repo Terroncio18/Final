@@ -49,3 +49,21 @@ Fora del paquet inicial: `chunk-QHKSYEMT.js` (578.656 B, **three**, carregat sot
 
 - Els recomptes són per nom amb grep, sense graf de crides. Els falsos positius són possibles, sobretot en tipus i en noms curts.
 - No s'ha executat cap prova ni build durant aquest inventari.
+
+## Resolució de codi mort — fase 4 (20/11/2026)
+
+- `@angular/forms` eliminada; exports només interns o només de test s'han fet
+  locals (`SpreadInput`, `WETTING`, `FLAME_MIN_M`, `DrawnMeasure`, `DrawnDraft`,
+  entre d'altres). Les proves obtenen el tipus de la funció o declaren la dada
+  que proven, sense eixamplar l'API de producció.
+- `FireField` i `FireAppearance`, sense importador de producció, i les proves
+  exclusives s'han retirat. El pintor actiu és `FireSurface`.
+- El wrapper `parseScenario`, que només feien servir proves, s'ha tret; la
+  pantalla llegeix amb `readScenario`.
+- `loadPoint`, `loadMin`, els càlculs de trajecte/temps de càrrega i les proves
+  d'aquesta funcionalitat s'han retirat. Els fitxers nous són versió 8; un
+  fitxer de la versió 7 amb aquests camps ara es rebutja perquè el pla canviaria
+  silenciosament si s'ignorés. L'interval manual entre passades es manté.
+- Les funcions, tipus i constants provats i/o usats per producció es mantenen.
+  La llista de duplicacions i els fitxers grans no s'han tractat com a codi
+  mort.

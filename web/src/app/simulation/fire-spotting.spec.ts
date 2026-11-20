@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('./domain', () => ({ GRID: 16, CELL_M: 30, domainAround: () => [0, 0, 16, 16] }));
 import { emberFlight, emberIgnitionProbability, emberRandom } from './spotting';
-import { spread, type SpreadInput } from './fire-spread';
+import { spread } from './fire-spread';
 import { fuelBed, FUEL_MODELS, firelineIntensity, M_PER_FT } from './rothermel';
 import { spreadWinds } from './wind';
 const moistures = { dead1: 0.01, dead10: 0.02, dead100: 0.03, live: 1 };
@@ -16,7 +16,7 @@ const seed = Array.from({ length: 20000 }, (_, i) => i).find((i) => {
   return flight && flight.cell % 16 > 7 && emberRandom(i, source, 3) < 0.5;
 })!;
 const flight = emberFlight(source, 0, intensity, false, seed, () => wind)!;
-const input: SpreadInput = {
+const input: Parameters<typeof spread>[0] = {
   elevation: new Float32Array(256).fill(100),
   bed,
   midflame: 0,

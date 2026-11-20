@@ -11,12 +11,13 @@ Només llegir. Què s'hi busca:
       cap no ho era (§11.63), i el linter tampoc no veu un fitxer sencer que
       ningú importa: s'ha de buscar a mà. Fet a `docs/inventari-web.md` punts
       1, 4-6 i `docs/inventari-api.md` punts 1-2. No s'ha trobat cap fitxer
-      sencer sense importador (a banda del cas de la 12.15, apart).
-- [x] **La 12.15**: `fire-field.ts` i `fire-appearance.ts` tenen proves i no
+      sencer sense importador en aquell inventari (la 12.15 es va resoldre i
+      els dos fitxers es van retirar a la fase 4, §11.66).
+- [x] **La 12.15**: `fire-field.ts` i `fire-appearance.ts` tenien proves i no
       els fa servir ningú. Decidir si es treuen o es queden com a alternativa
       sense WebGL2. Confirmat a `docs/inventari-web.md` punt 2: cap importador
-      de producció, només specs. La decisió de treure'ls o no queda pendent
-      (no es decideix en aquesta fase).
+      de producció, només specs. Decisió tancada a la fase 4: s'han tret amb
+      les proves exclusives; §11.66.
 - [x] **Duplicació**: el mateix càlcul escrit dues vegades, el mateix patró
       resolt de tres maneres (com el de la primera decisió de la fase 0).
       Fet: conversió metres-graus escrita cinc vegades, clamp escrit set

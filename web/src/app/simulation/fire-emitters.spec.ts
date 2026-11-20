@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('./domain', () => ({ GRID: 16, CELL_M: 30, domainAround: () => [0, 0, 1, 1] }));
 import { activeFront } from './fire-display';
-import { flameStrength, frontEmitters, FLAME_MIN_M } from './fire-emitters';
+import { flameStrength, frontEmitters } from './fire-emitters';
 import { fuelBed, FUEL_MODELS } from './rothermel';
 
 const moistures = { dead1: 0.06, dead10: 0.07, dead100: 0.08, live: 1 };
@@ -27,9 +27,10 @@ describe('flames drawn from the front the model computed', () => {
   });
 
   it('draws no flame below the minimum length, and grows with it up to a ceiling', () => {
-    expect(flameStrength(FLAME_MIN_M * 0.9)).toBe(0);
+    // 0.3 m is the minimum flame length drawn (fire-emitters.ts).
+    expect(flameStrength(0.3 * 0.9)).toBe(0);
     expect(flameStrength(NaN)).toBe(0);
-    expect(flameStrength(FLAME_MIN_M)).toBeGreaterThan(0);
+    expect(flameStrength(0.3)).toBeGreaterThan(0);
     expect(flameStrength(1)).toBeLessThan(flameStrength(3));
     expect(flameStrength(12)).toBe(1);
     expect(flameStrength(40)).toBe(1);

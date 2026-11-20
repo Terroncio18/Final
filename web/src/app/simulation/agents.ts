@@ -1,4 +1,4 @@
-import { aircraftKind, crewHead, dropPoint, type Countermeasure } from './countermeasures';
+import { AIRCRAFT, crewHead, dropPoint, type Countermeasure } from './countermeasures';
 import type { Point } from './point';
 
 /**
@@ -109,7 +109,7 @@ export function passesBetween(
 ): Pass[] {
   const passes: Pass[] = [];
   for (const measure of measures) {
-    if (!aircraftKind(measure.kind) || measure.litresPerPass === undefined) continue;
+    if (!(measure.kind in AIRCRAFT) || measure.litresPerPass === undefined) continue;
     const start = measure.startMin ?? 0,
       interval = measure.passIntervalMin ?? 0;
     for (let k = 0; k < (measure.passes ?? 1); k++) {

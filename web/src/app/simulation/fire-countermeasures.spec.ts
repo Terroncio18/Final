@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('./domain', () => ({ GRID: 16, CELL_M: 30, domainAround: () => [0, 0, 16, 16] }));
-import { spread, type SpreadInput } from './fire-spread';
+import { spread } from './fire-spread';
 import { fuelBed, FUEL_MODELS } from './rothermel';
 import type { Countermeasure } from './countermeasures';
 import { ignitionDistances } from './fire-distances';
 
 const bed = fuelBed(FUEL_MODELS[1], { dead1: 0.08, dead10: 0.08, dead100: 0.08, live: 1 });
-const input: SpreadInput = {
+const input: Parameters<typeof spread>[0] = {
   elevation: new Float32Array(256).fill(100),
   fuels: new Uint8Array(256).fill(1),
   fuelBeds: { 1: { bed, midflame: 0 } },

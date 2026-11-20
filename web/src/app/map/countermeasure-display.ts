@@ -5,7 +5,7 @@ import { writeSource } from './source-data';
 type Point = readonly [number, number];
 
 /** What the display needs of a measure: where, how wide, what colour. */
-export interface DrawnMeasure {
+interface DrawnMeasure {
   readonly id: string;
   readonly points: readonly Point[];
   readonly widthM: number;
@@ -14,7 +14,7 @@ export interface DrawnMeasure {
   readonly disc: boolean;
 }
 
-export interface DrawnDraft {
+interface DrawnDraft {
   readonly points: readonly Point[];
   /** Where the pointer is, for the segment not yet clicked. */
   readonly pointer: Point | null;

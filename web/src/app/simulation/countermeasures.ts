@@ -24,13 +24,6 @@ export interface Countermeasure {
   readonly litresPerPass?: number;
   readonly passes?: number;
   readonly passIntervalMin?: number;
-  /**
-   * Where an aircraft loads between passes (water, or a base for retardant),
-   * and how long loading takes. With them, passIntervalMin is not chosen: it
-   * is the flight there and back at cruise speed plus the load (§11.44).
-   */
-  readonly loadPoint?: Point;
-  readonly loadMin?: number;
   /** Fraction of the original dry fuel load remaining after removal. */
   readonly fuelRemaining?: number;
   /**
@@ -53,7 +46,7 @@ export const crewKind = (kind: CountermeasureKind): kind is CrewKind =>
   (CREW_KINDS as readonly string[]).includes(kind);
 const crewMeasure = (m: Countermeasure) => m.crewSize !== undefined;
 
-export interface CrewDefault {
+interface CrewDefault {
   readonly arrivalMin: number;
   readonly crewSize: number;
   readonly ratePerPerson: number;
@@ -144,65 +137,27 @@ interface CrewHead {
   readonly done: boolean;
 }
 
-/**
- * Named reference configurations, not a universal capacity for every aircraft.
- *
- * Cruise speed and load time are the manufacturer's, from the sheet named in
- * `speedSource` (§11.44). The helicopter's load time has no official figure —
- * only bucket makers' claims— so it has none here and is typed for each
- * measure (`loadMin: null`).
- */
+/** Named reference configurations, not a universal capacity for every aircraft. */
 export const AIRCRAFT = {
   helicopter: {
     name: 'Bell 412 · dipòsit ventral',
     capacityL: 1350,
     source:
       'https://firewebext.ffm.vic.gov.au/BurnsToday/sau/SAU_External/documents/Aircraft%20Identification%20Reference%20%28updated%202014%29.pdf',
-    /** Bell 412EPX, maximum cruise at maximum gross weight. */
-    cruiseKt: 123,
-    loadMin: null,
-    loadsAt: 'water',
-    speedSource:
-      'https://tadistributors.com/wp-content/uploads/2024/04/subaru-bell-412epx-fact-sheet.pdf',
   },
   amphibious: {
     name: 'De Havilland DHC-515',
     capacityL: 7000,
     source: 'https://dehavilland.com/wp-content/uploads/2025/01/DHC-515_Spec_Sheet_v14_DIGITAL.pdf',
-    /** Normal cruise, zero wind. */
-    cruiseKt: 180,
-    /** «12 seconds» to scoop a full tank. */
-    loadMin: 0.2,
-    loadsAt: 'water',
-    speedSource:
-      'https://dehavilland.com/wp-content/uploads/2025/01/DHC-515_Spec_Sheet_v14_DIGITAL.pdf',
   },
   retardant: {
     name: 'Air Tractor AT-802F',
     capacityL: 3104,
     source: 'https://airtractor.com/wp-content/uploads/2022/09/Air-Tractor_802F-Brochure_2022.pdf',
-    /** Cruise at 8,000 ft, the brochure's 187 mph. */
-    cruiseKt: 162,
-    /** «In just five minutes an AT-802F can take on a full 820-gallon load». */
-    loadMin: 5,
-    loadsAt: 'aerodrome',
-    speedSource:
-      'https://airtractor.com/wp-content/uploads/2022/09/Air-Tractor_802F-Brochure_2022.pdf',
   },
 } as const;
-export type AircraftKind = keyof typeof AIRCRAFT;
-export const aircraftKind = (kind: CountermeasureKind): kind is AircraftKind => kind in AIRCRAFT;
-/** The longest a load may take, minutes: the old upper bound of an interval. */
-const MAX_LOAD_MIN = 120;
 
-/** Flat-earth metres between two points; thirty kilometres can afford it. */
-export function distanceM(a: Point, b: Point): number {
-  const north = (b[1] - a[1]) * 111_320;
-  const east = (b[0] - a[0]) * 111_320 * Math.cos((((a[1] + b[1]) / 2) * Math.PI) / 180);
-  return Math.hypot(north, east);
-}
-
-/** Where a discharge falls, for its flights: its point, or the middle of a line. */
+/** Where a discharge falls: its point, or the middle of a line. */
 export function dropPoint(measure: Pick<Countermeasure, 'points'>): Point {
   const points = measure.points;
   if (points.length === 1) return points[0];
@@ -212,20 +167,6 @@ export function dropPoint(measure: Pick<Countermeasure, 'points'>): Point {
   return points.length % 2 === 0 ? [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] : a;
 }
 
-/** Minutes of one leg, drop to load or back, at the aircraft's cruise speed. */
-export function legMin(kind: AircraftKind, drop: Point, load: Point): number {
-  return distanceM(drop, load) / ((AIRCRAFT[kind].cruiseKt * 1852) / 60);
-}
-
-/** Minutes between passes: there and back at cruise speed, and the load. */
-export function passInterval(
-  kind: AircraftKind,
-  drop: Point,
-  load: Point,
-  loadMin: number,
-): number {
-  return 2 * legMin(kind, drop, load) + loadMin;
-}
 export const liquidKind = (kind: CountermeasureKind) =>
   kind === 'helicopter' || kind === 'amphibious' || kind === 'water-line' || kind === 'retardant';
 export const liquidCapacity = (kind: CountermeasureKind) =>
@@ -383,8 +324,6 @@ const FIELDS = new Set<string>([
   'passes',
   'passIntervalMin',
   'fuelRemaining',
-  'loadPoint',
-  'loadMin',
   'arrivalMin',
   'crewSize',
   'ratePerPerson',
@@ -459,30 +398,6 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
       raw.passes !== undefined ||
       raw.passIntervalMin !== undefined;
     const removal = raw.fuelRemaining !== undefined;
-    const loading = raw.loadPoint !== undefined || raw.loadMin !== undefined;
-    if (loading) {
-      if (!aircraftKind(def.kind) || !liquid)
-        return 'Només una descàrrega aèria té punt de càrrega.';
-      if (!validPoint(raw.loadPoint)) return 'Punt de càrrega incorrecte.';
-      const fixed = AIRCRAFT[def.kind].loadMin;
-      if (
-        !finite(raw.loadMin) ||
-        raw.loadMin < 0 ||
-        raw.loadMin > MAX_LOAD_MIN ||
-        (fixed !== null && raw.loadMin !== fixed)
-      )
-        return fixed === null
-          ? `El temps de càrrega ha d'anar de 0 a ${MAX_LOAD_MIN} minuts.`
-          : `El temps de càrrega del ${AIRCRAFT[def.kind].name} és de ${
-              fixed < 1 ? `${Math.round(fixed * 60)} s` : `${fixed} min`
-            }.`;
-      const expected = passInterval(def.kind, dropPoint(raw), raw.loadPoint, raw.loadMin);
-      if (
-        !finite(raw.passIntervalMin) ||
-        Math.abs(raw.passIntervalMin - expected) > 1e-6 * Math.max(1, expected)
-      )
-        return "L'interval entre passades no correspon al punt de càrrega.";
-    }
     if (
       liquid &&
       (!liquidKind(def.kind) ||
@@ -493,8 +408,7 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
         raw.passes < 1 ||
         raw.passes > 20 ||
         !finite(raw.passIntervalMin) ||
-        // A derived interval may be under a minute: a scooper next to the sea.
-        raw.passIntervalMin < (raw.loadPoint !== undefined ? 0 : 1) ||
+        raw.passIntervalMin < 1 ||
         raw.passIntervalMin > 120)
     )
       return `Descàrrega incorrecta: 1–${liquidCapacity(def.kind)} L per passada, 1–20 passades i 1–120 min entre passades.`;
@@ -539,9 +453,6 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
           }
         : {}),
       ...(removal ? { fuelRemaining: raw.fuelRemaining } : {}),
-      ...(loading
-        ? { loadPoint: [raw.loadPoint[0], raw.loadPoint[1]] as Point, loadMin: raw.loadMin }
-        : {}),
       ...(crew
         ? { arrivalMin: raw.arrivalMin, crewSize: raw.crewSize, ratePerPerson: raw.ratePerPerson }
         : {}),
@@ -708,7 +619,7 @@ export function crewHead(m: Countermeasure, minute: number, stoppedMin = Infinit
 }
 
 /** Piecewise-constant speed factors, valid from T=0 up to each `until`. */
-export interface TreatmentWindow {
+interface TreatmentWindow {
   readonly until: number;
   readonly factor: number;
 }

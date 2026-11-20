@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('./domain', () => ({ GRID: 16, CELL_M: 30, domainAround: () => [0, 0, 16, 16] }));
-import { spread, type SpreadInput } from './fire-spread';
+import { spread } from './fire-spread';
 import { fuelBed, FUEL_MODELS, M_PER_FT, flameLength } from './rothermel';
 import { frontIntensity } from './fire-emitters';
 import {
@@ -12,7 +12,7 @@ import {
 
 const centre = [8, 8] as const;
 const naturalBed = fuelBed(FUEL_MODELS[1], { dead1: 0.08, dead10: 0.08, dead100: 0.08, live: 1 });
-const input: SpreadInput = {
+const input: Parameters<typeof spread>[0] = {
   elevation: new Float32Array(256).fill(100),
   bed: { ...naturalBed, r0: 10 / M_PER_FT, heatPerArea: 1000 },
   midflame: 0,
@@ -36,7 +36,7 @@ const crew = (patch: Partial<Countermeasure> = {}) =>
   line({ arrivalMin: 0, crewSize: 1, ratePerPerson: 60, ...patch });
 const run = (
   measures: readonly Countermeasure[],
-  patch: Partial<SpreadInput> = {},
+  patch: Partial<Parameters<typeof spread>[0]> = {},
   crewStops?: ReadonlyMap<string, number>,
 ) =>
   spread({

@@ -9,7 +9,7 @@ import { fuelBed, FUEL_MODELS, type FuelBed, type FuelModel, type Moistures } fr
 import type { Point } from './point';
 
 /** Explicit scenario assumptions, not calibrated aircraft suppression performance. */
-export const WETTING = {
+const WETTING = {
   retainedFraction: 0.3,
   dryingTimeMin: 60,
   stepMin: 5,

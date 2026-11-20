@@ -1,5 +1,5 @@
 import { DEM_TILES } from '../map/map.config';
-import { CELL_M, domainAround, GRID, SIDE_M } from './domain';
+import { CELL_M, domainAround, GRID } from './domain';
 import type { Point } from './point';
 
 /**
@@ -208,6 +208,3 @@ export function groundAt(
     slope: terrain.slope[inner(row) * GRID + inner(column)],
   };
 }
-
-/** The side of the domain in metres, re-exported so callers need one import. */
-export { SIDE_M };

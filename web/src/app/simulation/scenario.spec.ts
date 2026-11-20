@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   formatScenario,
   isOutdated,
-  parseScenario,
   readScenario,
   SCENARIO_DEFAULTS,
   scenarioFileName,
@@ -24,6 +23,11 @@ const scenario: Scenario = {
   humidity: 22,
   temperature: 34,
 };
+
+function scenarioFrom(text: string): Scenario | string {
+  const read = readScenario(text);
+  return typeof read === 'string' ? read : read.scenario;
+}
 
 describe('scenario files', () => {
   it('round-trips crew fields in version 6 and reads every previous version', () => {
@@ -48,11 +52,11 @@ describe('scenario files', () => {
       ],
     };
     const text = formatScenario(planned, new Date(0));
-    expect(text).toContain('versio = 7');
-    expect(parseScenario(text)).toEqual(planned);
+    expect(text).toContain('versio = 8');
+    expect(scenarioFrom(text)).toEqual(planned);
     const legacy = formatScenario(scenario, new Date(0));
-    for (const version of ['1', '2', '3', '4', '5', '6']) {
-      const read = readScenario(legacy.replace('versio = 7', `versio = ${version}`));
+    for (const version of ['1', '2', '3', '4', '5', '6', '7']) {
+      const read = readScenario(legacy.replace('versio = 8', `versio = ${version}`));
       expect(typeof read).not.toBe('string');
       if (typeof read !== 'string') {
         expect(read.version).toBe(version);
@@ -93,15 +97,15 @@ describe('scenario files', () => {
         },
       ],
     };
-    expect(parseScenario(formatScenario(complete, new Date(0)))).toEqual(complete);
+    expect(scenarioFrom(formatScenario(complete, new Date(0)))).toEqual(complete);
     const text = formatScenario(scenario, new Date(0));
-    expect(typeof parseScenario(text + 'canvis_vent = [{"startMin":-1}]')).toBe('string');
-    expect(typeof parseScenario(text + 'brases = {"enabled":true,"seed":-1}')).toBe('string');
-    expect(parseScenario(text.replace('versio = 7', 'versio = 3'))).toEqual(scenario);
+    expect(typeof scenarioFrom(text + 'canvis_vent = [{"startMin":-1}]')).toBe('string');
+    expect(typeof scenarioFrom(text + 'brases = {"enabled":true,"seed":-1}')).toBe('string');
+    expect(scenarioFrom(text.replace('versio = 8', 'versio = 3'))).toEqual(scenario);
   });
   it('reads back exactly what it wrote', () => {
     const text = formatScenario(scenario, new Date('2026-11-14T19:00:00Z'));
-    expect(parseScenario(text)).toEqual(scenario);
+    expect(scenarioFrom(text)).toEqual(scenario);
     expect(text).toContain('desat = 2026-11-14T19:00:00.000Z');
   });
 
@@ -110,7 +114,7 @@ describe('scenario files', () => {
       .replace('vent = 35', 'vent   =   35,4')
       .replace('humitat = 22', 'humitat = 22\ncoses_noves = 7')
       .replace(/\n/g, '\r\n');
-    expect(parseScenario(text)).toEqual(scenario);
+    expect(scenarioFrom(text)).toEqual(scenario);
   });
 
   it('keeps a file within what the screen can hold', () => {
@@ -118,20 +122,20 @@ describe('scenario files', () => {
       .replace('vent = 35', 'vent = 400')
       .replace('vent_des_de = 315', 'vent_des_de = -45')
       .replace('temperatura = 34', 'temperatura = -20');
-    expect(parseScenario(text)).toMatchObject({ wind: 60, windFrom: 315, temperature: 10 });
+    expect(scenarioFrom(text)).toMatchObject({ wind: 60, windFrom: 315, temperature: 10 });
   });
 
   it('drops an ignition it cannot read and keeps the others', () => {
     const text = formatScenario(scenario, new Date(0)).replace('2.72000,39.76000', 'aquí');
-    expect(parseScenario(text)).toMatchObject({ ignitions: [[2.70378, 39.75517]] });
+    expect(scenarioFrom(text)).toMatchObject({ ignitions: [[2.70378, 39.75517]] });
   });
 
   it('refuses what is not a scenario, and says what is missing', () => {
-    expect(parseScenario('una llista de la compra')).toMatch(/no és un escenari/);
+    expect(scenarioFrom('una llista de la compra')).toMatch(/no és un escenari/);
     const text = formatScenario(scenario, new Date(0));
-    expect(parseScenario(text.replace(/^centre = .*$/m, ''))).toMatch(/domini/);
-    expect(parseScenario(text.replace(/^regio = .*$/m, 'regio = ../../x'))).toMatch(/domini/);
-    expect(parseScenario(text.replace(/^humitat = .*$/m, 'humitat = molta'))).toMatch(
+    expect(scenarioFrom(text.replace(/^centre = .*$/m, ''))).toMatch(/domini/);
+    expect(scenarioFrom(text.replace(/^regio = .*$/m, 'regio = ../../x'))).toMatch(/domini/);
+    expect(scenarioFrom(text.replace(/^humitat = .*$/m, 'humitat = molta'))).toMatch(
       /meteorologia/,
     );
   });
@@ -158,34 +162,54 @@ describe('scenario files', () => {
         },
       ],
     };
-    expect(formatScenario(planned, new Date(0))).toContain('versio = 7');
-    expect(parseScenario(formatScenario(planned, new Date(0)))).toEqual(planned);
+    expect(formatScenario(planned, new Date(0))).toContain('versio = 8');
+    expect(scenarioFrom(formatScenario(planned, new Date(0)))).toEqual(planned);
     const legacy = {
       ...planned,
       countermeasures: planned.countermeasures!.map(({ startMin, ...m }) => m),
     };
     expect(
-      parseScenario(formatScenario(legacy, new Date(0)).replace('versio = 7', 'versio = 2')),
+      scenarioFrom(formatScenario(legacy, new Date(0)).replace('versio = 8', 'versio = 2')),
     ).toEqual(legacy);
     expect(
-      parseScenario(formatScenario(scenario, new Date(0)).replace('versio = 7', 'versio = 1')),
+      scenarioFrom(formatScenario(scenario, new Date(0)).replace('versio = 8', 'versio = 1')),
     ).toEqual(scenario);
   });
 
   it('refuses corrupted, outside-domain or unsupported plans without dropping measures', () => {
     const text = formatScenario(scenario, new Date(0));
-    expect(parseScenario(text + 'contramesures = nope')).toMatch(/JSON/);
-    expect(parseScenario(text + 'contramesures = [{}]')).toMatch(/desconegut/);
-    expect(parseScenario(text.replace('versio = 7', 'versio = 99'))).toMatch(/Versió/);
+    expect(scenarioFrom(text + 'contramesures = nope')).toMatch(/JSON/);
+    expect(scenarioFrom(text + 'contramesures = [{}]')).toMatch(/desconegut/);
+    expect(scenarioFrom(text.replace('versio = 8', 'versio = 99'))).toMatch(/Versió/);
     const outside = [
       { id: 'x', kind: 'helicopter', points: [[0, 0]], widthM: 30, strength: 0.7, durationMin: 20 },
     ];
-    expect(parseScenario(text + 'contramesures = ' + JSON.stringify(outside))).toMatch(/domini/);
+    expect(scenarioFrom(text + 'contramesures = ' + JSON.stringify(outside))).toMatch(/domini/);
+  });
+
+  it('refuses removed load-point fields in version 7 scenarios', () => {
+    const measure = {
+      id: 'air',
+      kind: 'helicopter',
+      points: [[2.71, 39.76]],
+      widthM: 90,
+      strength: 0,
+      durationMin: 0,
+      litresPerPass: 1000,
+      passes: 2,
+      passIntervalMin: 12,
+      loadPoint: [2.7, 39.75],
+      loadMin: 3,
+    };
+    const text = `${formatScenario(scenario, new Date(0))}contramesures = ${JSON.stringify([measure])}`;
+    expect(scenarioFrom(text.replace('versio = 8', 'versio = 7'))).toMatch(
+      /Camp de contramesura desconegut/,
+    );
   });
 
   it('brings an older file up to date, naming every key it had to fill', () => {
     const old = formatScenario(scenario, new Date(0))
-      .replace('versio = 7\n', '')
+      .replace('versio = 8\n', '')
       .replace(/^humitat = .*\n/m, '')
       .replace(/^temperatura = .*\n/m, '');
     const read = readScenario(old);

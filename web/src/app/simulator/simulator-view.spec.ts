@@ -955,7 +955,7 @@ describe('simulator screen', () => {
         countermeasures: undefined,
       },
       new Date(0),
-    ).replace('versio = 7', 'versio = 1');
+    ).replace('versio = 8', 'versio = 1');
     await c['loadScenario'](
       fileEvent({ name: 'old.txt', size: old.length, text: async () => old }),
     );
@@ -1145,7 +1145,7 @@ describe('simulator screen', () => {
       windChanges: [],
       spotting: { enabled: false, seed: 1 },
     };
-    const text = formatScenario(scenario, new Date(0)).replace('versio = 7', 'versio = 1');
+    const text = formatScenario(scenario, new Date(0)).replace('versio = 8', 'versio = 1');
     await c['loadScenario']({
       target: { files: [{ size: text.length, text: async () => text, name: 'old.txt' }] },
     } as unknown as Event);

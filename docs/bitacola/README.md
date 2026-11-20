@@ -136,6 +136,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.63** El linter entra, i el que no deixa passar
 - **11.64** El combustible oficial surt de Balears
 - **11.65** El codi mort es retira amb prudència
+- **11.66** Fora el punt de càrrega antic i els pintors que no es feien servir
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):
@@ -150,7 +151,6 @@ amb el que es plantejava):
 - **12.22** Brigades que decideixen les coses petites
 - **12.23** Parcs de bombers i punts d'aigua al mapa
 - **12.24** Punts d'aigua i bases aèries a Espanya
-- **12.15** Dos pintors que no pinten
 - **12.7** El canvi de nom d'«ignició» a «centre»
 - **12.8** Les cel·les de mar dins del domini
 - **12.10** La meteorologia en directe

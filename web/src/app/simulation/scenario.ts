@@ -40,7 +40,7 @@ const LIMITS = {
 } as const;
 
 const HEADER = '# IgnisLab · escenari de simulació';
-const VERSION = '7';
+const VERSION = '8';
 
 /**
  * What a key the file does not carry stands for: the screen's own starting
@@ -133,7 +133,7 @@ export function formatScenario(scenario: Scenario, saved: Date): string {
           '# Contramesures: startMin és el minut de desplegament (absent = 0).',
           '# durationMin compta des del desplegament; coordenades [longitud,latitud].',
           '# Brigades: arrivalMin en minuts, crewSize en efectius i ratePerPerson en m/h (extinció de restes: ha/h).',
-          '# Descàrregues aèries: loadPoint [longitud,latitud] i loadMin en minuts; passIntervalMin en surt.',
+          '# Descàrregues aèries: litresPerPass, nombre de passades i interval entre passades en minuts.',
           `contramesures = ${JSON.stringify(scenario.countermeasures)}`,
         ]
       : []),
@@ -164,11 +164,6 @@ export const SCENARIO_TOO_LARGE = 'El fitxer d’escenari és massa gran.';
  *   a key that is there but unreadable is refused too, as it is not missing
  *   but wrong.
  */
-export function parseScenario(text: string): Scenario | string {
-  const read = readScenario(text);
-  return typeof read === 'string' ? read : read.scenario;
-}
-
 // eslint-disable-next-line complexity -- pending (docs/estil.md §4): a reader, one check per key of the file.
 export function readScenario(text: string): ScenarioRead | string {
   if (text.length > MAX_SCENARIO_SIZE) return SCENARIO_TOO_LARGE;
@@ -196,6 +191,7 @@ export function readScenario(text: string): ScenarioRead | string {
     version !== '4' &&
     version !== '5' &&
     version !== '6' &&
+    version !== '7' &&
     version !== VERSION
   )
     return 'Versió d’escenari no compatible.';

@@ -87,7 +87,7 @@ Los trece modelos usan las cargas, profundidades y extinciones de Anderson. Se m
 npm run test:fuels
 
 # web
-npx vitest run src/app/simulation/fire-fuels.spec.ts src/app/simulation/fuel-data.spec.ts src/app/simulation/fire-appearance.spec.ts
+npx vitest run src/app/simulation/fire-fuels.spec.ts src/app/simulation/fuel-data.spec.ts
 npm run build
 ```
 

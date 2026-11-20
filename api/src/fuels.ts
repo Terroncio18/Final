@@ -23,7 +23,7 @@ import {
 
 const FUEL_DATA_DIR = resolve(process.env.FUEL_DATA_DIR ?? "data/fuels");
 const FUEL_VERSION = "anderson13-worldcover2021-v2";
-export interface FuelDataset {
+interface FuelDataset {
   id: string;
   label: string;
   sourceUrl: string;
@@ -33,7 +33,7 @@ export interface FuelDataset {
   tiles: string[];
   priority: number;
 }
-export interface FuelResponse {
+interface FuelResponse {
   version: string;
   bounds: Bounds;
   size: number;

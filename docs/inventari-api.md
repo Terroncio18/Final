@@ -21,3 +21,11 @@ són possibles, sobretot en tipus i en noms curts (marcats com a dubtosos).
 
 - Els recomptes són per nom amb grep, sense graf de crides. Els falsos positius són possibles, sobretot en tipus i en noms curts.
 - No s'ha executat cap prova ni build durant aquest inventari.
+
+## Resolució de codi mort — fase 4 (20/11/2026)
+
+Les eines `fflate`, `proj4` i `shapefile` han passat a `devDependencies`;
+les constants d'ús intern han deixat de ser exports. `worldCoverTile`,
+`windowsFor` i `paintPolygon` continuen perquè les usa producció, els scripts
+o les proves. Les rutes velles de punts d'aigua, llacs i OSM ja no tenen font
+ni consumidor al repositori; són retirades, no codi pendent d'eliminar.
