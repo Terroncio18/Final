@@ -73,6 +73,7 @@ import {
   workStart,
   type ToolSettings,
 } from './countermeasure-plan';
+import { AnalysisPanel } from './analysis-panel';
 import { Icon, iconOr } from './icon';
 import { ToolSettingsModal, type ToolConfig } from './tool-settings';
 import { WeatherService } from './weather.service';
@@ -82,34 +83,6 @@ export const SIMULATE_FIRE = new InjectionToken<typeof spread>('simulate fire', 
   providedIn: 'root',
   factory: () => spread,
 });
-
-/**
- * What the analysis column can show, and whether it does on a first visit.
- *
- * The column is the reader's to arrange: someone looking at how a front
- * behaves wants intensity and flame length, someone looking at how much
- * burns wants the areas, and both at once is a column to scroll. What is
- * switched off is kept in the browser, under ANALYSIS_KEY.
- */
-const ANALYSIS_ITEMS = [
-  { id: 'area', label: 'Superfície', on: true },
-  { id: 'perimeter', label: 'Perímetre', on: true },
-  { id: 'rate', label: 'Velocitat', on: true },
-  { id: 'heading', label: 'Direcció', on: true },
-  { id: 'intensity', label: 'Intensitat', on: true },
-  { id: 'flame', label: 'Flama', on: true },
-  { id: 'control', label: 'Control', on: true },
-  { id: 'run', label: 'Avanç màxim', on: true },
-  { id: 'edge', label: 'Vora del domini', on: true },
-  { id: 'base', label: 'Sense vent', on: false },
-  { id: 'areaChart', label: 'Gràfica: superfície', on: true },
-  { id: 'rateChart', label: 'Gràfica: velocitat', on: true },
-  { id: 'forecast', label: 'Previsió', on: true },
-  { id: 'burnedFuels', label: 'Combustible', on: true },
-  { id: 'conditions', label: 'Condicions', on: true },
-] as const;
-
-const ANALYSIS_KEY = 'ignislab.analysis.hidden';
 
 /**
  * Below this, the three fixed-width columns no longer fit the window: the
@@ -202,27 +175,6 @@ function readable(point: Point): string {
 }
 
 /**
- * A line and the area under it, as two SVG paths.
- *
- * Drawn here and not with a charting library: two paths over a fixed viewBox
- * is what these charts are, and a dependency for that would be heavier than
- * the thing it draws. `preserveAspectRatio="none"` lets the viewBox stretch to
- * whatever width the column has.
- */
-function chartPaths(values: readonly number[], width = 300, height = 100) {
-  // A fire that has not moved is a flat line at the bottom, not a division by zero.
-  const top = Math.max(...values) || 1;
-  const step = width / (values.length - 1);
-  const points = values.map(
-    (value, i) => [i * step, height - (value / top) * (height - 10)] as const,
-  );
-  const line = points
-    .map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`)
-    .join(' ');
-  return { line, area: `${line} L${width} ${height} L0 ${height} Z` };
-}
-
-/**
  * The simulation screen: the domain, in relief, inside a console.
  *
  * A screen of its own and not a fifth step of the form. The form asks «where»
@@ -273,7 +225,7 @@ function sameItems<T>(a: readonly T[], b: readonly T[]): boolean {
 
 @Component({
   selector: 'app-simulator-view',
-  imports: [RouterLink, Icon, ToolSettingsModal],
+  imports: [RouterLink, Icon, ToolSettingsModal, AnalysisPanel],
   templateUrl: './simulator-view.html',
   styleUrls: ['./simulator-view.css', './countermeasures.css'],
   // Escape puts down whatever tool is in the hand, wherever the focus is.
@@ -1128,82 +1080,6 @@ export class SimulatorView {
       edgeReached,
     };
   }
-
-  /**
-   * What has burned so far, by fuel model: which fuels the fire is living on.
-   *
-   * A pass over the grid, so it is only made while the block is on screen,
-   * and once per minute of the timeline rather than per frame of it.
-   */
-  protected readonly burnedFuels = computed(() => {
-    const result = this.result();
-    const fuels = this.fuels.grid();
-    if (!result || !fuels || !this.shows('burnedFuels')) return [];
-    const minute = Math.floor(this.minutes());
-    const cells = new Map<number, number>();
-    let all = 0;
-    for (let i = 0; i < result.arrival.length; i += 1) {
-      if (result.arrival[i] > minute) continue;
-      cells.set(fuels.models[i], (cells.get(fuels.models[i]) ?? 0) + 1);
-      all += 1;
-    }
-    const one = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
-    return [...cells]
-      .sort((a, b) => b[1] - a[1])
-      .map(([id, count]) => ({
-        id,
-        name: FUEL_MODELS[id]?.name ?? 'Sense model',
-        area: one.format((count * CELL_M * CELL_M) / 10_000),
-        share: Math.round((count / all) * 100),
-      }));
-  });
-
-  // ---- What the analysis column shows. ----
-  protected readonly analysisItems = ANALYSIS_ITEMS;
-  protected readonly editing = signal(false);
-  private readonly hidden = signal<ReadonlySet<string>>(this.storedHidden());
-
-  private storedHidden(): ReadonlySet<string> {
-    try {
-      const stored = localStorage.getItem(ANALYSIS_KEY);
-      if (stored !== null) return new Set(JSON.parse(stored) as string[]);
-    } catch {
-      // No storage, or something else's value under the key: the defaults.
-    }
-    return new Set(ANALYSIS_ITEMS.filter((item) => !item.on).map((item) => item.id));
-  }
-
-  protected shows(id: (typeof ANALYSIS_ITEMS)[number]['id']): boolean {
-    return !this.hidden().has(id);
-  }
-
-  protected toggleItem(id: string): void {
-    const hidden = new Set(this.hidden());
-    if (!hidden.delete(id)) hidden.add(id);
-    this.hidden.set(hidden);
-    try {
-      localStorage.setItem(ANALYSIS_KEY, JSON.stringify([...hidden]));
-    } catch {
-      // Not kept for the next visit; it still holds for this one.
-    }
-  }
-
-  /** The two curves of the column, sampled every five minutes. */
-  protected readonly charts = computed(() => {
-    const result = this.result();
-    if (!result) return { area: chartPaths([0, 0]), rate: chartPaths([0, 0], 300, 64) };
-    const { area, rate } = result.series;
-    const areas: number[] = [];
-    const rates: number[] = [];
-    for (let minute = 0; minute <= this.horizon.minutes; minute += 5) {
-      areas.push(area[minute]);
-      let fastest = 0;
-      for (let m = Math.max(minute - 4, 0); m <= minute; m += 1)
-        fastest = Math.max(fastest, rate[m]);
-      rates.push(fastest);
-    }
-    return { area: chartPaths(areas), rate: chartPaths(rates, 300, 64) };
-  });
 
   /**
    * Mop-up is the crews', and a crew has two conditions (§11.40): there has

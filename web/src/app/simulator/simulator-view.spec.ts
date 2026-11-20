@@ -4,6 +4,7 @@ import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { vi, type Mock } from 'vitest';
 import { SimulatorView, SIMULATE_FIRE } from './simulator-view';
+import { AnalysisPanel } from './analysis-panel';
 import { ToolSettingsModal } from './tool-settings';
 import { Chrome } from '../chrome';
 import { MapService } from '../map/map.service';
@@ -343,7 +344,6 @@ describe('simulator screen', () => {
     expect(c['ground']()).toBeNull();
     expect(c['under']()).toBeNull();
     expect(c['state']().short).toBe('Llegint el terreny');
-    expect(c['charts']().area.line).toBe('M0.0 100.0 L300.0 100.0');
     expect(maps.setTerrain3D).toHaveBeenCalledWith(true);
     c['relief'].set(false);
     c['labels'].set(false);
@@ -816,26 +816,31 @@ describe('simulator screen', () => {
     expect(c['windRows']()[0]).toMatchObject({ time: '00:20', origin: 'S', pending: false });
   });
 
-  it('derives figures, forecasts, charts and burned-fuel composition from the current minute', async () => {
+  it('derives figures and forecasts from the current minute and hands them to the analysis column', async () => {
     await open(undefined, true);
     await ignition();
     expect(c['figures']()).toBeNull();
     expect(c['forecastRows']()).toEqual([]);
-    expect(c['burnedFuels']()).toEqual([]);
+    const panel = () =>
+      fixture.debugElement.query(By.directive(AnalysisPanel)).componentInstance as AnalysisPanel;
+    expect(panel().figures()).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-analysis-panel .no-run')).not.toBeNull();
     const result = await publish();
     c['minutes'].set(120);
+    await fixture.whenStable();
+    expect(panel().result()).toBe(result);
+    expect(panel().minutes()).toBe(120);
+    expect(panel().figures()).toBe(c['figures']());
+    expect(panel().conditions()).toBe(c['conditions']());
+    expect(panel().forecastRows()).toBe(c['forecastRows']());
+    expect(panel()['burnedFuels']()[0]).toMatchObject({ id: 1, share: 100 });
     expect(c['figures']()).toMatchObject({
       area: '120',
       heading: 'E',
       edge: 'No hi arriba',
       edgeReached: false,
     });
-    expect(c['charts']().area.line).toContain('L');
     expect(c['forecastRows']().every((r) => r.available)).toBe(true);
-    expect(c['burnedFuels']()[0]).toMatchObject({ id: 1, share: 100 });
-    c['toggleItem']('burnedFuels');
-    expect(c['burnedFuels']()).toEqual([]);
-    c['toggleItem']('burnedFuels');
     const zero = new Float32Array(1111),
       heading = new Float32Array(1111).fill(NaN);
     c['result'].set({
@@ -980,24 +985,6 @@ describe('simulator screen', () => {
     expect(c['scenarioNote']()?.text).toContain('per defecte');
   });
 
-  it('keeps analysis preferences when storage works and falls back when it does not', async () => {
-    localStorage.setItem('ignislab.analysis.hidden', '["area"]');
-    await open();
-    expect(c['shows']('area')).toBe(false);
-    c['toggleItem']('area');
-    expect(c['shows']('area')).toBe(true);
-    expect(localStorage.getItem('ignislab.analysis.hidden')).toBe('[]');
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-      throw new Error('blocked');
-    });
-    expect(c['storedHidden']().has('base')).toBe(true);
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new Error('blocked');
-    });
-    c['toggleItem']('area');
-    expect(c['shows']('area')).toBe(false);
-  });
-
   it('repaints on seeking and on visible frames, freezes reduced motion and cleans up animation', async () => {
     await open(undefined, true);
     await ignition();
@@ -1091,7 +1078,7 @@ describe('simulator screen', () => {
     expect(c['shownMeasures']()).toHaveLength(5);
   });
 
-  it('reports unknown burned fuel and preserves rendering with reduced motion while hidden', async () => {
+  it('reports unknown land and preserves rendering with reduced motion while hidden', async () => {
     await open(undefined, true);
     await ignition();
     const grid = fuelGrid();
@@ -1101,7 +1088,6 @@ describe('simulator screen', () => {
     await fixture.whenStable();
     const result = await publish();
     c['minutes'].set(10);
-    expect(c['burnedFuels']().find((f) => f.id === 255)?.name).toBe('Sense model');
     expect(c['unknownLand']()).toBe(1);
     c['plan'].measures.set([measure()]);
     expect(c['scenarioSummary']()).toContain('1 contramesura');

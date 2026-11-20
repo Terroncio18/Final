@@ -1,0 +1,344 @@
+/* The analysis column: what comes out of the computation.
+ *
+ * Its own rules, moved here from simulator-view.css, and a copy of the
+ * console's that it also wears —the panel's heading, the tag, the folding
+ * section, the list of facts, the focus ring— which simulator-view.css keeps
+ * for the rest of the screen. Everything is in the order it had there, so the
+ * cascade comes out the same. The box —a sidebar of the grid— is the
+ * console's: it styles this component's host, and the colours are its custom
+ * properties, which reach in from there.
+ */
+
+/* ---- Copied from simulator-view.css ---- */
+
+.panel-heading {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  height: 44px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  --icon-size: 16px;
+}
+
+.panel-heading h2 app-icon {
+  color: #8b9ba8;
+}
+
+.tiny-tag {
+  padding: 3px 5px;
+  white-space: nowrap;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: #7d8b99;
+  border: 1px solid #35404b;
+  border-radius: 3px;
+}
+
+.tiny-tag.warn {
+  color: #d39a6d;
+  border-color: #5c4330;
+}
+
+/* A section that folds, in either column: a <details> with its title. */
+.fold > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.fold > summary h3::before {
+  content: '▸';
+  margin-right: 6px;
+}
+
+.fold[open] > summary h3::before {
+  content: '▾';
+}
+
+.fold:not([open]) h3,
+.fold:not([open]) .chart-heading {
+  margin: 0;
+}
+
+/* ---- The column's own ---- */
+
+/* Inside a folding section the grid of figures has no frame of its own. */
+.fold .metric-grid {
+  margin: 0;
+  border: 0;
+}
+
+button.tiny-tag {
+  font-family: inherit;
+  background: none;
+  cursor: pointer;
+}
+
+.analysis-options {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 8px;
+  margin: 0;
+  padding: 10px 13px;
+  font-size: 10px;
+  color: #aab5bf;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.analysis-options legend {
+  padding: 0 0 6px;
+  color: #8e9ba8;
+}
+
+.analysis-options label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ---- Copied from simulator-view.css ---- */
+
+.terrain-facts {
+  margin: 9px 0 0;
+}
+
+.terrain-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 1px;
+}
+
+.terrain-facts dt {
+  color: #8e9ba8;
+}
+
+.terrain-facts dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.terrain-note {
+  margin: 9px 0 0;
+  font-size: 10px;
+  color: #8e9ba8;
+}
+
+/* ---- The column's own ---- */
+
+.metric-grid {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 10px 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.metric {
+  min-height: 84px;
+  padding: 10px 0 12px;
+}
+
+.metric:nth-child(even) {
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+}
+
+.metric > span {
+  font-size: 10px;
+  color: #8e9eaa;
+  white-space: nowrap;
+}
+
+.metric > div {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 6px;
+  --icon-size: 15px;
+}
+
+.metric strong {
+  font:
+    550 29px Manrope,
+    sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.8px;
+  line-height: 1.25;
+}
+
+.metric small {
+  font-size: 9px;
+  color: #92a3af;
+}
+
+.metric em {
+  display: block;
+  margin-top: 5px;
+  font-size: 9px;
+  font-style: normal;
+  color: #d69971;
+  white-space: nowrap;
+}
+
+.metric em.muted {
+  color: #708390;
+}
+
+.direction-metric {
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.warning-metric strong {
+  color: #efaa74;
+}
+
+.warning-metric > div app-icon {
+  color: #cc986d;
+}
+
+.chart-section {
+  flex-shrink: 0;
+  margin: 0 13px;
+  padding: 13px 0 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chart-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+}
+
+.chart-heading h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 550;
+  color: #c4ced7;
+}
+
+.chart-heading > span {
+  font-size: 9px;
+  color: #768a99;
+  white-space: nowrap;
+}
+
+.chart {
+  height: 106px;
+}
+
+.small-chart {
+  height: 63px;
+  margin-top: 9px;
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.chart-area {
+  fill: #fa884426;
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--orange);
+  stroke-width: 2;
+  /* The viewBox is stretched to the column's width, so a plain stroke would
+     come out thicker vertically than horizontally. */
+  vector-effect: non-scaling-stroke;
+}
+
+.muted-area {
+  fill: #8fbb9426;
+}
+
+.muted-line {
+  stroke: #8fbb94;
+}
+
+/* ---- Copied from simulator-view.css ---- */
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+}
+
+/* ---- The column's own ---- */
+
+/* A laptop screen: the figures give a little. The width is the one of the
+   laptop rule in simulator-view.css, and the two move together. */
+@media (max-width: 1250px) {
+  .metric strong {
+    font-size: 25px;
+  }
+
+  .metric > span {
+    font-size: 9px;
+  }
+}
+
+/* The banner of the column, without the alarm: it says the time, not a risk. */
+.chart-cursor {
+  stroke: #f1f6f8;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.7;
+}
+
+.no-run {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin: 14px;
+  padding: 26px 16px;
+  text-align: center;
+  color: #8e9ba8;
+  border: 1px dashed #35414e;
+  border-radius: 6px;
+  --icon-size: 22px;
+}
+
+.no-run strong {
+  font-size: 13px;
+  color: #d5dce2;
+}
+
+.no-run p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* In this column the lists of facts sit flush in their section. */
+.terrain-facts {
+  margin: 0;
+  font-size: 11px;
+}
+
+/* A figure that is a phrase —«No hi arriba», «T + 07:40»— and not a number. */
+.metric strong.text-metric {
+  font-size: 17px;
+  line-height: 1.5;
+}
