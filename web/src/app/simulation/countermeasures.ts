@@ -339,8 +339,185 @@ const validPoint = (p: unknown): p is Point =>
   Math.abs(p[0]) <= 180 &&
   Math.abs(p[1]) < 85;
 
+/** Untrusted input before validation: any field, any shape; each check below narrows one piece. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a validator reads whatever JSON the caller sent; every field is checked below before use.
+type UncheckedMeasure = any;
+
+/** Shape, unknown fields and kind: common to every measure, before any field is read. */
+function identifyMeasure(raw: UncheckedMeasure): MeasureDefinition | string {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'Contramesura incorrecta.';
+  // A field this version does not know may be one that changes the fire.
+  const unknown = Object.keys(raw).find((key) => !FIELDS.has(key));
+  if (unknown !== undefined) return `Camp de contramesura desconegut: «${unknown}».`;
+  const def = COUNTERMEASURE_CATALOG.find((d) => d.kind === raw.kind);
+  return def ?? 'Tipus de contramesura desconegut.';
+}
+
+/** Crews (12.19): all three fields numeric and in range, or none, and only for a crew kind. */
+function validateCrewFields(
+  raw: UncheckedMeasure,
+  def: MeasureDefinition,
+  crew: boolean,
+): string | undefined {
+  if (!crew) return undefined;
+  if (!crewKind(def.kind)) return 'Aquest tipus de contramesura no admet brigades.';
+  if (!['arrivalMin', 'crewSize', 'ratePerPerson'].every((key) => finite(raw[key])))
+    return 'La brigada necessita arribada, efectius i rendiment, tots tres numèrics.';
+  if (raw.arrivalMin < CREW_LIMITS.arrivalMin.min || raw.arrivalMin > CREW_LIMITS.arrivalMin.max)
+    return 'L’arribada de la brigada ha de ser entre 0 i 720 minuts.';
+  if (
+    !Number.isInteger(raw.crewSize) ||
+    raw.crewSize < CREW_LIMITS.crewSize.min ||
+    raw.crewSize > CREW_LIMITS.crewSize.max
+  )
+    return 'La brigada ha de tenir entre 1 i 500 efectius, sense decimals.';
+  const unit = def.kind === 'mop-up' ? 'ha/h' : 'm/h';
+  const limits = CREW_LIMITS[unit];
+  if (raw.ratePerPerson < limits.min || raw.ratePerPerson > limits.max)
+    return `El rendiment per efectiu ha de ser entre ${limits.min} i ${limits.max} ${unit}.`;
+  return undefined;
+}
+
+function validateIdentifier(raw: UncheckedMeasure, ids: ReadonlySet<string>): string | undefined {
+  if (typeof raw.id !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(raw.id) || ids.has(raw.id))
+    return 'Identificador de contramesura incorrecte o repetit.';
+  return undefined;
+}
+
+function validatePointsShape(raw: UncheckedMeasure, def: MeasureDefinition): string | undefined {
+  if (
+    !Array.isArray(raw.points) ||
+    !raw.points.every(validPoint) ||
+    (def.geometry === 'point' ? raw.points.length !== 1 : raw.points.length < 2) ||
+    raw.points.length > MAX_VERTICES
+  )
+    return 'Geometria de contramesura incorrecta.';
+  return undefined;
+}
+
+function validateLineDistinct(raw: UncheckedMeasure, def: MeasureDefinition): string | undefined {
+  if (
+    def.geometry === 'line' &&
+    !raw.points.some((p: Point) => p[0] !== raw.points[0][0] || p[1] !== raw.points[0][1])
+  )
+    return 'La franja necessita dos punts diferents.';
+  return undefined;
+}
+
+function validateWidth(raw: UncheckedMeasure): string | undefined {
+  if (!finite(raw.widthM) || raw.widthM < WIDTH_LIMITS.min || raw.widthM > WIDTH_LIMITS.max)
+    return `L'amplada ha d'estar entre ${CELL_M} i 3000 m.`;
+  return undefined;
+}
+
+/** Whether this measure discharges a liquid or removes fuel: both change what else is valid. */
+function physicalFlags(raw: UncheckedMeasure): { liquid: boolean; removal: boolean } {
+  const liquid =
+    raw.litresPerPass !== undefined ||
+    raw.passes !== undefined ||
+    raw.passIntervalMin !== undefined;
+  const removal = raw.fuelRemaining !== undefined;
+  return { liquid, removal };
+}
+
+function validateLiquid(
+  raw: UncheckedMeasure,
+  def: MeasureDefinition,
+  liquid: boolean,
+): string | undefined {
+  if (
+    liquid &&
+    (!liquidKind(def.kind) ||
+      !finite(raw.litresPerPass) ||
+      raw.litresPerPass < 1 ||
+      raw.litresPerPass > liquidCapacity(def.kind) ||
+      !Number.isInteger(raw.passes) ||
+      raw.passes < 1 ||
+      raw.passes > 20 ||
+      !finite(raw.passIntervalMin) ||
+      raw.passIntervalMin < 1 ||
+      raw.passIntervalMin > 120)
+  )
+    return `Descàrrega incorrecta: 1–${liquidCapacity(def.kind)} L per passada, 1–20 passades i 1–120 min entre passades.`;
+  return undefined;
+}
+
+function validateRemoval(
+  raw: UncheckedMeasure,
+  def: MeasureDefinition,
+  removal: boolean,
+): string | undefined {
+  if (
+    removal &&
+    (def.kind !== 'clearing' ||
+      !finite(raw.fuelRemaining) ||
+      raw.fuelRemaining < 0.05 ||
+      raw.fuelRemaining > 1)
+  )
+    return 'La tala ha de conservar entre el 5 i el 100 % de la càrrega original.';
+  return undefined;
+}
+
+/** Strength and duration: fixed at zero for liquid/removal measures, else within their limits. */
+function validateStrengthDuration(
+  raw: UncheckedMeasure,
+  def: MeasureDefinition,
+  liquid: boolean,
+  removal: boolean,
+): string | undefined {
+  if ((liquid || removal) && (raw.strength !== 0 || raw.durationMin !== 0))
+    return 'Les mesures de líquid o càrrega no admeten reducció artificial ni durada fixa.';
+  if (!finite(raw.strength) || raw.strength < 0 || raw.strength > 0.95)
+    return 'La reducció ha d’estar entre 0 i 95 %.';
+  if (
+    !finite(raw.durationMin) ||
+    (!liquid && temporary(def.kind)
+      ? raw.durationMin < DURATION_LIMITS.min || raw.durationMin > DURATION_LIMITS.max
+      : raw.durationMin !== 0)
+  )
+    return 'Durada incorrecta: 1–720 min per als efectes temporals; 0 per als permanents.';
+  return undefined;
+}
+
+function validateStartMin(raw: UncheckedMeasure): string | undefined {
+  if (
+    raw.startMin !== undefined &&
+    (!finite(raw.startMin) || raw.startMin < 0 || raw.startMin > 720)
+  )
+    return 'El desplegament ha de ser entre 0 i 720 minuts.';
+  return undefined;
+}
+
+function toCountermeasure(
+  raw: UncheckedMeasure,
+  def: MeasureDefinition,
+  liquid: boolean,
+  removal: boolean,
+  crew: boolean,
+): Countermeasure {
+  return {
+    id: raw.id,
+    kind: def.kind,
+    points: raw.points.map((p: Point) => [p[0], p[1]] as Point),
+    widthM: raw.widthM,
+    strength: raw.strength,
+    durationMin: raw.durationMin,
+    ...(raw.startMin !== undefined ? { startMin: raw.startMin } : {}),
+    ...(liquid
+      ? {
+          litresPerPass: raw.litresPerPass,
+          passes: raw.passes,
+          passIntervalMin: raw.passIntervalMin,
+        }
+      : {}),
+    ...(removal ? { fuelRemaining: raw.fuelRemaining } : {}),
+    ...(crew
+      ? { arrivalMin: raw.arrivalMin, crewSize: raw.crewSize, ratePerPerson: raw.ratePerPerson }
+      : {}),
+  };
+}
+
 /** Strict, bounded and all-or-nothing: a malformed barrier must never disappear silently. */
-// eslint-disable-next-line complexity -- pending (docs/estil.md §4): a validator, one check per field; to be split by kind of measure.
 export function parseCountermeasures(value: unknown): readonly Countermeasure[] | string {
   if (!Array.isArray(value) || value.length > MAX_COUNTERMEASURES)
     return `El pla admet fins a ${MAX_COUNTERMEASURES} contramesures.`;
@@ -348,115 +525,32 @@ export function parseCountermeasures(value: unknown): readonly Countermeasure[] 
   const result: Countermeasure[] = [];
   let vertices = 0;
   for (const raw of value) {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'Contramesura incorrecta.';
-    // A field this version does not know may be one that changes the fire.
-    const unknown = Object.keys(raw).find((key) => !FIELDS.has(key));
-    if (unknown !== undefined) return `Camp de contramesura desconegut: «${unknown}».`;
-    const def = COUNTERMEASURE_CATALOG.find((d) => d.kind === raw.kind);
-    if (!def) return 'Tipus de contramesura desconegut.';
+    const def = identifyMeasure(raw);
+    if (typeof def === 'string') return def;
     const crew = ['arrivalMin', 'crewSize', 'ratePerPerson'].some((key) => key in raw);
-    if (crew) {
-      if (!crewKind(def.kind)) return 'Aquest tipus de contramesura no admet brigades.';
-      if (!['arrivalMin', 'crewSize', 'ratePerPerson'].every((key) => finite(raw[key])))
-        return 'La brigada necessita arribada, efectius i rendiment, tots tres numèrics.';
-      if (
-        raw.arrivalMin < CREW_LIMITS.arrivalMin.min ||
-        raw.arrivalMin > CREW_LIMITS.arrivalMin.max
-      )
-        return 'L’arribada de la brigada ha de ser entre 0 i 720 minuts.';
-      if (
-        !Number.isInteger(raw.crewSize) ||
-        raw.crewSize < CREW_LIMITS.crewSize.min ||
-        raw.crewSize > CREW_LIMITS.crewSize.max
-      )
-        return 'La brigada ha de tenir entre 1 i 500 efectius, sense decimals.';
-      const unit = def.kind === 'mop-up' ? 'ha/h' : 'm/h';
-      const limits = CREW_LIMITS[unit];
-      if (raw.ratePerPerson < limits.min || raw.ratePerPerson > limits.max)
-        return `El rendiment per efectiu ha de ser entre ${limits.min} i ${limits.max} ${unit}.`;
-    }
-    if (typeof raw.id !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(raw.id) || ids.has(raw.id))
-      return 'Identificador de contramesura incorrecte o repetit.';
-    if (
-      !Array.isArray(raw.points) ||
-      !raw.points.every(validPoint) ||
-      (def.geometry === 'point' ? raw.points.length !== 1 : raw.points.length < 2) ||
-      raw.points.length > MAX_VERTICES
-    )
-      return 'Geometria de contramesura incorrecta.';
+    const crewError = validateCrewFields(raw, def, crew);
+    if (crewError) return crewError;
+    const idError = validateIdentifier(raw, ids);
+    if (idError) return idError;
+    const pointsError = validatePointsShape(raw, def);
+    if (pointsError) return pointsError;
     vertices += raw.points.length;
     if (vertices > 512) return 'El pla supera els 512 vèrtexs.';
-    if (
-      def.geometry === 'line' &&
-      !raw.points.some((p: Point) => p[0] !== raw.points[0][0] || p[1] !== raw.points[0][1])
-    )
-      return 'La franja necessita dos punts diferents.';
-    if (!finite(raw.widthM) || raw.widthM < WIDTH_LIMITS.min || raw.widthM > WIDTH_LIMITS.max)
-      return `L'amplada ha d'estar entre ${CELL_M} i 3000 m.`;
-    const liquid =
-      raw.litresPerPass !== undefined ||
-      raw.passes !== undefined ||
-      raw.passIntervalMin !== undefined;
-    const removal = raw.fuelRemaining !== undefined;
-    if (
-      liquid &&
-      (!liquidKind(def.kind) ||
-        !finite(raw.litresPerPass) ||
-        raw.litresPerPass < 1 ||
-        raw.litresPerPass > liquidCapacity(def.kind) ||
-        !Number.isInteger(raw.passes) ||
-        raw.passes < 1 ||
-        raw.passes > 20 ||
-        !finite(raw.passIntervalMin) ||
-        raw.passIntervalMin < 1 ||
-        raw.passIntervalMin > 120)
-    )
-      return `Descàrrega incorrecta: 1–${liquidCapacity(def.kind)} L per passada, 1–20 passades i 1–120 min entre passades.`;
-    if (
-      removal &&
-      (def.kind !== 'clearing' ||
-        !finite(raw.fuelRemaining) ||
-        raw.fuelRemaining < 0.05 ||
-        raw.fuelRemaining > 1)
-    )
-      return 'La tala ha de conservar entre el 5 i el 100 % de la càrrega original.';
-    if ((liquid || removal) && (raw.strength !== 0 || raw.durationMin !== 0))
-      return 'Les mesures de líquid o càrrega no admeten reducció artificial ni durada fixa.';
-    if (!finite(raw.strength) || raw.strength < 0 || raw.strength > 0.95)
-      return 'La reducció ha d’estar entre 0 i 95 %.';
-    if (
-      !finite(raw.durationMin) ||
-      (!liquid && temporary(def.kind)
-        ? raw.durationMin < DURATION_LIMITS.min || raw.durationMin > DURATION_LIMITS.max
-        : raw.durationMin !== 0)
-    )
-      return 'Durada incorrecta: 1–720 min per als efectes temporals; 0 per als permanents.';
+    const lineError = validateLineDistinct(raw, def);
+    if (lineError) return lineError;
+    const widthError = validateWidth(raw);
+    if (widthError) return widthError;
+    const { liquid, removal } = physicalFlags(raw);
+    const liquidError = validateLiquid(raw, def, liquid);
+    if (liquidError) return liquidError;
+    const removalError = validateRemoval(raw, def, removal);
+    if (removalError) return removalError;
+    const strengthDurationError = validateStrengthDuration(raw, def, liquid, removal);
+    if (strengthDurationError) return strengthDurationError;
     ids.add(raw.id);
-    if (
-      raw.startMin !== undefined &&
-      (!finite(raw.startMin) || raw.startMin < 0 || raw.startMin > 720)
-    )
-      return 'El desplegament ha de ser entre 0 i 720 minuts.';
-    result.push({
-      id: raw.id,
-      kind: def.kind,
-      points: raw.points.map((p: Point) => [p[0], p[1]] as Point),
-      widthM: raw.widthM,
-      strength: raw.strength,
-      durationMin: raw.durationMin,
-      ...(raw.startMin !== undefined ? { startMin: raw.startMin } : {}),
-      ...(liquid
-        ? {
-            litresPerPass: raw.litresPerPass,
-            passes: raw.passes,
-            passIntervalMin: raw.passIntervalMin,
-          }
-        : {}),
-      ...(removal ? { fuelRemaining: raw.fuelRemaining } : {}),
-      ...(crew
-        ? { arrivalMin: raw.arrivalMin, crewSize: raw.crewSize, ratePerPerson: raw.ratePerPerson }
-        : {}),
-    });
+    const startMinError = validateStartMin(raw);
+    if (startMinError) return startMinError;
+    result.push(toCountermeasure(raw, def, liquid, removal, crew));
   }
   return result;
 }
@@ -636,53 +730,77 @@ interface CountermeasureField {
   readonly timedIgnitions: readonly { cell: number; minute: number }[];
 }
 
-// eslint-disable-next-line complexity -- pending (docs/estil.md §4): one branch per kind of measure; split with parseCountermeasures.
-export function compileCountermeasures(
-  centre: Point,
-  input: readonly Countermeasure[],
-  crewStops: ReadonlyMap<string, number> = new Map(),
-): CountermeasureField {
-  const measures = parseCountermeasures(input);
-  if (typeof measures === 'string') throw new Error(measures);
-  const blocked = new Uint8Array(GRID * GRID);
-  const permanent = new Float32Array(GRID * GRID).fill(1);
-  const intervals = new Map<number, { from: number; until: number; factor: number }[]>();
-  const wet = new Map<number, TreatmentWindow[]>();
-  const ignitions = new Set<number>();
-  const timedIgnitions = new Map<number, number>();
-  const mopUp = new Map<number, number>();
-  for (const measure of measures) {
-    if (physicalMeasure(measure)) continue;
-    const schedule = crewSchedule(centre, measure);
-    const cells = schedule?.cells ?? countermeasureCells(centre, measure);
-    for (let i = 0; i < cells.length; i++) {
-      const cell = cells[i];
-      const from = schedule?.minutes[i] ?? measure.startMin ?? 0;
-      if (schedule && from > (crewStops.get(measure.id) ?? Infinity)) continue;
-      // Mop-up is a barrier from its minute on, like a late firebreak; what
-      // it adds is that the fire already in the cell goes out (fire-spread).
-      if (measure.kind === 'mop-up') mopUp.set(cell, Math.min(mopUp.get(cell) ?? Infinity, from));
-      const barrier =
-        measure.kind === 'firebreak' ||
-        measure.kind === 'defense-line' ||
-        measure.kind === 'mop-up';
-      if (barrier && from === 0) blocked[cell] = 1;
-      else if (measure.kind === 'clearing' && from === 0)
-        permanent[cell] = Math.min(permanent[cell], 1 - measure.strength);
-      else if (measure.kind === 'backfire') {
-        if (from === 0) ignitions.add(cell);
-        else timedIgnitions.set(cell, Math.min(timedIgnitions.get(cell) ?? Infinity, from));
-      } else if (barrier || measure.strength > 0) {
-        let windows = intervals.get(cell);
-        if (!windows) intervals.set(cell, (windows = []));
-        windows.push({
-          from,
-          until: measure.durationMin ? from + measure.durationMin : Infinity,
-          factor: barrier ? 0 : 1 - measure.strength,
-        });
-      }
-    }
+interface PendingWindow {
+  readonly from: number;
+  readonly until: number;
+  readonly factor: number;
+}
+
+/** The mutable state one measure's cells are folded into, built up across all measures. */
+interface MeasureEffects {
+  readonly blocked: Uint8Array;
+  readonly permanent: Float32Array;
+  readonly intervals: Map<number, PendingWindow[]>;
+  readonly ignitions: Set<number>;
+  readonly timedIgnitions: Map<number, number>;
+  readonly mopUp: Map<number, number>;
+}
+
+const isBarrierKind = (kind: CountermeasureKind): boolean =>
+  kind === 'firebreak' || kind === 'defense-line' || kind === 'mop-up';
+
+/** One measure's effect on a single cell it reaches, from the minute it does (§11.40 mop-up). */
+function applyMeasureEffect(
+  measure: Countermeasure,
+  cell: number,
+  from: number,
+  effects: MeasureEffects,
+): void {
+  const { blocked, permanent, intervals, ignitions, timedIgnitions, mopUp } = effects;
+  // Mop-up is a barrier from its minute on, like a late firebreak; what it
+  // adds is that the fire already in the cell goes out (fire-spread).
+  if (measure.kind === 'mop-up') mopUp.set(cell, Math.min(mopUp.get(cell) ?? Infinity, from));
+  const barrier = isBarrierKind(measure.kind);
+  if (barrier && from === 0) blocked[cell] = 1;
+  else if (measure.kind === 'clearing' && from === 0)
+    permanent[cell] = Math.min(permanent[cell], 1 - measure.strength);
+  else if (measure.kind === 'backfire') {
+    if (from === 0) ignitions.add(cell);
+    else timedIgnitions.set(cell, Math.min(timedIgnitions.get(cell) ?? Infinity, from));
+  } else if (barrier || measure.strength > 0) {
+    let windows = intervals.get(cell);
+    if (!windows) intervals.set(cell, (windows = []));
+    windows.push({
+      from,
+      until: measure.durationMin ? from + measure.durationMin : Infinity,
+      factor: barrier ? 0 : 1 - measure.strength,
+    });
   }
+}
+
+/** Every cell one measure reaches, with the minute it does (crew schedule, or immediate). */
+function applyMeasure(
+  centre: Point,
+  measure: Countermeasure,
+  crewStops: ReadonlyMap<string, number>,
+  effects: MeasureEffects,
+): void {
+  const schedule = crewSchedule(centre, measure);
+  const cells = schedule?.cells ?? countermeasureCells(centre, measure);
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i];
+    const from = schedule?.minutes[i] ?? measure.startMin ?? 0;
+    if (schedule && from > (crewStops.get(measure.id) ?? Infinity)) continue;
+    applyMeasureEffect(measure, cell, from, effects);
+  }
+}
+
+/** Collapse each cell's overlapping windows into the piecewise-constant schedule treatmentFactor reads. */
+function buildTreatmentWindows(
+  intervals: ReadonlyMap<number, readonly PendingWindow[]>,
+  permanent: Float32Array,
+): Map<number, TreatmentWindow[]> {
+  const wet = new Map<number, TreatmentWindow[]>();
   for (const [cell, windows] of intervals) {
     const cuts = [...new Set([0, ...windows.flatMap((w) => [w.from, w.until]), Infinity])].sort(
       (a, b) => a - b,
@@ -700,14 +818,36 @@ export function compileCountermeasures(
     }
     wet.set(cell, schedule);
   }
+  return wet;
+}
+
+export function compileCountermeasures(
+  centre: Point,
+  input: readonly Countermeasure[],
+  crewStops: ReadonlyMap<string, number> = new Map(),
+): CountermeasureField {
+  const measures = parseCountermeasures(input);
+  if (typeof measures === 'string') throw new Error(measures);
+  const effects: MeasureEffects = {
+    blocked: new Uint8Array(GRID * GRID),
+    permanent: new Float32Array(GRID * GRID).fill(1),
+    intervals: new Map(),
+    ignitions: new Set(),
+    timedIgnitions: new Map(),
+    mopUp: new Map(),
+  };
+  for (const measure of measures) {
+    if (physicalMeasure(measure)) continue;
+    applyMeasure(centre, measure, crewStops, effects);
+  }
   return {
-    mopUp,
-    blocked,
-    permanent,
-    temporary: wet,
-    ignitions: [...ignitions],
-    timedIgnitions: [...timedIgnitions]
-      .filter(([cell]) => !ignitions.has(cell))
+    mopUp: effects.mopUp,
+    blocked: effects.blocked,
+    permanent: effects.permanent,
+    temporary: buildTreatmentWindows(effects.intervals, effects.permanent),
+    ignitions: [...effects.ignitions],
+    timedIgnitions: [...effects.timedIgnitions]
+      .filter(([cell]) => !effects.ignitions.has(cell))
       .map(([cell, minute]) => ({ cell, minute })),
   };
 }
