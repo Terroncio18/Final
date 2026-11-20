@@ -1,0 +1,175 @@
+/* The tool's modal (§11.39).
+ *
+ * Its own rules, moved here from countermeasures.css, and a copy of the
+ * console's that it also wears —the row of buttons, the note, the field— from
+ * simulator-view.css and countermeasures.css, which keep theirs for the rest
+ * of the screen. The copies are in the order they had there, so the cascade
+ * comes out the same. The colours are the console's custom properties, which
+ * reach in from its host.
+ */
+
+/* The host adds no box: the backdrop and the modal are fixed to the window. */
+:host {
+  display: contents;
+}
+
+/* ---- Copied from simulator-view.css ---- */
+
+.terrain-note {
+  margin: 9px 0 0;
+  font-size: 10px;
+  color: #8e9ba8;
+}
+
+.tools-row {
+  display: flex;
+  gap: 8px;
+}
+
+.tools-row button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 50%;
+  padding: 6px;
+  font: inherit;
+  font-size: 11px;
+  color: #a7b4c0;
+  background: none;
+  border: 1px solid #35414e;
+  border-radius: 4px;
+  cursor: pointer;
+  --icon-size: 13px;
+}
+
+.primary {
+  flex: 1;
+  font-size: 12px;
+  padding: 9px 7px;
+  color: #231b16;
+  background: var(--orange);
+  border-color: var(--orange);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 3px;
+}
+
+/* ---- Copied from countermeasures.css ---- */
+
+.measure-fields input:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 1px;
+}
+
+.measure-note.failed {
+  color: #e8a37c;
+}
+
+.measure-dot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 4px;
+  background: var(--measure);
+  border-radius: 2px;
+}
+
+.measure-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 5px 0 0 18px;
+}
+
+.measure-fields label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  color: #8e9ba8;
+}
+
+.measure-fields input {
+  width: 52px;
+  padding: 2px 4px;
+  font: inherit;
+  color: inherit;
+  background: #0f151b;
+  border: 1px solid #35414e;
+  border-radius: 3px;
+}
+
+/* ---- The modal's own ---- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: #05090dad;
+}
+
+.tool-modal {
+  position: fixed;
+  z-index: 41;
+  top: 50%;
+  left: 50%;
+  width: min(360px, calc(100vw - 32px));
+  padding: 18px;
+  transform: translate(-50%, -50%);
+  background: var(--panel);
+  border: 1px solid #3a4652;
+  border-top: 3px solid var(--measure);
+  border-radius: 6px;
+  box-shadow: 0 18px 50px #000a;
+}
+
+.tool-modal h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.tool-modal a {
+  font-size: 10px;
+  color: #9fb2c0;
+}
+
+.tool-modal .measure-fields {
+  flex-direction: column;
+  gap: 9px;
+  margin: 14px 0 0;
+}
+
+.tool-modal .measure-fields label {
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.tool-modal .measure-fields input {
+  width: 90px;
+  padding: 5px 7px;
+}
+
+.tool-modal-actions {
+  margin-top: 16px;
+}
+
+.tool-modal-actions button {
+  width: auto;
+  flex: 1;
+  justify-content: center;
+}
+
+.tool-modal .crew-source {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #9fb0bc;
+}

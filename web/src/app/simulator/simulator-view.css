@@ -1660,10 +1660,3 @@ select:focus-visible {
   font-size: 17px;
   line-height: 1.5;
 }
-
-.tool-modal .crew-source {
-  display: block;
-  margin-top: 8px;
-  font-size: 11px;
-  color: #9fb0bc;
-}

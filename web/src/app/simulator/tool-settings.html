@@ -1,0 +1,132 @@
+@if (configView(); as config) {
+  <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- Escape closes it from anywhere: the simulator view listens on the document. -->
+  <div class="modal-backdrop" (click)="cancelSettings()"></div>
+  <div
+    class="tool-modal"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="config.label"
+    [style.--measure]="config.colour"
+  >
+    <h3><span class="measure-dot"></span>{{ config.label }}</h3>
+    @if (config.aircraft; as aircraft) {
+      <a [href]="aircraft.source" target="_blank" rel="noopener noreferrer"
+        >{{ aircraft.name }} · capacitat {{ aircraft.capacityL }} L</a
+      >
+    }
+    <div class="measure-fields">
+      <label>
+        <span>{{ config.widthLabel }} (m)</span>
+        <input
+          type="number"
+          inputmode="numeric"
+          step="1"
+          [min]="widthLimits.min"
+          [max]="widthLimits.max"
+          [value]="shown(config.settings.widthM)"
+          (change)="setSetting('widthM', $event)"
+        />
+      </label>
+      @if (config.liquid) {
+        <label>
+          <span>Litres per passada</span>
+          <input
+            type="number"
+            min="1"
+            [max]="config.capacity"
+            step="1"
+            [value]="shown(config.settings.litresPerPass)"
+            (change)="setSetting('litresPerPass', $event)"
+          />
+        </label>
+        <label>
+          <span>Passades</span>
+          <input
+            type="number"
+            min="1"
+            max="20"
+            step="1"
+            [value]="shown(config.settings.passes)"
+            (change)="setSetting('passes', $event)"
+          />
+        </label>
+        <label>
+          <span>Temps entre passades (min)</span>
+          <input
+            type="number"
+            min="1"
+            max="120"
+            step="1"
+            [value]="shown(config.settings.passIntervalMin)"
+            (change)="setSetting('passIntervalMin', $event)"
+          />
+        </label>
+      }
+      @if (config.removal) {
+        <label>
+          <span>Combustible restant (%)</span>
+          <input
+            type="number"
+            min="5"
+            max="100"
+            step="1"
+            [value]="shown(config.settings.fuelRemaining, true)"
+            (change)="setSetting('fuelRemaining', $event)"
+          />
+        </label>
+      }
+      @if (config.crew; as crew) {
+        <label>
+          <span>Arribada (min)</span>
+          <input
+            type="number"
+            min="0"
+            max="720"
+            step="1"
+            [value]="shown(config.settings.arrivalMin)"
+            (change)="setSetting('arrivalMin', $event)"
+          />
+        </label>
+        <label>
+          <span>Efectius</span>
+          <input
+            type="number"
+            min="1"
+            max="500"
+            step="1"
+            [value]="shown(config.settings.crewSize)"
+            (change)="setSetting('crewSize', $event)"
+          />
+        </label>
+        <label>
+          <span>Rendiment per efectiu ({{ crew.unit }})</span>
+          <input
+            type="number"
+            [min]="crew.min"
+            [max]="crew.max"
+            step="any"
+            [value]="shown(config.settings.ratePerPerson)"
+            (change)="setSetting('ratePerPerson', $event)"
+          />
+        </label>
+      }
+    </div>
+    @if (config.crew; as crew) {
+      @if (crew.url) {
+        <a [href]="crew.url" target="_blank" rel="noopener noreferrer"
+          >Rendiment: {{ crew.cite }}</a
+        >
+      } @else {
+        <small class="crew-source">Rendiment provisional, sense font publicada</small>
+      }
+    }
+    @if (config.error) {
+      <p class="terrain-note measure-note failed" role="alert">{{ config.error }}</p>
+    }
+    <div class="tools-row tool-modal-actions">
+      <button type="button" (click)="resetSettings()"><app-icon name="reset" /> Restablir</button>
+      <button type="button" (click)="cancelSettings()">Cancel·lar</button>
+      <button type="button" class="primary" (click)="apply.emit()">Aplicar</button>
+    </div>
+  </div>
+}

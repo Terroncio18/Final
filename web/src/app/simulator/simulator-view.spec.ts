@@ -1,8 +1,10 @@
 import { signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { vi, type Mock } from 'vitest';
 import { SimulatorView, SIMULATE_FIRE } from './simulator-view';
+import { ToolSettingsModal } from './tool-settings';
 import { Chrome } from '../chrome';
 import { MapService } from '../map/map.service';
 import { PlacesService } from '../map/places.service';
@@ -618,10 +620,17 @@ describe('simulator screen', () => {
   });
 
   it('validates countermeasure settings, remembers choices and warns before editing history', async () => {
+    // The modal's own fields are tested in tool-settings.spec.ts; here, that
+    // it opens, edits this view's state and hands the apply back to it.
+    const modal = async () => {
+      await fixture.whenStable();
+      return fixture.debugElement.query(By.directive(ToolSettingsModal))?.componentInstance as
+        ToolSettingsModal | undefined;
+    };
+    const element = () => fixture.nativeElement as HTMLElement;
     await open();
-    expect(c['configView']()).toBeNull();
-    c['setSetting']('widthM', input('50'));
-    c['resetSettings']();
+    expect(c['configuring']()).toBeNull();
+    expect(await modal()).toBeUndefined();
     c['applySettings']();
     c['confirmPastMeasure']();
     c['computing'].set(true);
@@ -630,27 +639,30 @@ describe('simulator screen', () => {
     c['computing'].set(false);
     for (const entry of COUNTERMEASURE_CATALOG) {
       c['pickMeasure'](entry.kind);
-      expect(c['configView']()?.label).toBe(entry.label);
-      c['cancelSettings']();
+      await modal();
+      expect(element().querySelector('.tool-modal h3')?.textContent).toBe(entry.label);
+      element()
+        .querySelector<HTMLButtonElement>('.tool-modal-actions button:nth-child(2)')!
+        .click();
+      expect(c['configuring']()).toBeNull();
+      expect(await modal()).toBeUndefined();
     }
     c['pickMeasure']('clearing');
-    c['setSetting']('fuelRemaining', input('25,5'));
+    const settings = (await modal())!;
+    settings['setSetting']('fuelRemaining', input('25,5'));
     expect(c['configuring']()!.settings.fuelRemaining).toBe(0.255);
-    c['setSetting']('widthM', input(''));
-    c['applySettings']();
+    settings['setSetting']('widthM', input(''));
+    element().querySelector<HTMLButtonElement>('.tool-modal .primary')!.click();
     expect(c['configuring']()?.error).toBeTruthy();
-    c['resetSettings']();
-    c['applySettings']();
+    settings['resetSettings']();
+    element().querySelector<HTMLButtonElement>('.tool-modal .primary')!.click();
     expect(c['plan'].kind()).toBe('clearing');
+    expect(await modal()).toBeUndefined();
     c['pickMeasure']('clearing');
     expect(c['plan'].kind()).toBeNull();
     c['pickMeasure']('clearing');
     c['pickMeasure']('clearing');
     expect(c['configuring']()).toBeNull();
-    expect(c['shown'](undefined)).toBe('');
-    expect(c['shown'](NaN)).toBe('');
-    expect(c['shown'](0.25, true)).toBe(25);
-    expect(c['shown'](30)).toBe(30);
     c['result'].set(resultFor());
     c['minutes'].set(10);
     c['plan'].measures.set([measure({ startMin: 20 })]);
