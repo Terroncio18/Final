@@ -56,6 +56,14 @@ export default tseslint.config(
       complexity: ['error', 15],
       // A promise nobody waits for is a failure nobody sees (§11.57).
       '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-explicit-any': 'error',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'TSUnknownKeyword',
+          message: 'Defineix el tipus concret de les dades: unknown no està permès al projecte.',
+        },
+      ],
       // Two unused names that are not mistakes: the key a rest pattern leaves
       // out on purpose, and a parameter kept with `_` to show the shape.
       '@typescript-eslint/no-unused-vars': [
@@ -72,13 +80,6 @@ export default tseslint.config(
         { type: 'element', prefix: 'app', style: 'kebab-case' },
       ],
     },
-  },
-  {
-    // Grouped by subject, not by kind: the signal and what is derived from it
-    // side by side. Reordering them would scatter what is read together over a
-    // thousand lines; what they need is to be split (docs/estil.md §1).
-    files: ['src/app/simulator/simulator-view.ts', 'src/app/simulator/countermeasure-plan.ts'],
-    rules: { '@typescript-eslint/member-ordering': 'off' },
   },
   {
     files: ['**/*.spec.ts'],
