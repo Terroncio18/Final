@@ -14,13 +14,8 @@ const WETTING = {
   dryingTimeMin: 60,
   stepMin: 5,
   maxMoisture: 3,
-  /**
-   * Added moisture below which the water is taken as dried off: 0.1 points of
-   * fine fuel moisture, which moves Rothermel's rate by well under 1 %. From
-   * then on the cell is its plain fuel again and costs the model nothing more
-   * (§11.36); before this, a drop was followed in five-minute steps to the end
-   * of the run.
-   */
+  // Treat added moisture below 0.001 (0.1 percentage points) as dry: its spread-rate effect is
+  // below 1%, allowing the plain-fuel fast path.
   driedMoisture: 0.001,
 } as const;
 type Drop = { minute: number; litresM2: number };
@@ -40,7 +35,6 @@ function firstEvent(history: History): number {
   return Math.min(history.drops[0]?.minute ?? Infinity, history.removals[0]?.minute ?? Infinity);
 }
 
-/** The latest drop or removal by a minute, and never before the first. */
 function lastEventBy(history: History, first: number, minute: number): number {
   return Math.max(
     first,
@@ -49,7 +43,6 @@ function lastEventBy(history: History, first: number, minute: number): number {
   );
 }
 
-/** The share of the original load left by a minute. */
 function remainingAt(history: History, time: number): number {
   return Math.min(1, ...history.removals.filter((r) => r.minute <= time).map((r) => r.remaining));
 }
@@ -58,7 +51,6 @@ function nextRemoval(history: History, minute: number): number {
   return history.removals.find((r) => r.minute > minute)?.minute ?? Infinity;
 }
 
-/** Where a wet interval ends: the next event, or the next moisture step once wetted. */
 function intervalEnd(history: History, minute: number): number {
   const tick = Math.floor(minute / WETTING.stepMin) * WETTING.stepMin;
   return Math.min(
@@ -93,7 +85,7 @@ function addedMoisture(history: History, model: FuelModel, from: number, dead1: 
 /** Sparse dose histories. Fuel inputs and the land-cover grid remain immutable. */
 export class FuelTreatments {
   private readonly histories = new Map<number, History>();
-  /** Per cell, the state from each quantised minute: it depends on nothing else. */
+
   private readonly cache = new Map<number, Map<number, TreatedFuel>>();
   /** Per cell, the plain-fuel state once its water has dried off, and since when. */
   private readonly dried = new Map<number, { from: number; state: TreatedFuel }>();
@@ -117,16 +109,12 @@ export class FuelTreatments {
     return this.histories.has(cell);
   }
 
-  /** Every cell with a treatment, whenever it comes. */
   public cells(): IterableIterator<number> {
     return this.histories.keys();
   }
 
-  /**
-   * The treated fuel of a cell at a minute, or undefined before its first
-   * treatment. Called for every step through a treated cell, so the saved
-   * states are looked up first and only a miss works one out.
-   */
+  // This is called for every treated-cell step; cache interval states and calculate only on a
+  // miss.
   public at(cell: number, minute: number): TreatedFuel | undefined {
     const history = this.histories.get(cell),
       model = this.models[this.fuels?.[cell] ?? 1];
@@ -153,7 +141,6 @@ export class FuelTreatments {
     );
   }
 
-  /** Works out the state of an interval that starts at `from`, and saves it. */
   private settle(
     cell: number,
     model: FuelModel,
@@ -162,7 +149,7 @@ export class FuelTreatments {
     from: number,
   ): TreatedFuel {
     const excess = addedMoisture(history, model, from, this.moistures.dead1);
-    // Dried off, and no other drop to come: plain fuel until the next removal.
+
     const dry = excess < WETTING.driedMoisture && !history.drops.some((d) => d.minute > minute);
     const remaining = remainingAt(history, minute);
     const moisture1h = this.moistures.dead1 + (dry ? 0 : excess);
@@ -185,7 +172,6 @@ export class FuelTreatments {
     return state;
   }
 
-  /** Writes one measure into the history of every cell it reaches, up to its crew's stop. */
   private record(centre: Point, measure: Countermeasure, stop: number): void {
     const schedule = crewSchedule(centre, measure);
     const footprint = schedule?.cells ?? countermeasureCells(centre, measure);

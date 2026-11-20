@@ -8,11 +8,12 @@ import { TerrainService } from './terrain.service';
 import { readTerrain, type Terrain } from './terrain';
 import { PointLocator, shapeAt } from './point-locator';
 import { boundsOf, contains, type AreaGeometry } from './bounds';
+import type { JsonValue } from './json-value';
 
-const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+const response = (body: JsonValue, status = 200) => new Response(JSON.stringify(body), { status });
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  let reject!: (reason: unknown) => void;
+  let reject!: (reason: Error) => void;
   const promise = new Promise<T>((yes, no) => {
     resolve = yes;
     reject = no;
@@ -178,6 +179,64 @@ describe('simulation input requests', () => {
     expect(await locator.locate([2, 2])).toBeNull();
     fetcher.mockResolvedValueOnce(response({}, 404));
     await expect(new PointLocator().locate([0, 0])).rejects.toThrow('404');
+  });
+
+  it('retries a failed province read and then reuses the successful lookup', async () => {
+    fetcher
+      .mockResolvedValueOnce(response({}, 503))
+      .mockResolvedValueOnce(
+        response({ features: [{ id: 'ES531', properties: { region: 'ES53' }, geometry }] }),
+      )
+      .mockResolvedValueOnce(response({ features: [{ properties: { id: 'one' }, geometry }] }));
+    const locator = new PointLocator();
+    await expect(locator.locate([0.5, 0.5])).rejects.toThrow('503');
+    await expect(locator.locate([0.5, 0.5])).resolves.toEqual({
+      region: 'ES53',
+      province: 'ES531',
+      municipality: 'one',
+    });
+    await expect(locator.locate([0.5, 0.5])).resolves.not.toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it('retries only the failed municipalities while retaining the province data', async () => {
+    fetcher
+      .mockResolvedValueOnce(
+        response({ features: [{ id: 'ES531', properties: { region: 'ES53' }, geometry }] }),
+      )
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(response({ features: [{ properties: { id: 'one' }, geometry }] }));
+    const locator = new PointLocator();
+    await expect(locator.locate([0.5, 0.5])).rejects.toThrow('offline');
+    await expect(locator.locate([0.5, 0.5])).resolves.toEqual({
+      region: 'ES53',
+      province: 'ES531',
+      municipality: 'one',
+    });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it('shares concurrent failures and concurrent retry reads', async () => {
+    const initial = deferred<Response>();
+    fetcher.mockReturnValueOnce(initial.promise);
+    const locator = new PointLocator();
+    const failed = Promise.allSettled([locator.locate([0.5, 0.5]), locator.locate([0.5, 0.5])]);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    initial.reject(new Error('offline'));
+    expect((await failed).every((entry) => entry.status === 'rejected')).toBe(true);
+    const province = deferred<Response>();
+    const municipalities = deferred<Response>();
+    fetcher.mockReturnValueOnce(province.promise).mockReturnValueOnce(municipalities.promise);
+    const retried = Promise.all([locator.locate([0.5, 0.5]), locator.locate([0.5, 0.5])]);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    province.resolve(
+      response({ features: [{ id: 'ES531', properties: { region: 'ES53' }, geometry }] }),
+    );
+    await settle();
+    expect(fetcher).toHaveBeenCalledTimes(3);
+    municipalities.resolve(response({ features: [{ properties: { id: 'one' }, geometry }] }));
+    const result = { region: 'ES53', province: 'ES531', municipality: 'one' };
+    expect(await retried).toEqual([result, result]);
   });
 
   it('returns no place for water inside a province but outside its municipalities', async () => {

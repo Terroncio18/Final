@@ -23,7 +23,7 @@ describe('point locator', () => {
       bounds: [1, 0, 2, 1] as const,
       geometry: { type: 'Polygon', coordinates: square(1, 0) },
     },
-  ] as never;
+  ] satisfies Parameters<typeof shapeAt>[0];
 
   it('finds the shape a point falls in, and nothing outside them all', () => {
     expect(shapeAt(shapes, [0.5, 0.5])).toBe('A');

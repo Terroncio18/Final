@@ -1,10 +1,9 @@
 import { Injectable } from '@angular/core';
-import type { FeatureCollection } from 'geojson';
+import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson';
 import { MUNICIPALITIES_URL, PROVINCES_URL } from '../map/map.config';
 import { boundsOf, contains, type AreaGeometry } from './bounds';
 import type { Point } from './point';
 
-/** The three codes the simulator's address is made of (§2.26). */
 export interface Place {
   readonly region: string;
   readonly province: string;
@@ -17,14 +16,18 @@ interface Shape {
   readonly geometry: AreaGeometry;
 }
 
-function shapes(collection: FeatureCollection, id: (feature: GeoJSON.Feature) => string): Shape[] {
+type AreaCollection = FeatureCollection<Polygon | MultiPolygon>;
+
+function shapes(
+  collection: AreaCollection,
+  id: (feature: Feature<Polygon | MultiPolygon>) => string,
+): Shape[] {
   return collection.features.map((feature) => {
-    const geometry = feature.geometry as unknown as AreaGeometry;
+    const geometry = feature.geometry;
     return { id: id(feature), bounds: boundsOf(geometry), geometry };
   });
 }
 
-/** The shape a point falls in: the extent first, four comparisons, then the outline. */
 export function shapeAt(list: readonly Shape[], [lon, lat]: Point): string | null {
   for (const shape of list) {
     const [west, south, east, north] = shape.bounds;
@@ -34,42 +37,59 @@ export function shapeAt(list: readonly Shape[], [lon, lat]: Point): string | nul
   return null;
 }
 
-/**
- * Which region, province and municipality a point is in: what a detection
- * needs to open the simulator, which is addressed by those codes like the form
- * (§11.53). Read from the same files the form reads, the provinces once and
- * each province's municipalities when a point falls in it, and kept.
- */
+// Reuse the form’s province and municipality files. Cache each province’s geometry after the first
+// point query.
 @Injectable({ providedIn: 'root' })
 export class PointLocator {
   private provinces: Promise<Shape[]> | null = null;
-  /** Each province's region, as the provinces file says it (NUTS 2). */
+
   private readonly regions = new Map<string, string>();
   private readonly municipalities = new Map<string, Promise<Shape[]>>();
 
   public async locate(point: Point): Promise<Place | null> {
-    this.provinces ??= read(PROVINCES_URL).then((c) => {
-      for (const f of c.features) this.regions.set(String(f.id), String(f.properties?.['region']));
-      return shapes(c, (f) => String(f.id));
-    });
-    const province = shapeAt(await this.provinces, point);
+    const province = shapeAt(await this.readProvinces(), point);
     if (!province) return null;
-    let list = this.municipalities.get(province);
-    if (!list) {
-      list = read(`${MUNICIPALITIES_URL}/${province}.geojson`).then((c) =>
-        shapes(c, (f) => String(f.properties?.['id'])),
-      );
-      this.municipalities.set(province, list);
-    }
-    const municipality = shapeAt(await list, point);
+    const municipality = shapeAt(await this.readMunicipalities(province), point);
     const region = this.regions.get(province);
     return municipality && region ? { region, province, municipality } : null;
   }
+
+  private readProvinces(): Promise<Shape[]> {
+    if (this.provinces) return this.provinces;
+    const pending: Promise<Shape[]> = read(PROVINCES_URL)
+      .then((collection) => {
+        const list = shapes(collection, (feature) => String(feature.id));
+        this.regions.clear();
+        for (const feature of collection.features) {
+          this.regions.set(String(feature.id), String(feature.properties?.['region']));
+        }
+        return list;
+      })
+      .catch((error) => {
+        if (this.provinces === pending) this.provinces = null;
+        throw error;
+      });
+    this.provinces = pending;
+    return pending;
+  }
+
+  private readMunicipalities(province: string): Promise<Shape[]> {
+    const held = this.municipalities.get(province);
+    if (held) return held;
+    const pending: Promise<Shape[]> = read(`${MUNICIPALITIES_URL}/${province}.geojson`)
+      .then((collection) => shapes(collection, (feature) => String(feature.properties?.['id'])))
+      .catch((error) => {
+        if (this.municipalities.get(province) === pending) this.municipalities.delete(province);
+        throw error;
+      });
+    this.municipalities.set(province, pending);
+    return pending;
+  }
 }
 
-async function read(path: string): Promise<FeatureCollection> {
-  // Against the document, not the current URL, as the form's services do.
+async function read(path: string): Promise<AreaCollection> {
+  // Resolve against document.baseURI rather than the active route.
   const response = await fetch(new URL(path, document.baseURI).href);
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-  return (await response.json()) as FeatureCollection;
+  return (await response.json()) as AreaCollection;
 }

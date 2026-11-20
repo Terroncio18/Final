@@ -21,8 +21,7 @@ function toRegion(feature: RegionFeature): Region {
   const { id, name, country, scope } = feature.properties;
   return {
     id,
-    // GISCO ships at least one name with a trailing space (`Comunitat
-    // Valenciana `), which shows up as a gap before the next word.
+    // GISCO names can have trailing whitespace, for example Comunitat Valenciana.
     name: name.trim(),
     country,
     scope,
@@ -30,35 +29,21 @@ function toRegion(feature: RegionFeature): Region {
   };
 }
 
-/**
- * The regions of the first step, and where each one is.
- *
- * Root-provided on purpose: every step of the form needs the same list, and
- * reading the file once per session is the whole point.
- */
 @Injectable({ providedIn: 'root' })
 export class RegionsService {
-  /** Empty until the file is in. The step says it is waiting. */
   public readonly regions = signal<readonly Region[]>([]);
 
-  /** True when the file could not be read, so the step can say so. */
   public readonly failed = signal(false);
 
   private asked = false;
 
-  /**
-   * Reads the regions, once.
-   *
-   * It is the same file MapLibre has already fetched for the border layer, so
-   * the browser answers from cache and there is no second source of truth for
-   * the names.
-   */
+  // Reuse the same region file as the map so names and borders share one source.
   public load(): void {
     if (this.asked) return;
     this.asked = true;
+    this.failed.set(false);
 
-    // Resolved against the document and not against the current URL: from
-    // /simulacio a relative path would go looking for /simulacio/data/.
+    // Resolve against document.baseURI; nested routes would otherwise request /simulacio/data/.
     const url = new URL(REGIONS_URL, document.baseURI).href;
 
     fetch(url)
@@ -67,13 +52,15 @@ export class RegionsService {
         return response.json() as Promise<RegionCollection>;
       })
       .then((collection) => this.regions.set(collection.features.map(toRegion)))
-      .catch((error: unknown) => {
+      .catch((error: Error) => {
         console.error('[regions]', error);
         this.failed.set(true);
+        // Forget the failed read: these data are asked for once, so without this the screen has
+        // no way back from a passing network failure.
+        this.asked = false;
       });
   }
 
-  /** The region a URL code names, or nothing if it names none. */
   public find(id: string): Region | undefined {
     return this.regions().find((region) => region.id === id);
   }

@@ -1,12 +1,13 @@
 import {
   Component,
   computed,
-  DestroyRef,
   effect,
   ElementRef,
   inject,
   input,
   viewChild,
+  type OnDestroy,
+  type OnInit,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MapService } from '../map/map.service';
@@ -18,31 +19,19 @@ import { PointLocator } from './point-locator';
 import { ProvincesService } from './provinces.service';
 import { TerrainService } from './terrain.service';
 
-/**
- * The end of the hierarchy: the centre of the simulation.
- *
- * The map is already framed on the municipality, so this step only has to turn
- * the canvas into something to click on and put what was clicked into the URL.
- * From there a whole simulation is a link, which is what §2.19 was for.
- *
- * **What is clicked here is the centre of the domain and not where the fire
- * starts** (§11.11). The square is cut around it, and which cell or cells are
- * lit is a question asked inside the simulator, where the ground can be seen
- * in relief and there can be more than one of them. The identifiers still say
- * «ignition» throughout; the rename is its own change.
- */
+// Despite legacy ignition names, this step chooses the domain centre. Fire-start points are added
+// inside the simulator.
 @Component({
   selector: 'app-ignition-step',
   imports: [RouterLink],
   templateUrl: './ignition-step.html',
   styleUrl: './step-panel.css',
 })
-export class IgnitionStep {
+export class IgnitionStep implements OnInit, OnDestroy {
   public readonly region = input.required<string>();
   public readonly province = input.required<string>();
   public readonly municipality = input.required<string>();
 
-  /** The `@lon,lat` segment, absent until something has been clicked. */
   public readonly point = input<string>();
 
   private readonly provinces = inject(ProvincesService);
@@ -53,10 +42,9 @@ export class IgnitionStep {
   private readonly levels = inject(LevelsService);
   private readonly router = inject(Router);
 
-  /** The point a cross-border lookup is answering for, so a later click can supersede it. */
+  // Identify the point being located so a newer click can supersede it.
   private resolving: Point | null = null;
 
-  /** Only in the template once there is a point, so it is not required. */
   private readonly relief = viewChild<ElementRef<HTMLCanvasElement>>('relief');
 
   protected readonly reading = this.terrain.reading;
@@ -65,30 +53,22 @@ export class IgnitionStep {
 
   protected readonly chosen = computed(() => this.municipalities.find(this.municipality()));
 
-  /**
-   * True when the point is in none of the province's municipalities.
-   *
-   * The sea, or a neighbouring province: the domain is 30 km wide and the
-   * border is wherever it is. The URL then keeps the municipality it came
-   * with —there is nothing better to put in it— and the panel says so, which
-   * is the one thing that must not be left to the user to notice.
-   */
+  // An unlocated point keeps the URL municipality but is flagged outside it; this can mean sea or
+  // a neighbouring province.
   protected readonly outside = computed(() => {
     const point = this.ignition();
     if (!point || !this.municipalities.municipalities().length) return false;
     return this.municipalities.at(point) === null;
   });
 
-  /** Nothing when the segment is absent or does not parse. */
   protected readonly ignition = computed(() => parsePoint(this.point()));
 
-  /** Latitude first for reading, longitude first for the URL: see point.ts. */
+  // Display latitude first; URL coordinates are longitude first.
   protected readonly coordinates = computed(() => {
     const point = this.ignition();
     return point ? point[1].toFixed(5) + ', ' + point[0].toFixed(5) : '';
   });
 
-  /** One decimal: the slope of a 30 m cell does not know more than that. */
   protected readonly slopes = computed(() => {
     const ground = this.ground();
     if (!ground) return null;
@@ -102,20 +82,12 @@ export class IgnitionStep {
     };
   });
 
-  /**
-   * Where the button goes, or nothing while there is no point to simulate.
-   *
-   * The same four segments on the simulator's route, so the two screens name
-   * the same simulation the same way (§2.26) and the link can be copied from
-   * one address bar to the other.
-   */
   protected readonly simulation = computed(() => {
     const point = this.ignition();
     if (!point) return null;
     return ['/simulador', this.region(), this.province(), this.municipality(), formatPoint(point)];
   });
 
-  /** What the square on the map is, in the three numbers that define it. */
   protected readonly domain = {
     km: new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 }).format(SIDE_M / 1000),
     grid: GRID,
@@ -123,11 +95,8 @@ export class IgnitionStep {
   };
 
   public constructor() {
-    this.provinces.load();
-
     effect(() => {
-      // Reached straight from a link, the municipalities of this province may
-      // not be in yet; asking again is free once they are.
+      // Direct links may arrive before municipality data; the service reuses an existing load.
       const province = this.provinces.find(this.province());
       if (province) {
         this.levels.show('ignition', {
@@ -139,9 +108,6 @@ export class IgnitionStep {
       const chosen = this.chosen();
       if (!chosen) return;
 
-      // Once there is a point the domain is the thing to look at, and it is
-      // usually wider than the municipality, so the camera follows it. Every
-      // move reframes: the square is what the user is judging, not the town.
       const point = this.ignition();
       if (point) {
         this.maps.setDomain(domainRing(point));
@@ -152,7 +118,6 @@ export class IgnitionStep {
       }
     });
 
-    // The URL is what the map draws: the point is never held here.
     effect(() => this.maps.setIgnition(this.ignition()));
 
     effect(() => {
@@ -163,68 +128,53 @@ export class IgnitionStep {
 
     effect(() => this.drawRelief());
 
-    this.maps.setPicking(true);
-    inject(DestroyRef).onDestroy(() => this.maps.setPicking(false));
-
     effect(() => {
       const picked = this.maps.picked();
       if (!picked) return;
-      // The point decides the municipality, and not the other way round. The
-      // three steps above chose one, but the map does not stop at its border:
-      // clicking two valleys over has to answer about the valley clicked, or
-      // the panel describes a municipality the fire is not in.
+      // The clicked point determines its municipality, even across the previous selection’s
+      // border.
       const local = this.municipalities.at(picked);
       if (local) {
         this.goTo(this.region(), this.province(), local.id, picked);
         return;
       }
 
-      // Not in the province already on screen: the sea, the next province,
-      // or —this is the one the fallback below cannot tell apart on its
-      // own— the other country. PointLocator answers from the whole study
-      // area and not only what is loaded, so a point that crossed the border
-      // gets the address it actually fell in rather than keeping Spain's.
+      // The local province cannot distinguish sea from another country; PointLocator searches the
+      // whole study area.
       this.resolving = picked;
       this.locator
         .locate(picked)
         .then((place) => {
-          if (this.resolving !== picked) return; // superseded by a later click
+          if (this.resolving !== picked) return;
           if (place) this.goTo(place.region, place.province, place.municipality, picked);
-          // The sea, or nothing PointLocator could read either: there is
-          // nothing better to put in it, so the segment stays as it was and
-          // the panel says the point is outside it.
           else this.goTo(this.region(), this.province(), this.municipality(), picked);
         })
-        .catch((error: unknown) => {
+        .catch((error: Error) => {
           console.error('[ignition]', error);
           if (this.resolving !== picked) return;
           this.goTo(this.region(), this.province(), this.municipality(), picked);
         });
     });
-
-    inject(DestroyRef).onDestroy(() => this.terrain.clear());
   }
 
-  /**
-   * Moves the URL to a point, under whichever address answers for it.
-   *
-   * Moving a point that is already set replaces the entry instead of
-   * stacking one: otherwise the back button would walk a trail of nudges
-   * rather than returning to the list.
-   */
+  public ngOnInit(): void {
+    this.provinces.load();
+    this.maps.setPicking(true);
+  }
+
+  public ngOnDestroy(): void {
+    this.maps.setPicking(false);
+    this.terrain.clear();
+  }
+
+  // Replace an existing coordinate entry so Back returns to the list instead of replaying nudges.
   private goTo(region: string, province: string, municipality: string, point: Point): void {
     void this.router.navigate(['/simulacio', region, province, municipality, formatPoint(point)], {
       replaceUrl: this.ignition() !== null,
     });
   }
 
-  /**
-   * A hillshade of what was read, as a check that it is the right ground.
-   *
-   * Numbers alone would not catch a sampling bug: a grid off by one tile still
-   * has a plausible minimum and maximum. A relief does not — it either looks
-   * like the valley on the map beside it or it does not.
-   */
+  // The sampled hillshade helps spot a misaligned grid whose numeric min/max still look plausible.
   private drawRelief(): void {
     const canvas = this.relief()?.nativeElement;
     const ground = this.ground();
@@ -236,8 +186,7 @@ export class IgnitionStep {
     if (!context) return;
 
     const image = context.createImageData(size, size);
-    // Light from the north-west at 45°, which is the convention every relief
-    // map uses: lit from elsewhere, hills read as hollows.
+    // North-west illumination at 45° prevents familiar hills from appearing as hollows.
     const zenith = Math.PI / 4;
     const azimuth = (315 * Math.PI) / 180;
 

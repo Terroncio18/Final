@@ -9,19 +9,8 @@ void main() {
   gl_Position = vec4(p*2.0-1.0, 0.0, 1.0);
 }`;
 
-/**
- * FireCast's char, noise, hot line and three future bands over an arrival field.
- *
- * Two things keep the picture from showing the grid it comes from:
- *
- * - **The edge of what burns is a contour, not a row of cells.** Whether a
- *   cell can be reached is interpolated like the arrival time is, and the
- *   picture ends where that coverage crosses one half. A barrier or a hole
- *   comes out with cut corners instead of steps.
- * - **The forecast lines keep their width on screen**, thin and dashed.
- *   The picture is draped and stretched with the ground, so a width in cells
- *   is under a pixel with the 30 km domain in view and a band up close.
- */
+// Interpolate burn coverage at 0.5 to avoid stair-stepped edges. Forecast lines retain screen
+// width as the ground texture stretches with zoom.
 const FRAGMENT = `#version 300 es
 precision highp float;
 uniform sampler2D field;

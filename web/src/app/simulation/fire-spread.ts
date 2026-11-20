@@ -35,11 +35,6 @@ import {
   FUEL_MODELS,
 } from './rothermel';
 
-/**
- * What a simulation needs to run. All of it is data, none of it is a service:
- * the same inputs give the same fire, which is what makes a link reproduce a
- * simulation and not merely describe one.
- */
 interface SpreadInput {
   /** Metres above sea level, GRID × GRID, rows from north to south. */
   readonly elevation: Float32Array;
@@ -56,7 +51,7 @@ interface SpreadInput {
   readonly spotting?: SpottingOptions;
   readonly wind10mKmh?: number;
   readonly temperatureC?: number;
-  /** The cells the fire starts in, as indices into the grid. */
+
   readonly ignitions: readonly number[];
   /** How long to simulate, in minutes. */
   readonly horizon: number;
@@ -75,16 +70,11 @@ export interface SpreadResult {
   readonly horizon: number;
   /** Terrestrial cells with a known, burnable fuel model. */
   readonly burnable: number;
-  /**
-   * Heat released per unit area by each cell's untreated fuel, BTU/ft²: the
-   * H·w of Byram's intensity. Zero where nothing burns. For the drawing, which
-   * multiplies it by the speed the front really crosses the cell at.
-   */
+  // Heat per ground area, BTU/ft², from untreated fuel. Multiplying by the actual front speed
+  // gives Byram intensity.
   readonly heat: Float32Array;
-  /**
-   * One entry per minute, from 0 to the horizon inclusive. Worked out once,
-   * so moving the timeline reads a number instead of scanning a million cells.
-   */
+  // One precomputed entry per minute, including both endpoints, so playback avoids rescanning the
+  // grid.
   readonly series: {
     /** Burned so far, hectares. */
     readonly area: Float32Array;
@@ -108,34 +98,10 @@ export interface SpreadResult {
   readonly crewStops?: ReadonlyMap<string, number>;
 }
 
-/** How many cells away a single step may land, along either axis. */
 const REACH = 5;
 
-/**
- * The steps a fire can take from a cell: every direction that can be written
- * with whole cells up to REACH away, once each.
- *
- * Eight neighbours would be the obvious choice and it is the wrong one twice
- * over. A fire that should be round comes out an octagon, because every path
- * is made of steps at 0 or 45 degrees. And a wind-driven fire comes out far
- * too thin: its ellipse is narrow, the fastest way to a point on the flank
- * leaves the heading by ten or twenty degrees, and with no step in that
- * direction the path zigzags and arrives late. Measured on flat ground with a
- * 22 km/h wind over twelve hours, against the area of the exact ellipse:
- *
- *   reach 2 (16 steps)    874 ha   -35 %
- *   reach 3 (32 steps)   1070 ha   -21 %
- *   reach 4 (48 steps)   1181 ha   -13 %
- *   reach 5 (80 steps)   1245 ha    -8 %   <- in use
- *
- * (the ellipse is 1352 ha). The head of the fire is right at every reach, to
- * within a cell; what improves is the flank. Each line costs a few tens of
- * milliseconds more, so the limit is not the time: past five the steps are
- * longer than the terrain features they would be jumping over.
- *
- * A step several cells long could jump a line of cells that do not burn, so
- * every crossed cell has to burn too; travel time includes its own fuel.
- */
+// Use primitive directions up to five cells away to reduce octagonal and narrow-flank bias. Every
+// crossed cell must burn, including cells touched only at a corner.
 const STEPS: readonly (readonly [number, number])[] = (() => {
   const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : Math.abs(a));
   const steps: [number, number][] = [];
@@ -162,7 +128,6 @@ const PATHS = STEPS.map(([dx, dy]) => {
 });
 
 // At an exact grid corner the ray touches both adjacent cells. Do not cut
-// diagonally through a one-cell firebreak, even if the touched length is zero.
 const CORNERS = STEPS.map(([dx, dy]) => {
   const offsets: { offset: number; fraction: number }[] = [];
   if (!dx || !dy) return offsets;
@@ -214,7 +179,6 @@ class Heap {
     this.cells[i] = cell;
   }
 
-  /** Removes the smallest and leaves it in `key` and `cell`. */
   public pop(): void {
     this.key = this.keys[0];
     this.cell = this.cells[0];
@@ -236,38 +200,13 @@ class Heap {
   }
 }
 
-/** Gives the page a turn, so a long computation does not freeze it. */
 function breathe(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/**
- * Spreads a fire over the domain and says when it reaches each cell.
- *
- * **A minimum travel time, and not a cellular automaton that ticks.** Each
- * cell has a rate of spread in every direction —Rothermel's rate for its
- * slope and the wind, drawn out into an ellipse— and the fire reaches a cell
- * by whichever path gets there first. That is Dijkstra's shortest path with
- * time for distance, the idea behind Finney's Minimum Travel Time (2002), and
- * it has two properties a ticking automaton does not: the answer does not
- * depend on a time step, and it is the same every time it is run.
- *
- * What comes out is one number per cell, the minute the fire arrives. The
- * whole evolution is in that grid: the fire at any time T is the cells whose
- * number is below T, so the timeline is a threshold and not a re-run.
- *
- * Per cell, the three things that shape the ellipse:
- * - **The slope** pushes the fire uphill, by φs = slopeK · tan².
- * - **The wind** pushes it downwind by φw, depending on each cell's fuel.
- * - The two are **added as vectors** (Rothermel 1983): a wind across a slope
- *   gives a fire that runs at an angle to both. The length of the sum sets
- *   the head rate, and the wind that would give that sum on flat ground sets
- *   how narrow the ellipse is.
- *
- * It runs on the page's own thread, in slices, and reports how far it has
- * got. A million cells take a second or two, which is not worth a worker and
- * its build configuration yet.
- */
+// Minimum travel time: Dijkstra over direction-dependent Rothermel ellipses (Finney 2002). Wind
+// and slope factors add as vectors (Rothermel 1983); arrival times encode the whole timeline
+// without a time step.
 export async function spread(
   input: SpreadInput,
   onProgress?: (share: number) => void,
@@ -278,7 +217,6 @@ export async function spread(
   for (const [id, minute] of stops)
     if (!validStop(plan, id, minute)) throw new Error('Parada de brigada incorrecta.');
   // Fix only the earliest new stop: later stops may disappear when an earlier
-  // one removes future treatments. Each rerun fixes at least one more crew.
   for (;;) {
     let stop: { id: string; minute: number } | undefined;
     const result = await spreadRun(input, onProgress, crews, stops, (id, minute) => {
@@ -298,7 +236,6 @@ interface CrewVisit {
 
 type PlannedMeasures = NonNullable<SpreadInput['countermeasures']>;
 
-/** Per cell, the crews that will work it and when. Throws on a plan the model refuses. */
 function crewVisits(plan: PlannedMeasures): Map<number, CrewVisit[]> {
   const parsed = parseCountermeasures(plan.measures);
   if (typeof parsed === 'string') throw new Error(parsed);
@@ -321,7 +258,6 @@ function crewVisits(plan: PlannedMeasures): Map<number, CrewVisit[]> {
   return crews;
 }
 
-/** A stop is a real minute, on a measure of this plan that has a crew. */
 function validStop(plan: PlannedMeasures | undefined, id: string, minute: number): boolean {
   return (
     Number.isFinite(minute) &&
@@ -330,7 +266,6 @@ function validStop(plan: PlannedMeasures | undefined, id: string, minute: number
   );
 }
 
-/** The incoming triangles of frontIntensity, restricted to this cell's neighbourhood. */
 function crewEntryIntensity(
   arrival: Float32Array,
   cell: number,
@@ -347,14 +282,11 @@ function crewEntryIntensity(
       if (x + dx < 0 || x + dx >= GRID || y + dy < 0 || y + dy >= GRID) continue;
       const t = arrival[cell + dy * GRID + dx];
       // Only the incoming, already reached side may decide a stop. A future
-      // vertex could move after that stop removes a barrier, changing history.
       if (t <= time) local[(dy + 1) * 3 + dx + 1] = t;
       if (t < time) previous = Math.max(previous, t);
     }
   if (!(heat > 0)) return 0;
   // A triangle's pace is constant between vertex times. Sampling inside the
-  // last interval before entry gives its exact left limit, without degenerating
-  // the contour into a zero-length segment at the vertex. Heat is read at entry.
   let hottest = 0;
   let found = false;
   for (const segment of activeFront(local, 3, (previous + time) / 2)) {
@@ -364,7 +296,6 @@ function crewEntryIntensity(
     hottest = Math.max(hottest, byramIntensity(heat, speed));
   }
   // A one-cell fuel corridor has no finite triangle. Its arriving path still
-  // measures the front's speed, including any wait in the destination cell.
   return found ? hottest : byramIntensity(heat, incomingSpeed);
 }
 
@@ -377,15 +308,14 @@ interface LocalBed {
   readonly r0: number;
 }
 
-/** What a run reads besides the grid, checked and built before any cell is visited. */
 interface RunSetup {
   readonly treatments: CompiledMeasures | undefined;
   readonly fuelTreatments: FuelTreatments | undefined;
   /** Read for every step of every cell: a byte per cell, not a map lookup. */
   readonly treatedFuel: Uint8Array | undefined;
-  /** The same for the cells with a timed multiplier or a late barrier. */
+
   readonly timed: Uint8Array | undefined;
-  /** When each mopped-up cell's fire is put out (§11.40); Infinity elsewhere. */
+  /** When each mopped-up cell's fire is put out; Infinity elsewhere. */
   readonly mopped: Float32Array | undefined;
   readonly spotting: boolean;
   readonly physical: boolean;
@@ -393,7 +323,6 @@ interface RunSetup {
   readonly beds: ReadonlyMap<number, LocalBed>;
 }
 
-/** Per cell: head rate, heading and eccentricity of the ellipse. */
 interface HeadField {
   /** m/min, 0 where nothing burns. */
   readonly rate: Float32Array;
@@ -410,7 +339,6 @@ interface HeadField {
   baseSum: number;
 }
 
-/** One wind of the sequence, as the ellipses read it. */
 interface WindField {
   readonly start: number;
   readonly east: number;
@@ -419,23 +347,16 @@ interface WindField {
   readonly models: ReadonlyMap<number, number>;
 }
 
-// ---- Each step: its length and its direction, worked out once. ----
 const STEP_OFFSET = STEPS.map(([dx, dy]) => dy * GRID + dx);
 const STEP_LENGTH = STEPS.map(([dx, dy]) => Math.hypot(dx, dy) * CELL_M);
 const STEP_E = STEPS.map(([dx, dy]) => dx / Math.hypot(dx, dy));
 // A step down the grid is a step south.
 const STEP_N = STEPS.map(([dx, dy]) => -dy / Math.hypot(dx, dy));
 
-/** Two cells across, for the slope's central differences. */
 const SPAN = 2 * CELL_M;
 
-/**
- * One run of the solver, with the crew stops already known.
- *
- * Split in the stages it goes through (docs/estil.md §4), measured before and
- * after on the 1024² grid: the inner loop is still one step, one segment at a
- * time, over typed arrays read from a single object.
- */
+// Keep the inner solver loop on typed arrays; changes here require comparing outputs and timing on
+// the 1024² grid.
 async function spreadRun(
   input: SpreadInput,
   onProgress: ((share: number) => void) | undefined,
@@ -486,7 +407,6 @@ async function spreadRun(
   };
 }
 
-/** Checks the input, in the order the errors have always come out, and compiles the plan. */
 function prepareRun(input: SpreadInput, crewStops: ReadonlyMap<string, number>): RunSetup {
   checkGrid(input);
   const plan = input.countermeasures;
@@ -520,7 +440,6 @@ function checkGrid(input: SpreadInput): void {
   }
 }
 
-/** The water and the clearings of a plan, over moistures already checked. */
 function treatedFuels(input: SpreadInput, crewStops: ReadonlyMap<string, number>) {
   const plan = input.countermeasures!;
   return new FuelTreatments(
@@ -533,7 +452,6 @@ function treatedFuels(input: SpreadInput, crewStops: ReadonlyMap<string, number>
   );
 }
 
-/** Whether embers fly; throws when they should and the weather to carry them is missing. */
 function checkSpotting(input: SpreadInput): boolean {
   if (input.spotting && typeof parseSpotting(input.spotting) === 'string')
     throw new Error('Configuració de brases incorrecta.');
@@ -570,7 +488,6 @@ function invalidWind(w: SpreadWind, i: number, winds: readonly SpreadWind[]): bo
   );
 }
 
-/** The plan as one byte or one number per cell, for the loops that read it every step. */
 function treatmentMasks(
   treatments: CompiledMeasures | undefined,
   fuelTreatments: FuelTreatments | undefined,
@@ -597,7 +514,6 @@ function localBeds(input: SpreadInput): Map<number, LocalBed> {
   return beds;
 }
 
-/** The untreated bed of a cell: its own model's, or the uniform one. */
 function plainBed(input: SpreadInput, setup: RunSetup, cell: number): FuelBed {
   const model = input.fuels?.[cell];
   return model === undefined ? input.bed : setup.beds.get(model)!.bed;
@@ -617,7 +533,6 @@ function slopeNorth(elevation: Float32Array, row: number, column: number): numbe
   return -(elevation[down + column] - elevation[up + column]) / SPAN;
 }
 
-/** The baseline ellipse of every cell, for the wind at T=0 and the untreated fuel. */
 async function headField(input: SpreadInput, setup: RunSetup): Promise<HeadField> {
   const count = GRID * GRID;
   const field: HeadField = {
@@ -649,7 +564,6 @@ async function headField(input: SpreadInput, setup: RunSetup): Promise<HeadField
   return field;
 }
 
-/** The bed a cell burns with, or undefined where nothing does. */
 function burningBed(
   input: SpreadInput,
   setup: RunSetup,
@@ -657,7 +571,6 @@ function burningBed(
   index: number,
 ): LocalBed | undefined {
   // The sea. Terrarium gives the sea floor as negative elevation and the
-  // surface as zero; neither burns (§12.8).
   if (input.elevation[index] <= 0) return undefined;
   const model = input.fuels?.[index];
   if (model === 0) return undefined;
@@ -678,7 +591,7 @@ function headCell(
 ): void {
   const index = row * GRID + column;
   const { bed, phiWind, r0 } = local;
-  // The gradient points uphill.
+
   const gradE = slopeEast(elevation, row, column);
   const gradN = slopeNorth(elevation, row, column);
   const tan2 = gradE * gradE + gradN * gradN;
@@ -735,12 +648,8 @@ function midflameAt(
   return model === undefined ? input.midflame : input.fuelBeds![model].midflame;
 }
 
-/**
- * The time-dependent ellipse, for a run whose wind changes or whose fuel is
- * treated. One cached ellipse per cell bounds memory independently of wind
- * changes. Its epoch can move forward or back when a long edge straddles a
- * transition.
- */
+// Cache one time-dependent ellipse per cell to bound memory. A long edge may cross epochs in
+// either direction.
 class Ellipses {
   public readonly rate: Float32Array;
   public readonly east: Float32Array;
@@ -766,7 +675,6 @@ class Ellipses {
     this.baseWind = { east: Math.sin(towards), north: Math.cos(towards) };
   }
 
-  /** Brings a cell's cached ellipse to an epoch and to its fuel at a minute. */
   public update(cell: number, epoch: number, minute: number): void {
     const changed = this.setup.fuelTreatments?.at(cell, minute)?.bed;
     if (this.epoch[cell] === epoch && this.fuel.get(cell) === changed) return;
@@ -783,7 +691,6 @@ class Ellipses {
     this.recompute(cell, epoch, changed);
   }
 
-  /** Minutes to cross a distance of a cell in a direction, through every change on the way. */
   public travel(cell: number, distance: number, start: number, east: number, north: number) {
     let remaining = distance,
       now = start;
@@ -805,7 +712,6 @@ class Ellipses {
     return now - start;
   }
 
-  /** The next minute the wind, a timed treatment or the cell's fuel changes. */
   private changeAfter(
     cell: number,
     epoch: number,
@@ -856,7 +762,7 @@ class Propagation {
   public readonly spots = new Map<number, SpotIgnition>();
   private readonly entrySpeed: Map<number, number> | undefined;
   private readonly heap = new Heap();
-  /** With the wind changing, every segment takes the time-dependent path. */
+
   private readonly windy: boolean;
   /** The speed the last step entered its destination at, for the crews. */
   private incoming = 0;
@@ -873,7 +779,6 @@ class Propagation {
     this.windy = setup.winds.length > 0;
   }
 
-  /** Lights the ignitions and the backfires; says which ones, for the statistics. */
   public ignite() {
     const { rate } = this.field;
     const treatments = this.setup.treatments;
@@ -906,8 +811,6 @@ class Propagation {
       this.relax(cell, time);
       done += 1;
       if ((done & 4095) === 0 && performance.now() - sliceStart > 14) {
-        // The time reached so far is the honest measure of progress: the fire
-        // is computed in the order it burns.
         onProgress?.(Math.min(time / this.input.horizon, 1));
         await breathe();
         sliceStart = performance.now();
@@ -915,7 +818,6 @@ class Propagation {
     }
   }
 
-  /** The first crew the front catches with flames too long to work by (§11.40). */
   public crewStop(crewStops: ReadonlyMap<string, number>) {
     const { arrival } = this;
     let firstStop: { id: string; minute: number } | undefined;
@@ -931,7 +833,6 @@ class Propagation {
     return firstStop;
   }
 
-  /** The backfires lit when they are deployed, where they can still burn. */
   private igniteTimed() {
     const { rate } = this.field;
     const treatments = this.setup.treatments;
@@ -964,7 +865,6 @@ class Propagation {
     return flameLength(entry) > MOP_UP_MAX_FLAME_M;
   }
 
-  /** Embers from a cell as it ignites: where they land, and whether they light it. */
   private spotFrom(cell: number, time: number): void {
     const candidate = emberFlight(
       cell,
@@ -997,7 +897,6 @@ class Propagation {
     };
   }
 
-  /** An ember that falls in time, ahead of the front, on fuel that can burn then. */
   private spotLands(candidate: SpotIgnition): boolean {
     return (
       candidate.minute <= this.input.horizon &&
@@ -1030,7 +929,6 @@ class Propagation {
     this.spots.set(candidate.cell, { ...candidate, minute });
   }
 
-  /** Every step out of a cell just reached. */
   private relax(cell: number, time: number): void {
     const { rate } = this.field;
     const column = cell % GRID;
@@ -1048,7 +946,6 @@ class Propagation {
     }
   }
 
-  /** Minutes along one step, segment by segment; every crossed cell has to burn. */
   private stepTravel(cell: number, time: number, step: number, next: number): number {
     const { rate } = this.field;
     const { timed } = this.setup;
@@ -1067,11 +964,8 @@ class Propagation {
     return travel;
   }
 
-  /**
-   * Minutes across one segment. Only a cell whose fuel was treated, or a run
-   * whose wind changes, needs the time-dependent path; the rest of the grid
-   * keeps the baseline ellipse, which is exactly what that path would read for it.
-   */
+  // Untreated cells under fixed wind use the baseline ellipse; only changing wind or treatments
+  // need time-dependent travel.
   private segmentTravel(at: number, step: number, distance: number, start: number): number {
     const { treatedFuel, timed, treatments } = this.setup;
     if (this.windy || treatedFuel?.[at] === 1)
@@ -1097,10 +991,8 @@ class Propagation {
 
   private reach(cell: number, time: number, next: number, reached: number): void {
     const { mopped } = this.setup;
-    // Fire that left a cell before its mop-up but would only get across
-    // after it was put out on the way: the step half in the source cell is
-    // done, the rest was waiting —for wet fuel to dry, say— and the crew got
-    // there first. The barrier window alone would let it through.
+    // Reject travel completed after the source cell was mopped up, even when a barrier window
+    // would otherwise allow waiting.
     if (mopped && time <= mopped[cell] && reached > mopped[cell]) return;
     if (reached < this.arrival[next] && reached <= this.input.horizon) {
       this.arrival[next] = reached;
@@ -1110,7 +1002,6 @@ class Propagation {
   }
 }
 
-/** Each burned cell's ellipse as it was when the front got there. */
 function ellipsesAtArrival(
   input: SpreadInput,
   setup: RunSetup,
@@ -1145,7 +1036,6 @@ function treatmentsAtArrival(
   }
 }
 
-/** What measure() reads per cell, besides the arrival. */
 interface CellFigures {
   readonly rate: Float32Array;
   readonly headE: Float32Array;
@@ -1153,7 +1043,6 @@ interface CellFigures {
   readonly intensity: Float32Array;
 }
 
-/** Per minute, what the cells reached in it add up to. */
 interface MinuteTotals {
   readonly cells: Float64Array;
   readonly edges: Float64Array;
@@ -1164,22 +1053,9 @@ interface MinuteTotals {
   reachedEdge: number;
 }
 
-/**
- * The figures of a fire, minute by minute, out of its arrival times.
- *
- * - **Area** is a count of cells, each 0,09 ha.
- * - **Perimeter** is counted on the grid's edges —each side between a burned
- *   cell and an unburned one— and then multiplied by π/4. A line drawn in
- *   steps is longer than the line it stands for, by 4/π on average over every
- *   direction, and without the correction a round fire would report the
- *   perimeter of the square around it.
- * - **Rate and heading** are those of the cells the fire reaches in that
- *   minute: what the front is doing then, not an average of the whole fire.
- * - **Intensity** is Byram's, at the head rate of each cell reached that
- *   minute, and the highest of them: the hardest stretch of the front.
- * - **Run** is how far the fire has got from the ignition nearest to each
- *   cell, in a straight line, and the farthest so far.
- */
+// Area counts cells. Perimeter counts exposed grid edges, corrected by π/4 for directional bias.
+// Rate, heading and peak Byram intensity use cells reached that minute; run is the farthest
+// distance to the nearest active ignition.
 function measure(
   arrival: Float32Array,
   rate: Float32Array,
@@ -1196,7 +1072,6 @@ function measure(
   return { series: series(totals, farthest, minutes), reachedEdge: totals.reachedEdge };
 }
 
-/** Per minute, the farthest a cell reached in it is from its nearest ignition, in cells. */
 function farthestByMinute(
   arrival: Float32Array,
   ignitions: readonly number[],
@@ -1206,7 +1081,6 @@ function farthestByMinute(
 ): Float32Array {
   const farthest = new Float32Array(minutes);
   // Each epoch uses only ignitions already deployed. Future backfires must not
-  // change past run statistics. One distance field at a time bounds memory.
   const epochs = [...new Set([0, ...timedIgnitions.map((i) => i.minute)])].sort((a, b) => a - b);
   for (let epoch = 0; epoch < epochs.length; epoch++) {
     const from = epochs[epoch],
@@ -1220,7 +1094,6 @@ function farthestByMinute(
   return farthest;
 }
 
-/** The same for the cells reached within one epoch, from the ignitions active in it. */
 function farthestInEpoch(
   farthest: Float32Array,
   arrival: Float32Array,
@@ -1271,7 +1144,6 @@ function totalsByMinute(
   return totals;
 }
 
-/** The east and south sides of a cell, and its west and north ones on the border. */
 function cellEdges(
   edges: Float64Array,
   arrival: Float32Array,
@@ -1310,7 +1182,6 @@ function onBorder(row: number, column: number): boolean {
   return row === 0 || column === 0 || row === GRID - 1 || column === GRID - 1;
 }
 
-/** The running sums of the totals, as the series the timeline reads. */
 function series(totals: MinuteTotals, farthest: Float32Array, minutes: number) {
   const { cells, edges, sumE, sumN } = totals;
   const area = new Float32Array(minutes);

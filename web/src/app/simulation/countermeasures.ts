@@ -1,5 +1,6 @@
 import { CELL_M, domainAround, GRID } from './domain';
 import type { Point } from './point';
+import type { JsonObject, JsonValue } from './json-value';
 
 export type CountermeasureKind =
   | 'defense-line'
@@ -26,20 +27,16 @@ export interface Countermeasure {
   readonly passIntervalMin?: number;
   /** Fraction of the original dry fuel load remaining after removal. */
   readonly fuelRemaining?: number;
-  /**
-   * Crews (12.19): all three or none. Without them a ground measure appears
-   * whole at startMin, as before (§11.28). With them each cell is done when
-   * the crew gets there, from the first vertex in drawing order.
-   */
+  // Without crew fields the measure activates whole at startMin. With all three, construction
+  // advances from the first vertex in drawing order.
   /** Minutes from the decision (startMin) until the crew starts working on site. */
   readonly arrivalMin?: number;
-  /** Number of people working the measure. */
+
   readonly crewSize?: number;
   /** Production per person: metres of line per hour, or hectares per hour for mop-up. */
   readonly ratePerPerson?: number;
 }
 
-/** The measures a ground crew builds; the rest stay instantaneous. */
 const CREW_KINDS = ['defense-line', 'firebreak', 'clearing', 'water-line', 'mop-up'] as const;
 export type CrewKind = (typeof CREW_KINDS)[number];
 export const crewKind = (kind: CountermeasureKind): kind is CrewKind =>
@@ -58,17 +55,9 @@ interface CrewDefault {
 
 const ORTEGA_2023 =
   'Ortega, Rodríguez y Silva & Molina (2023), IJWF 32:1503–1514, doi:10.1071/WF22087 — shrub, direct attack, 0.67 m/min per firefighter';
-/**
- * Default crews. Crew size 20 is the reference crew of the NWCG tables
- * (sustained line production, 20-person crews). Rates per person:
- * - hand line: Ortega et al. (2023), Spanish Mediterranean wildfires,
- *   shrub (fuel models 5–6), direct attack: 0.67 m/min = 40.2 m/h;
- * - hose line: NWCG Fire Line Production Rate Tables (2021, from PMS 210),
- *   initial action by engine crews, fuel model 5, 4 persons: 16 chains/h
- *   (1 chain = 20.1168 m) = 321.9 m/h, i.e. 80.5 m/h each. The table warns it
- *   is for initial action only;
- * - firebreak, clearing and mop-up: no published rate found. Placeholders.
- */
+// Default crew size 20 follows NWCG sustained line-production tables. Hand line: Ortega et al.
+// (2023), models 5–6, 0.67 m/min per person. Hose: NWCG (2021/PMS 210), model 5, engine crew of 4,
+// 16 chains/h = 80.5 m/h per person (initial action only). Other rates are editable placeholders.
 export const CREW_DEFAULTS: Readonly<Record<CrewKind, CrewDefault>> = {
   'defense-line': {
     arrivalMin: 0,
@@ -119,9 +108,7 @@ export const CREW_LIMITS = {
   'ha/h': { min: 0.001, max: 10 },
 } as const;
 
-/** When each cell of a crew measure is done (contract 12.19). */
 interface CrewSchedule {
-  /** The same cells as countermeasureCells. */
   readonly cells: readonly number[];
   /** Minute each cell is done, aligned with cells. */
   readonly minutes: Float32Array;
@@ -130,7 +117,7 @@ interface CrewSchedule {
   /** Length of the polyline, metres. */
   readonly lengthM: number;
 }
-/** Where the head of the work is at a minute. */
+
 interface CrewHead {
   readonly point: Point;
   readonly builtM: number;
@@ -157,7 +144,6 @@ export const AIRCRAFT = {
   },
 } as const;
 
-/** Where a discharge falls: its point, or the middle of a line. */
 export function dropPoint(measure: Pick<Countermeasure, 'points'>): Point {
   const points = measure.points;
   if (points.length === 1) return points[0];
@@ -299,19 +285,15 @@ export const COUNTERMEASURE_CATALOG: readonly MeasureDefinition[] = [
   },
 ];
 
-/**
- * The longest flame a crew can put out with hand tools, in metres: the first
- * band of the fire characteristics chart, 4 ft (Andrews & Rothermel 1982), the
- * same cut the analysis column reads control difficulty by (§11.25). Where the
- * front is hotter than this, mop-up cannot be used (§11.40).
- */
+// Maximum hand-tool flame length: 4 ft, the first Andrews & Rothermel (1982) control band. Mop-up
+// is refused above it.
 export const MOP_UP_MAX_FLAME_M = 1.2;
 
 const MAX_COUNTERMEASURES = 100;
 export const WIDTH_LIMITS = { min: CELL_M, max: 3000 } as const;
 export const DURATION_LIMITS = { min: 1, max: 720 } as const;
 export const MAX_VERTICES = 64;
-/** Every field of `Countermeasure`; anything else in a file is refused. */
+
 const FIELDS = new Set<string>([
   'id',
   'kind',
@@ -330,8 +312,9 @@ const FIELDS = new Set<string>([
 ] satisfies (keyof Countermeasure)[]);
 const temporary = (kind: CountermeasureKind) =>
   kind === 'water-line' || kind === 'helicopter' || kind === 'amphibious' || kind === 'retardant';
-const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
-const validPoint = (p: unknown): p is Point =>
+const finite = (n: JsonValue | undefined): n is number =>
+  typeof n === 'number' && Number.isFinite(n);
+const validPoint = (p: JsonValue | Point | undefined): p is Point =>
   Array.isArray(p) &&
   p.length === 2 &&
   finite(p[0]) &&
@@ -339,52 +322,61 @@ const validPoint = (p: unknown): p is Point =>
   Math.abs(p[0]) <= 180 &&
   Math.abs(p[1]) < 85;
 
-/** Untrusted input before validation: any field, any shape; each check below narrows one piece. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a validator reads whatever JSON the caller sent; every field is checked below before use.
-type UncheckedMeasure = any;
+type UncheckedMeasure = JsonObject | Countermeasure;
 
-/** Shape, unknown fields and kind: common to every measure, before any field is read. */
-function identifyMeasure(raw: UncheckedMeasure): MeasureDefinition | string {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'Contramesura incorrecta.';
+function isMeasureObject(value: JsonValue | Countermeasure): value is UncheckedMeasure {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function identifyMeasure(
+  raw: JsonValue | Countermeasure,
+): { raw: UncheckedMeasure; definition: MeasureDefinition } | string {
+  if (!isMeasureObject(raw)) return 'Contramesura incorrecta.';
   // A field this version does not know may be one that changes the fire.
   const unknown = Object.keys(raw).find((key) => !FIELDS.has(key));
   if (unknown !== undefined) return `Camp de contramesura desconegut: «${unknown}».`;
   const def = COUNTERMEASURE_CATALOG.find((d) => d.kind === raw.kind);
-  return def ?? 'Tipus de contramesura desconegut.';
+  return def ? { raw, definition: def } : 'Tipus de contramesura desconegut.';
 }
 
-/** Crews (12.19): all three fields numeric and in range, or none, and only for a crew kind. */
 function validateCrewFields(
   raw: UncheckedMeasure,
   def: MeasureDefinition,
-  crew: boolean,
-): string | undefined {
-  if (!crew) return undefined;
+): Pick<Countermeasure, 'arrivalMin' | 'crewSize' | 'ratePerPerson'> | string {
+  const crew = ['arrivalMin', 'crewSize', 'ratePerPerson'].some((key) => key in raw);
+  if (!crew) return {};
   if (!crewKind(def.kind)) return 'Aquest tipus de contramesura no admet brigades.';
-  if (!['arrivalMin', 'crewSize', 'ratePerPerson'].every((key) => finite(raw[key])))
+  const { arrivalMin, crewSize, ratePerPerson } = raw;
+  if (!finite(arrivalMin) || !finite(crewSize) || !finite(ratePerPerson))
     return 'La brigada necessita arribada, efectius i rendiment, tots tres numèrics.';
-  if (raw.arrivalMin < CREW_LIMITS.arrivalMin.min || raw.arrivalMin > CREW_LIMITS.arrivalMin.max)
+  if (arrivalMin < CREW_LIMITS.arrivalMin.min || arrivalMin > CREW_LIMITS.arrivalMin.max)
     return 'L’arribada de la brigada ha de ser entre 0 i 720 minuts.';
   if (
-    !Number.isInteger(raw.crewSize) ||
-    raw.crewSize < CREW_LIMITS.crewSize.min ||
-    raw.crewSize > CREW_LIMITS.crewSize.max
+    !Number.isInteger(crewSize) ||
+    crewSize < CREW_LIMITS.crewSize.min ||
+    crewSize > CREW_LIMITS.crewSize.max
   )
     return 'La brigada ha de tenir entre 1 i 500 efectius, sense decimals.';
   const unit = def.kind === 'mop-up' ? 'ha/h' : 'm/h';
   const limits = CREW_LIMITS[unit];
-  if (raw.ratePerPerson < limits.min || raw.ratePerPerson > limits.max)
+  if (ratePerPerson < limits.min || ratePerPerson > limits.max)
     return `El rendiment per efectiu ha de ser entre ${limits.min} i ${limits.max} ${unit}.`;
-  return undefined;
+  return { arrivalMin, crewSize, ratePerPerson };
 }
 
-function validateIdentifier(raw: UncheckedMeasure, ids: ReadonlySet<string>): string | undefined {
+function validateIdentifier(
+  raw: UncheckedMeasure,
+  ids: ReadonlySet<string>,
+): Pick<Countermeasure, 'id'> | string {
   if (typeof raw.id !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(raw.id) || ids.has(raw.id))
     return 'Identificador de contramesura incorrecte o repetit.';
-  return undefined;
+  return { id: raw.id };
 }
 
-function validatePointsShape(raw: UncheckedMeasure, def: MeasureDefinition): string | undefined {
+function validatePointsShape(
+  raw: UncheckedMeasure,
+  def: MeasureDefinition,
+): Pick<Countermeasure, 'points'> | string {
   if (
     !Array.isArray(raw.points) ||
     !raw.points.every(validPoint) ||
@@ -392,25 +384,27 @@ function validatePointsShape(raw: UncheckedMeasure, def: MeasureDefinition): str
     raw.points.length > MAX_VERTICES
   )
     return 'Geometria de contramesura incorrecta.';
-  return undefined;
+  return { points: raw.points };
 }
 
-function validateLineDistinct(raw: UncheckedMeasure, def: MeasureDefinition): string | undefined {
+function validateLineDistinct(
+  points: readonly Point[],
+  def: MeasureDefinition,
+): string | undefined {
   if (
     def.geometry === 'line' &&
-    !raw.points.some((p: Point) => p[0] !== raw.points[0][0] || p[1] !== raw.points[0][1])
+    !points.some((p) => p[0] !== points[0][0] || p[1] !== points[0][1])
   )
     return 'La franja necessita dos punts diferents.';
   return undefined;
 }
 
-function validateWidth(raw: UncheckedMeasure): string | undefined {
+function validateWidth(raw: UncheckedMeasure): Pick<Countermeasure, 'widthM'> | string {
   if (!finite(raw.widthM) || raw.widthM < WIDTH_LIMITS.min || raw.widthM > WIDTH_LIMITS.max)
     return `L'amplada ha d'estar entre ${CELL_M} i 3000 m.`;
-  return undefined;
+  return { widthM: raw.widthM };
 }
 
-/** Whether this measure discharges a liquid or removes fuel: both change what else is valid. */
 function physicalFlags(raw: UncheckedMeasure): { liquid: boolean; removal: boolean } {
   const liquid =
     raw.litresPerPass !== undefined ||
@@ -424,47 +418,51 @@ function validateLiquid(
   raw: UncheckedMeasure,
   def: MeasureDefinition,
   liquid: boolean,
-): string | undefined {
+): Pick<Countermeasure, 'litresPerPass' | 'passes' | 'passIntervalMin'> | string {
+  if (!liquid) return {};
   if (
-    liquid &&
-    (!liquidKind(def.kind) ||
-      !finite(raw.litresPerPass) ||
-      raw.litresPerPass < 1 ||
-      raw.litresPerPass > liquidCapacity(def.kind) ||
-      !Number.isInteger(raw.passes) ||
-      raw.passes < 1 ||
-      raw.passes > 20 ||
-      !finite(raw.passIntervalMin) ||
-      raw.passIntervalMin < 1 ||
-      raw.passIntervalMin > 120)
+    !liquidKind(def.kind) ||
+    !finite(raw.litresPerPass) ||
+    raw.litresPerPass < 1 ||
+    raw.litresPerPass > liquidCapacity(def.kind) ||
+    !finite(raw.passes) ||
+    !Number.isInteger(raw.passes) ||
+    raw.passes < 1 ||
+    raw.passes > 20 ||
+    !finite(raw.passIntervalMin) ||
+    raw.passIntervalMin < 1 ||
+    raw.passIntervalMin > 120
   )
     return `Descàrrega incorrecta: 1–${liquidCapacity(def.kind)} L per passada, 1–20 passades i 1–120 min entre passades.`;
-  return undefined;
+  return {
+    litresPerPass: raw.litresPerPass,
+    passes: raw.passes,
+    passIntervalMin: raw.passIntervalMin,
+  };
 }
 
 function validateRemoval(
   raw: UncheckedMeasure,
   def: MeasureDefinition,
   removal: boolean,
-): string | undefined {
+): Pick<Countermeasure, 'fuelRemaining'> | string {
+  if (!removal) return {};
   if (
-    removal &&
-    (def.kind !== 'clearing' ||
-      !finite(raw.fuelRemaining) ||
-      raw.fuelRemaining < 0.05 ||
-      raw.fuelRemaining > 1)
+    def.kind !== 'clearing' ||
+    !finite(raw.fuelRemaining) ||
+    raw.fuelRemaining < 0.05 ||
+    raw.fuelRemaining > 1
   )
     return 'La tala ha de conservar entre el 5 i el 100 % de la càrrega original.';
-  return undefined;
+  return { fuelRemaining: raw.fuelRemaining };
 }
 
-/** Strength and duration: fixed at zero for liquid/removal measures, else within their limits. */
 function validateStrengthDuration(
   raw: UncheckedMeasure,
   def: MeasureDefinition,
   liquid: boolean,
   removal: boolean,
-): string | undefined {
+): Pick<Countermeasure, 'strength' | 'durationMin'> | string {
   if ((liquid || removal) && (raw.strength !== 0 || raw.durationMin !== 0))
     return 'Les mesures de líquid o càrrega no admeten reducció artificial ni durada fixa.';
   if (!finite(raw.strength) || raw.strength < 0 || raw.strength > 0.95)
@@ -476,81 +474,65 @@ function validateStrengthDuration(
       : raw.durationMin !== 0)
   )
     return 'Durada incorrecta: 1–720 min per als efectes temporals; 0 per als permanents.';
-  return undefined;
+  return { strength: raw.strength, durationMin: raw.durationMin };
 }
 
-function validateStartMin(raw: UncheckedMeasure): string | undefined {
+function validateStartMin(raw: UncheckedMeasure): Pick<Countermeasure, 'startMin'> | string {
   if (
     raw.startMin !== undefined &&
     (!finite(raw.startMin) || raw.startMin < 0 || raw.startMin > 720)
   )
     return 'El desplegament ha de ser entre 0 i 720 minuts.';
-  return undefined;
-}
-
-function toCountermeasure(
-  raw: UncheckedMeasure,
-  def: MeasureDefinition,
-  liquid: boolean,
-  removal: boolean,
-  crew: boolean,
-): Countermeasure {
-  return {
-    id: raw.id,
-    kind: def.kind,
-    points: raw.points.map((p: Point) => [p[0], p[1]] as Point),
-    widthM: raw.widthM,
-    strength: raw.strength,
-    durationMin: raw.durationMin,
-    ...(raw.startMin !== undefined ? { startMin: raw.startMin } : {}),
-    ...(liquid
-      ? {
-          litresPerPass: raw.litresPerPass,
-          passes: raw.passes,
-          passIntervalMin: raw.passIntervalMin,
-        }
-      : {}),
-    ...(removal ? { fuelRemaining: raw.fuelRemaining } : {}),
-    ...(crew
-      ? { arrivalMin: raw.arrivalMin, crewSize: raw.crewSize, ratePerPerson: raw.ratePerPerson }
-      : {}),
-  };
+  return raw.startMin !== undefined ? { startMin: raw.startMin } : {};
 }
 
 /** Strict, bounded and all-or-nothing: a malformed barrier must never disappear silently. */
-export function parseCountermeasures(value: unknown): readonly Countermeasure[] | string {
+export function parseCountermeasures(
+  value: JsonValue | readonly Countermeasure[],
+): readonly Countermeasure[] | string {
   if (!Array.isArray(value) || value.length > MAX_COUNTERMEASURES)
     return `El pla admet fins a ${MAX_COUNTERMEASURES} contramesures.`;
   const ids = new Set<string>();
   const result: Countermeasure[] = [];
+  const measures: readonly (JsonValue | Countermeasure)[] = value;
   let vertices = 0;
-  for (const raw of value) {
-    const def = identifyMeasure(raw);
-    if (typeof def === 'string') return def;
-    const crew = ['arrivalMin', 'crewSize', 'ratePerPerson'].some((key) => key in raw);
-    const crewError = validateCrewFields(raw, def, crew);
-    if (crewError) return crewError;
-    const idError = validateIdentifier(raw, ids);
-    if (idError) return idError;
-    const pointsError = validatePointsShape(raw, def);
-    if (pointsError) return pointsError;
-    vertices += raw.points.length;
+  for (const measure of measures) {
+    const identified = identifyMeasure(measure);
+    if (typeof identified === 'string') return identified;
+    const { raw, definition } = identified;
+    const crew = validateCrewFields(raw, definition);
+    if (typeof crew === 'string') return crew;
+    const identifier = validateIdentifier(raw, ids);
+    if (typeof identifier === 'string') return identifier;
+    const geometry = validatePointsShape(raw, definition);
+    if (typeof geometry === 'string') return geometry;
+    vertices += geometry.points.length;
     if (vertices > 512) return 'El pla supera els 512 vèrtexs.';
-    const lineError = validateLineDistinct(raw, def);
+    const lineError = validateLineDistinct(geometry.points, definition);
     if (lineError) return lineError;
-    const widthError = validateWidth(raw);
-    if (widthError) return widthError;
+    const width = validateWidth(raw);
+    if (typeof width === 'string') return width;
     const { liquid, removal } = physicalFlags(raw);
-    const liquidError = validateLiquid(raw, def, liquid);
-    if (liquidError) return liquidError;
-    const removalError = validateRemoval(raw, def, removal);
-    if (removalError) return removalError;
-    const strengthDurationError = validateStrengthDuration(raw, def, liquid, removal);
-    if (strengthDurationError) return strengthDurationError;
-    ids.add(raw.id);
-    const startMinError = validateStartMin(raw);
-    if (startMinError) return startMinError;
-    result.push(toCountermeasure(raw, def, liquid, removal, crew));
+    const liquidFields = validateLiquid(raw, definition, liquid);
+    if (typeof liquidFields === 'string') return liquidFields;
+    const removalFields = validateRemoval(raw, definition, removal);
+    if (typeof removalFields === 'string') return removalFields;
+    const strengthDuration = validateStrengthDuration(raw, definition, liquid, removal);
+    if (typeof strengthDuration === 'string') return strengthDuration;
+    ids.add(identifier.id);
+    const start = validateStartMin(raw);
+    if (typeof start === 'string') return start;
+    result.push({
+      ...identifier,
+      kind: definition.kind,
+      points: geometry.points.map((point): Point => [point[0], point[1]]),
+      ...width,
+      ...strengthDuration,
+      ...start,
+      ...liquidFields,
+      ...removalFields,
+      ...crew,
+    });
   }
   return result;
 }
@@ -718,10 +700,7 @@ interface TreatmentWindow {
   readonly factor: number;
 }
 interface CountermeasureField {
-  /**
-   * Cells whose fire is put out, and from which minute (mop-up, §11.40): no
-   * fire leaves them, nor enters them, after it.
-   */
+  // Mopped-up cells neither emit nor receive fire from the specified minute.
   readonly mopUp: ReadonlyMap<number, number>;
   readonly blocked: Uint8Array;
   readonly permanent: Float32Array;
@@ -736,7 +715,6 @@ interface PendingWindow {
   readonly factor: number;
 }
 
-/** The mutable state one measure's cells are folded into, built up across all measures. */
 interface MeasureEffects {
   readonly blocked: Uint8Array;
   readonly permanent: Float32Array;
@@ -749,7 +727,6 @@ interface MeasureEffects {
 const isBarrierKind = (kind: CountermeasureKind): boolean =>
   kind === 'firebreak' || kind === 'defense-line' || kind === 'mop-up';
 
-/** One measure's effect on a single cell it reaches, from the minute it does (§11.40 mop-up). */
 function applyMeasureEffect(
   measure: Countermeasure,
   cell: number,
@@ -757,8 +734,7 @@ function applyMeasureEffect(
   effects: MeasureEffects,
 ): void {
   const { blocked, permanent, intervals, ignitions, timedIgnitions, mopUp } = effects;
-  // Mop-up is a barrier from its minute on, like a late firebreak; what it
-  // adds is that the fire already in the cell goes out (fire-spread).
+  // Mop-up closes the cell like a late barrier and also extinguishes fire already present there.
   if (measure.kind === 'mop-up') mopUp.set(cell, Math.min(mopUp.get(cell) ?? Infinity, from));
   const barrier = isBarrierKind(measure.kind);
   if (barrier && from === 0) blocked[cell] = 1;
@@ -778,7 +754,6 @@ function applyMeasureEffect(
   }
 }
 
-/** Every cell one measure reaches, with the minute it does (crew schedule, or immediate). */
 function applyMeasure(
   centre: Point,
   measure: Countermeasure,
@@ -795,7 +770,6 @@ function applyMeasure(
   }
 }
 
-/** Collapse each cell's overlapping windows into the piecewise-constant schedule treatmentFactor reads. */
 function buildTreatmentWindows(
   intervals: ReadonlyMap<number, readonly PendingWindow[]>,
   permanent: Float32Array,

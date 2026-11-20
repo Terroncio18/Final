@@ -1,19 +1,8 @@
 import { GRID } from './domain';
 import type { Terrain } from './terrain';
 
-/**
- * The bands the slope layer is painted in.
- *
- * **They are this project's and nobody else's.** There is no standard set of
- * slope classes for wildfire —as there is no FRP threshold (§2.17)— so these
- * are cuts for reading a map and not thresholds of the model, which takes the
- * slope of each cell as a number and never sees a class.
- *
- * One hue from light to dark, so the order survives a greyscale print, and
- * violet because every other candidate already means something on this map:
- * orange and red are fire (§2.22), green is what the photograph underneath is
- * made of, and white is an administrative line.
- */
+// These slope bands are presentation choices, not thresholds used by the model. A monotonic
+// light/dark ramp preserves order in greyscale.
 export const SLOPE_CLASSES = [
   { upTo: 5, label: '0–5°', colour: '#efe6fb' },
   { upTo: 15, label: '5–15°', colour: '#cdb4f0' },
@@ -27,17 +16,8 @@ function rgb(hex: string): [number, number, number] {
   return [value >> 16, (value >> 8) & 255, value & 255];
 }
 
-/**
- * The slope of a domain as a picture: one pixel per cell, one colour per band.
- *
- * A data URL and not a set of polygons: the grid is already a raster, and a
- * million cells traced into shapes would be megabytes of geometry to say what
- * 1024 × 1024 pixels say exactly. Rows run north to south in the grid and in
- * the image alike, so there is nothing to flip.
- *
- * The border row and column take the cell inside them, as the reading under
- * the pointer does: slopeOf() has no neighbour to difference against there.
- */
+// One image pixel per grid cell, north to south. Border samples use the nearest interior cell
+// because central slope differences need neighbours.
 export function slopeImage(terrain: Terrain): string {
   const canvas = document.createElement('canvas');
   canvas.width = GRID;

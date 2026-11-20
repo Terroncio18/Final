@@ -1,6 +1,3 @@
-/* Shared by every step of the form: one panel that changes its contents, not a
-   different panel per level. Same place and same width as the detection panel,
-   so the two ways into a simulation look like the same application. */
 .step-panel {
   position: absolute;
   z-index: 2;
@@ -12,9 +9,7 @@
   background: var(--panel);
   border-left: 1px solid var(--line);
 
-  /* A head that stays and a body that scrolls, rather than one scrolling box:
-     a province with three hundred municipalities would otherwise push the step
-     number, its name and the way back off the top of the screen. */
+  /* Only the body scrolls so headings and Back remain visible on long municipality lists. */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -27,8 +22,7 @@
 .panel-body {
   flex: 1;
   overflow-y: auto;
-  /* Pulled out to the panel's edges so the scrollbar rides the border and the
-     rows keep the padding they had. */
+
   margin: 0 -18px;
   padding: 0 18px;
 }
@@ -81,10 +75,6 @@ h3 {
   background: #1d252e;
 }
 
-/* The two countries of the first step, folded away.
-   Closed to begin with: twenty-four regions in one list is a scroll, and two
-   rows is not. Neither is opened by default, because opening Spain and leaving
-   Portugal shut would quietly say which of the two the application is about. */
 .group {
   border-top: 1px solid var(--line);
 }
@@ -123,7 +113,6 @@ h3 {
   transform: rotate(90deg);
 }
 
-/* How many are inside, so a folded row still says something. */
 .group summary small {
   margin-left: auto;
   font-weight: 400;
@@ -165,8 +154,6 @@ h3 {
   background: #1d252e;
 }
 
-/* The code is shown because it is what the URL carries: seeing ES51 next to
-   Cataluña is what makes the address bar readable. */
 .choices small {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
@@ -213,8 +200,6 @@ dd {
   font-variant-numeric: tabular-nums;
 }
 
-/* It leads somewhere now, so it looks like it does: the same accent and the
-   same dark text as the other way into the application, in the top bar. */
 .simulate {
   display: block;
   width: 100%;

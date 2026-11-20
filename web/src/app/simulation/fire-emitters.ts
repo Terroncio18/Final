@@ -3,35 +3,23 @@ import { GRID, CELL_M } from './domain';
 import { activeFront } from './fire-display';
 import { byramIntensity, flameLength } from './rothermel';
 
-/**
- * Flames below this length are not drawn: the front is creeping or waiting
- * —for wet fuel to dry, at a line it cannot cross— and what is left is the
- * ember glow on the ground, not a flame.
- */
+// Below this flame length, render only ground glow: a creeping or waiting front has no visible
+// flame at domain scale.
 const FLAME_MIN_M = 0.3;
-/** At and above this length a flame is drawn at its largest. */
+// Flame length in metres at maximum visual size.
 const FLAME_MAX_M = 12;
-/** The smallest flame drawn is this fraction of the largest. */
+// Minimum visual size as a fraction of maximum.
 const FLAME_FLOOR = 0.25;
 
-/**
- * How big a front's flames are drawn, from 0 (none) to 1, for a flame length
- * in metres. Logarithmic, so that a creeping fire under trees and a grass head
- * fire both read, and bounded, because the drawing is seen from thirty
- * kilometres away and is a picture of the flame length, not the flame (§11.35).
- */
+// Logarithmic visual strength in [0, 1], not a physical flame height.
 export function flameStrength(lengthM: number): number {
   if (!(lengthM >= FLAME_MIN_M)) return 0;
   const share = Math.log(lengthM / FLAME_MIN_M) / Math.log(FLAME_MAX_M / FLAME_MIN_M);
   return FLAME_FLOOR + (1 - FLAME_FLOOR) * Math.min(1, share);
 }
 
-/**
- * The hottest the front is, at a minute, where it crosses some cells: Byram's
- * intensity in kW/m, read as the flames are (§11.35), from the speed the front
- * really crosses each cell at and the heat of the cell it enters. Zero where
- * the front does not pass, or has stopped.
- */
+// Peak Byram intensity, kW/m, using actual front speed from arrival times and the destination
+// cell’s heat.
 export function frontIntensity(
   arrival: Float32Array,
   minute: number,
@@ -51,15 +39,8 @@ export function frontIntensity(
   return hottest;
 }
 
-/**
- * Evenly spaced along the flaming part of the continuous front, not clustered
- * at cell centres, each with the strength of its flame.
- *
- * The intensity is Byram's with the speed the front **really** crosses each
- * cell at —read from the arrival times, so barriers, water and waits are in
- * it— and the heat per area of the cell it is entering, treated if a
- * countermeasure has wetted it or taken fuel out (`heatAt`).
- */
+// Space emitters along the continuous front. Use arrival-derived speed and treated fuel heat so
+// waits and suppression affect visual intensity.
 export function frontEmitters(
   arrival: Float32Array,
   elevation: Float32Array,
@@ -101,8 +82,7 @@ export function frontEmitters(
     const cell = Math.min(GRID - 1, Math.floor(y)) * GRID + Math.min(GRID - 1, Math.floor(x));
     positions[i * 3 + 2] = Math.max(elevation[cell], 0) * unitsPerMetre;
     strength[i] = s.strength;
-    // More flames where the front is hotter: a particle picks its birthplace
-    // with a chance that grows with the strength there.
+    // Choose particle birthplaces with probability weighted by flame strength.
     total += s.strength * s.strength;
     weights[i] = total;
   }

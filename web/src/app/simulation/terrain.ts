@@ -2,15 +2,8 @@ import { DEM_TILES } from '../map/map.config';
 import { CELL_M, domainAround, GRID } from './domain';
 import type { Point } from './point';
 
-/**
- * Zoom level of the elevation tiles we read.
- *
- * A Terrarium pixel at zoom z covers 156.543 * cos(lat) / 2^z metres, so at
- * zoom 12 that is 27 m in the north of the peninsula and 34 m in the Canaries:
- * either side of the 30 m cell, which is what we want. Zoom 13 would be four
- * times the tiles for detail the source does not have — underneath it is SRTM
- * and EU-DEM, both built around 30 m.
- */
+// At zoom 12, Terrarium pixels span about 27–34 m in the study area, matching 30 m cells. Zoom 13
+// quadruples tile work without finer source detail.
 const ZOOM = 12;
 
 const TILE = 256;
@@ -47,21 +40,22 @@ export interface Terrain {
   readonly maxElevation: number;
   readonly maxSlope: number;
   readonly meanSlope: number;
-  /** How many tiles were read, which is what the wait was spent on. */
+
   readonly tiles: number;
 }
 
-/**
- * Reads the elevation under a domain and works out its slope.
- *
- * The grid is regular in longitude and latitude rather than in metres. Across
- * 30 km the cosine of the latitude changes by 0,4%, so a cell is between 29,94
- * and 30,07 m wide instead of exactly 30: under a tenth of a metre, which is
- * nothing next to what a 30 m elevation model knows.
- */
-export async function readTerrain(point: Point): Promise<Terrain> {
-  const [west, south, east, north] = domainAround(point);
+type DomainBounds = ReturnType<typeof domainAround>;
 
+interface TerrainMosaic {
+  readonly pixels: Uint8ClampedArray;
+  readonly width: number;
+  readonly height: number;
+  readonly originX: number;
+  readonly originY: number;
+  readonly tiles: number;
+}
+
+async function loadTerrainTiles([west, south, east, north]: DomainBounds): Promise<TerrainMosaic> {
   const [x0, y0] = toWorld(west, north);
   const [x1, y1] = toWorld(east, south);
 
@@ -73,8 +67,7 @@ export async function readTerrain(point: Point): Promise<Terrain> {
   const across = tileX1 - tileX0 + 1;
   const down = tileY1 - tileY0 + 1;
 
-  // One canvas for every tile at once: the alternative is a getImageData per
-  // tile, and that call is the expensive part, not the drawing.
+  // Read one assembled canvas; repeated getImageData calls cost more than tile drawing.
   const canvas = new OffscreenCanvas(across * TILE, down * TILE);
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) throw new Error('sense context 2d');
@@ -92,17 +85,32 @@ export async function readTerrain(point: Point): Promise<Terrain> {
   }
   await Promise.all(requests);
 
-  const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  return {
+    pixels: context.getImageData(0, 0, canvas.width, canvas.height).data,
+    width: canvas.width,
+    height: canvas.height,
+    originX: tileX0 * TILE,
+    originY: tileY0 * TILE,
+    tiles: across * down,
+  };
+}
 
-  // Decoded once into metres. Doing it inside the sampling loop would decode
-  // every pixel four times over, once per bilinear neighbour.
-  const heights = new Float32Array(canvas.width * canvas.height);
+function decodeHeights({ pixels, width, height }: TerrainMosaic): Float32Array {
+  // Decode metres once rather than four times per bilinear sample.
+  const heights = new Float32Array(width * height);
   for (let i = 0, p = 0; i < heights.length; i += 1, p += 4) {
     heights[i] = decode(pixels[p], pixels[p + 1], pixels[p + 2]);
   }
+  return heights;
+}
 
-  const originX = tileX0 * TILE;
-  const originY = tileY0 * TILE;
+// The grid is regular in longitude and latitude; its cell widths vary slightly across the domain.
+function sampleElevation(
+  [west, south, east, north]: DomainBounds,
+  mosaic: TerrainMosaic,
+  heights: Float32Array,
+): Pick<Terrain, 'elevation' | 'minElevation' | 'maxElevation'> {
+  const { originX, originY, width, height: rasterHeight } = mosaic;
   const elevation = new Float32Array(GRID * GRID);
 
   let minElevation = Infinity;
@@ -117,15 +125,14 @@ export async function readTerrain(point: Point): Promise<Terrain> {
 
       const px = wx - originX;
       const py = wy - originY;
-      const ix = Math.min(Math.max(Math.floor(px), 0), canvas.width - 2);
-      const iy = Math.min(Math.max(Math.floor(py), 0), canvas.height - 2);
+      const ix = Math.min(Math.max(Math.floor(px), 0), width - 2);
+      const iy = Math.min(Math.max(Math.floor(py), 0), rasterHeight - 2);
       const fx = px - ix;
       const fy = py - iy;
 
-      const index = iy * canvas.width + ix;
+      const index = iy * width + ix;
       const top = heights[index] * (1 - fx) + heights[index + 1] * fx;
-      const bottom =
-        heights[index + canvas.width] * (1 - fx) + heights[index + canvas.width + 1] * fx;
+      const bottom = heights[index + width] * (1 - fx) + heights[index + width + 1] * fx;
       const height = top * (1 - fy) + bottom * fy;
 
       elevation[row * GRID + column] = height;
@@ -134,16 +141,18 @@ export async function readTerrain(point: Point): Promise<Terrain> {
     }
   }
 
-  return { elevation, ...slopeOf(elevation), minElevation, maxElevation, tiles: across * down };
+  return { elevation, minElevation, maxElevation };
 }
 
-/**
- * Slope in degrees, by central differences.
- *
- * One of the three inputs Rothermel takes, which is why the elevation is read
- * at all: the model does not care how high the ground is, only how steeply it
- * tilts. The border keeps its neighbour's value rather than inventing one.
- */
+export async function readTerrain(point: Point): Promise<Terrain> {
+  const bounds = domainAround(point);
+  const mosaic = await loadTerrainTiles(bounds);
+  const heights = decodeHeights(mosaic);
+  const sampled = sampleElevation(bounds, mosaic, heights);
+  return { ...sampled, ...slopeOf(sampled.elevation), tiles: mosaic.tiles };
+}
+
+// Central-difference slope, in degrees. Border cells reuse their interior neighbour.
 function slopeOf(elevation: Float32Array): {
   slope: Float32Array;
   maxSlope: number;
@@ -171,11 +180,7 @@ function slopeOf(elevation: Float32Array): {
   return { slope, maxSlope, meanSlope: total / inner };
 }
 
-/**
- * The cell of the grid a place falls in, as an index, or nothing outside the
- * square. The inverse of the sampling in readTerrain(): rows run from north to
- * south, and a cell stands for the ground under it.
- */
+// Rows run north to south; coordinates select cell areas rather than grid vertices.
 export function cellOf(centre: Point, place: Point): number | null {
   const [west, south, east, north] = domainAround(centre);
   const column = Math.floor(((place[0] - west) / (east - west)) * GRID);
@@ -184,14 +189,7 @@ export function cellOf(centre: Point, place: Point): number | null {
   return row * GRID + column;
 }
 
-/**
- * The ground under one place of a domain, or nothing outside the square.
- *
- * The inverse of the sampling in readTerrain(): rows run from north to south
- * and a cell stands for the ground under it. The slope is read one cell in
- * from the edge, because slopeOf() has no neighbour to difference against on
- * the border and leaves it at zero.
- */
+// Read slope one cell in from the border because slopeOf leaves its uncomputable border at zero.
 export function groundAt(
   terrain: Terrain,
   centre: Point,

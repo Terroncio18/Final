@@ -3,15 +3,10 @@ import { parseCountermeasures, type Countermeasure } from './countermeasures';
 import { domainAround } from './domain';
 import { parseSpotting, type SpottingOptions } from './spotting';
 import { parseWindChanges, type WindChange } from './wind';
+import type { JsonValue } from './json-value';
 
-/**
- * A scenario: everything it takes to compute the same fire again.
- *
- * The domain —by the four segments of the address (§11.4)—, where it is lit,
- * and the weather that was in force. Nothing computed travels with it: the
- * terrain and the fuel are read again from the centre, and the fire is the
- * same because the computation has no chance in it (§11.19).
- */
+// Save inputs rather than computed fields; terrain and fuel are loaded again when the scenario
+// opens.
 export interface Scenario {
   readonly name: string;
   readonly region: string;
@@ -32,7 +27,6 @@ export interface Scenario {
   readonly spotting?: SpottingOptions;
 }
 
-/** What the sliders of the screen can hold: a file cannot ask for more. */
 const LIMITS = {
   wind: [0, 60],
   humidity: [10, 90],
@@ -42,12 +36,8 @@ const LIMITS = {
 const HEADER = '# IgnisLab · escenari de simulació';
 const VERSION = '8';
 
-/**
- * What a key the file does not carry stands for: the screen's own starting
- * values. They are the values a scenario older than the key ran with —no
- * plan, a steady wind, no embers— and, for the weather, the sliders as the
- * screen opens.
- */
+// Missing optional keys take the historical defaults: no plan, steady wind and no embers. Report
+// every filled key to the user.
 export const SCENARIO_DEFAULTS: {
   readonly wind: number;
   readonly windFrom: number;
@@ -59,15 +49,10 @@ export const SCENARIO_DEFAULTS: {
   windFrom: 315,
   humidity: 28,
   temperature: 32,
-  // Seed 1: a number that reads as a choice, not as a year.
+
   spotting: { enabled: false, seed: 1 },
 };
 
-/**
- * A scenario as read, and how far the file was from the current format: the
- * version it says it is, and the keys that had to be filled with defaults.
- * With either, the screen offers to save it again as a current file.
- */
 interface ScenarioRead {
   readonly scenario: Scenario;
   readonly version: string;
@@ -77,14 +62,7 @@ interface ScenarioRead {
 export const isOutdated = (read: ScenarioRead) =>
   read.version !== VERSION || read.filled.length > 0;
 
-/**
- * The scenario as a text file: one `key = value` per line, in Catalan, with
- * the units in the comments.
- *
- * Plain text and not JSON on purpose. It is a file somebody keeps, attaches
- * to a report and opens a year later: it should say what it is to whoever
- * opens it with a notepad, and survive being edited by hand.
- */
+// Human-editable format: Catalan key = value lines with unit comments.
 export function formatScenario(scenario: Scenario, saved: Date): string {
   if (scenario.spotting && typeof parseSpotting(scenario.spotting) === 'string')
     throw new Error('Configuració de brases incorrecta.');
@@ -145,7 +123,6 @@ export function formatScenario(scenario: Scenario, saved: Date): string {
 export const MAX_SCENARIO_SIZE = 1_000_000;
 export const SCENARIO_TOO_LARGE = 'El fitxer d’escenari és massa gran.';
 
-/** The `key = value` lines of a scenario file, skipping notes and blanks. */
 function readValues(text: string): Map<string, string> {
   const values = new Map<string, string>();
   for (const raw of text.split(/\r?\n/)) {
@@ -167,7 +144,6 @@ function checkVersionSupported(version: string | undefined): string | null {
   return null;
 }
 
-/** The domain: the four codes of the address and the centre. Nothing stands for it missing. */
 function readDomain(
   values: Map<string, string>,
 ): { region: string; province: string; municipality: string; centre: Point } | string {
@@ -185,11 +161,8 @@ function readDomain(
   return { region, province, municipality, centre };
 }
 
-/**
- * The weather sliders. By the key the file uses. A decimal comma is what a
- * hand writes here. Absent, each takes its default and is named in `filled`;
- * there and unreadable, the whole block is refused.
- */
+// Accept decimal commas. Missing weather fields take reported defaults; unreadable fields reject
+// the file.
 function readWeather(
   values: Map<string, string>,
   filled: string[],
@@ -220,7 +193,6 @@ function readWeather(
   return { wind, from, humidity, temperature };
 }
 
-/** The ember block: absent takes no spotting and is named in `filled`; there and wrong, refused. */
 function readSpottingKey(
   values: Map<string, string>,
   filled: string[],
@@ -229,7 +201,7 @@ function readSpottingKey(
     filled.push('brases');
     return undefined;
   }
-  let raw: unknown;
+  let raw: JsonValue;
   try {
     raw = JSON.parse(values.get('brases')!);
   } catch {
@@ -238,7 +210,6 @@ function readSpottingKey(
   return parseSpotting(raw);
 }
 
-/** The wind-history block: absent takes a steady wind and is named in `filled`; there and wrong, refused. */
 function readWindChangesKey(
   values: Map<string, string>,
   filled: string[],
@@ -247,7 +218,7 @@ function readWindChangesKey(
     filled.push('canvis de vent');
     return undefined;
   }
-  let raw: unknown;
+  let raw: JsonValue;
   try {
     raw = JSON.parse(values.get('canvis_vent')!);
   } catch {
@@ -256,10 +227,6 @@ function readWindChangesKey(
   return parseWindChanges(raw);
 }
 
-/**
- * The countermeasures plan: absent takes no plan and is named in `filled`;
- * there and wrong, or outside the scenario's domain, refused.
- */
 function readCountermeasuresKey(
   values: Map<string, string>,
   filled: string[],
@@ -269,7 +236,7 @@ function readCountermeasuresKey(
     filled.push('contramesures');
     return undefined;
   }
-  let raw: unknown;
+  let raw: JsonValue;
   try {
     raw = JSON.parse(values.get('contramesures')!);
   } catch {
@@ -284,25 +251,9 @@ function readCountermeasuresKey(
   return parsed;
 }
 
-/**
- * Reads a scenario back, or says why it cannot.
- *
- * - **A newer version is refused whole**: what it adds may change the fire,
- *   and opening it without that would answer another question in silence.
- * - **Strict with what changes the fire.** Without the domain or the weather
- *   the file is refused; a malformed plan, wind or ember block is refused
- *   whole, and so is a countermeasure carrying a field this version does not
- *   know.
- * - **Lenient with the rest**: an unknown `key = value` line is skipped,
- *   which is what lets a file edited by hand carry notes; a slider value out
- *   of range is clamped; and an ignition that does not parse is dropped
- *   rather than guessed, as in the address (§11.16).
- * - **An older file is brought up to date** (§11.33): a key it does not
- *   carry takes its default, and is named in `filled`. Without the domain
- *   it is still refused, because nothing can stand for where the fire is;
- *   a key that is there but unreadable is refused too, as it is not missing
- *   but wrong.
- */
+// Reject newer versions and malformed simulation blocks whole. Skip unknown text keys, clamp
+// slider ranges and drop invalid ignition coordinates. Report defaults filled for older files;
+// never invent a missing domain.
 export function readScenario(text: string): ScenarioRead | string {
   if (text.length > MAX_SCENARIO_SIZE) return SCENARIO_TOO_LARGE;
   if (!text.includes('IgnisLab')) return 'El fitxer no és un escenari d’IgnisLab.';
@@ -349,7 +300,6 @@ export function readScenario(text: string): ScenarioRead | string {
   return { scenario, version: version ?? '1', filled };
 }
 
-/** A file name out of a scenario's name: `ignislab-tramuntana-forta.txt`. */
 export function scenarioFileName(name: string): string {
   const slug = name
     .normalize('NFD')

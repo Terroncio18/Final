@@ -16,7 +16,6 @@ export function ignitionDistances(ignitions: readonly number[]): Float64Array {
   return field;
 }
 
-/** Down one column, the squared distance to the nearest ignition above or below. */
 function columnDistances(field: Float64Array, x: number): void {
   let last = -Infinity;
   for (let y = 0; y < GRID; y++) {

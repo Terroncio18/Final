@@ -2,14 +2,8 @@ import { Injectable, signal } from '@angular/core';
 import { formatPoint, type Point } from './point';
 import { readTerrain, type Terrain } from './terrain';
 
-/**
- * The elevation under the current domain.
- *
- * Kept out of the component because the read is slow —a few dozen tiles and a
- * million samples— and because a point that has moved on must not be overwritten
- * by an answer that arrives late. Each read carries a token; only the newest
- * one is allowed to publish.
- */
+// Only the newest domain read may publish; slow terrain requests can finish after the centre
+// moves.
 @Injectable({ providedIn: 'root' })
 export class TerrainService {
   public readonly terrain = signal<Terrain | null>(null);
@@ -35,7 +29,7 @@ export class TerrainService {
         this.terrain.set(terrain);
         this.reading.set(false);
       })
-      .catch((error: unknown) => {
+      .catch((error: Error) => {
         console.error('[terrain]', error);
         if (mine !== this.token) return;
         this.failed.set(true);
@@ -43,7 +37,6 @@ export class TerrainService {
       });
   }
 
-  /** Forgets everything, so leaving and coming back reads again. */
   public clear(): void {
     this.token += 1;
     this.last = null;

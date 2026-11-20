@@ -1,8 +1,4 @@
 <div class="search">
-  <!-- The ARIA combobox pattern: the focus never leaves the field, the rows are
-       options and not links, and which one is current travels in
-       aria-activedescendant. A list of links would mean Tab through eight of
-       them to reach the ninth thing on the panel. -->
   <input
     class="field"
     type="search"
@@ -23,25 +19,23 @@
   />
 
   @if (open()) {
-    <!-- preventDefault on mousedown keeps the focus where it is, so the blur
-         does not take the row off screen before the click reaches it. -->
     <div class="dropdown" (mousedown)="$event.preventDefault()">
       @if (results().length) {
         <ul class="results" id="search-results" role="listbox" aria-label="Resultats de la cerca">
           @for (match of results(); track match.id; let i = $index) {
-            <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- the keyboard stays in the field, which moves through the rows. -->
             <li
               class="result"
               [class.on]="i === highlighted()"
               [id]="'search-result-' + i"
               role="option"
+              tabindex="-1"
               [attr.aria-selected]="i === highlighted()"
               (click)="go(match)"
+              (keydown)="key($event)"
+              (focus)="highlighted.set(i)"
               (mouseenter)="highlighted.set(i)"
             >
               <span class="name">{{ match.name }}</span>
-              <!-- The province, because 173 names belong to more than one
-                   unit and the row would otherwise be unchoosable. -->
               <small>{{ match.provinceName }}</small>
             </li>
           }

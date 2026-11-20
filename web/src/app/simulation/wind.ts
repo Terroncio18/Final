@@ -1,4 +1,5 @@
 import { FUEL_MODELS, midflameWind } from './rothermel';
+import type { JsonObject, JsonValue } from './json-value';
 
 /** An instantaneous change in the 10 m wind, held until the next change. */
 export interface WindChange {
@@ -16,17 +17,33 @@ export interface SpreadWind {
   readonly fuelMidflame: Readonly<Record<number, number>>;
 }
 
-export function parseWindChanges(value: unknown): readonly WindChange[] | string {
+function windValues(value: JsonValue | WindChange): WindChange | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const raw = value as JsonObject | WindChange;
+  const { startMin, speedKmh, fromDeg } = raw;
+  if (
+    typeof startMin !== 'number' ||
+    !Number.isFinite(startMin) ||
+    typeof speedKmh !== 'number' ||
+    !Number.isFinite(speedKmh) ||
+    typeof fromDeg !== 'number' ||
+    !Number.isFinite(fromDeg)
+  )
+    return null;
+  return { startMin, speedKmh, fromDeg };
+}
+
+export function parseWindChanges(
+  value: JsonValue | readonly WindChange[],
+): readonly WindChange[] | string {
   if (!Array.isArray(value) || value.length > 100) return 'S’admeten fins a 100 canvis de vent.';
   let previous = -1;
   const changes: WindChange[] = [];
-  for (const raw of value) {
+  const entries: readonly (JsonValue | WindChange)[] = value;
+  for (const entry of entries) {
+    const raw = windValues(entry);
     if (
       !raw ||
-      typeof raw !== 'object' ||
-      ![raw.startMin, raw.speedKmh, raw.fromDeg].every(
-        (n) => typeof n === 'number' && Number.isFinite(n),
-      ) ||
       raw.startMin < 0 ||
       raw.startMin > 720 ||
       raw.startMin <= previous ||

@@ -1,13 +1,7 @@
 import { AIRCRAFT, crewHead, dropPoint, type Countermeasure } from './countermeasures';
 import type { Point } from './point';
 
-/**
- * Who is working, where (12.20, §11.50): crews and machinery at the head of
- * their line while they work, and the passes of the aircraft. Nothing here is
- * decided: every position and every pass follows from what the model already
- * computed —the crew's schedule and stop (12.19), the passes of a discharge
- * (§11.31)— and none of it changes the fire.
- */
+// Agent positions and passes visualize the computed schedule; they do not change the fire.
 type GroundKind = 'crew' | 'bulldozer' | 'fire-engine';
 type AircraftFigure = 'helicopter' | 'scooper' | 'tanker';
 
@@ -28,14 +22,12 @@ export interface Pass {
   readonly liquid: 'water' | 'retardant';
 }
 
-/** Clockwise from north, flat-earth: a few kilometres can afford it. */
 export function bearing(a: Point, b: Point): number {
   const east = (b[0] - a[0]) * Math.cos((((a[1] + b[1]) / 2) * Math.PI) / 180);
   const north = b[1] - a[1];
   return ((Math.atan2(east, north) * 180) / Math.PI + 360) % 360;
 }
 
-/** The direction of the segment of a line nearest a point on it. */
 function headingAlong(points: readonly Point[], at: Point): number {
   let best = 0,
     bestDistance = Infinity;
@@ -59,7 +51,6 @@ function headingAlong(points: readonly Point[], at: Point): number {
   return points.length > 1 ? bearing(points[best], points[best + 1]) : 0;
 }
 
-/** Machinery shares the crew's schedule (§11.42); only its figure changes. */
 const groundKind = (measure: Countermeasure): GroundKind =>
   measure.kind === 'firebreak' || measure.kind === 'clearing'
     ? 'bulldozer'
@@ -67,11 +58,7 @@ const groundKind = (measure: Countermeasure): GroundKind =>
       ? 'fire-engine'
       : 'crew';
 
-/**
- * The crews and machines at work at a minute: from when they start on site
- * until their measure is done (§11.50), at the head of the work and facing
- * along the line. A crew stopped for safety is gone (§11.42).
- */
+// Draw crews at the head of their work from arrival until completion or a safety stop.
 export function groundAgentsAt(
   measures: readonly Countermeasure[],
   minute: number,
@@ -95,12 +82,8 @@ export function groundAgentsAt(
   return agents;
 }
 
-/**
- * The aircraft passes whose minute falls in `(from, to]`: the ones the clock
- * has just gone past. A line of retardant is flown along its drawing; a drop
- * on a point, into the wind (`windFromDeg`), which is only a choice of how it
- * looks.
- */
+// Emit aircraft passes in (from, to]. Retardant follows its polyline; point drops face into the
+// wind for display only.
 export function passesBetween(
   measures: readonly Countermeasure[],
   from: number,

@@ -1,40 +1,26 @@
-import { Component, DestroyRef, inject } from '@angular/core';
+import { Component, inject, type OnDestroy, type OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { MapService } from '../map/map.service';
 import { LevelsService } from './levels.service';
 
-/**
- * The form, as something with a lifetime of its own.
- *
- * It draws nothing: it exists so that «a simulation is being set up» is a state
- * somebody owns. The detections go off here and come back when it is destroyed,
- * which covers every way out —a step, the close button, the browser's back—
- * without each step having to remember.
- *
- * What it hands back is the state the first step starts from, the ignition point
- * and its domain included: that is `levels.clear()` and not a list of layers
- * written out here, which is what §2.29 took away.
- *
- * Off while choosing because the map is answering a different question: during
- * the form it shows administrative boundaries and the user is picking a
- * territory, not reading where it is burning. The marks would be an invitation
- * to click something the form cannot answer.
- */
+// Own form-wide map state for every exit path, including browser Back; individual steps need not
+// restore hotspots.
 @Component({
   selector: 'app-simulation-flow',
   imports: [RouterOutlet],
   template: '<router-outlet />',
 })
-export class SimulationFlow {
-  public constructor() {
-    const maps = inject(MapService);
-    const levels = inject(LevelsService);
+export class SimulationFlow implements OnInit, OnDestroy {
+  private readonly maps = inject(MapService);
+  private readonly levels = inject(LevelsService);
 
-    maps.setHotspotsVisible(false);
-    inject(DestroyRef).onDestroy(() => {
-      maps.setHotspotsVisible(true);
-      levels.clear();
-      maps.setPicking(false);
-    });
+  public ngOnInit(): void {
+    this.maps.setHotspotsVisible(false);
+  }
+
+  public ngOnDestroy(): void {
+    this.maps.setHotspotsVisible(true);
+    this.levels.clear();
+    this.maps.setPicking(false);
   }
 }

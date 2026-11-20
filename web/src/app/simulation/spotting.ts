@@ -1,4 +1,5 @@
 import { CELL_M, GRID } from './domain';
+import type { JsonObject, JsonValue } from './json-value';
 
 export interface SpottingOptions {
   readonly enabled: boolean;
@@ -76,11 +77,14 @@ export function emberFlight(
   return { source: cell, cell: y * GRID + x, minute: land + 0.5, distanceM };
 }
 
-export function parseSpotting(value: unknown): SpottingOptions | string {
-  const v = value as Partial<SpottingOptions> | null;
+export function parseSpotting(
+  value: JsonValue | Partial<SpottingOptions>,
+): SpottingOptions | string {
+  const v = value as JsonObject | SpottingOptions | null;
   return v &&
     typeof v === 'object' &&
     typeof v.enabled === 'boolean' &&
+    typeof v.seed === 'number' &&
     Number.isInteger(v.seed) &&
     v.seed! >= 0 &&
     v.seed! <= 4294967295

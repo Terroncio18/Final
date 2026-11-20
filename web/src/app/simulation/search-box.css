@@ -1,6 +1,4 @@
-/* The field lives in the panel head, which never scrolls, and the list floats
-   over the body, which does: a list in the flow would push the step's own list
-   down the panel on every keystroke. */
+/* Float results over the scrollable body so typing does not push the hierarchy list down. */
 .search {
   position: relative;
   margin-top: 12px;
@@ -34,8 +32,7 @@
 
 .dropdown {
   position: absolute;
-  /* The panel body is a later sibling of the head, so without this it paints
-     over the list. One is enough: both are in the same stacking context. */
+  /* The later panel body would paint over the list without a raised stacking level. */
   z-index: 1;
   top: calc(100% + 6px);
   right: 0;
@@ -46,8 +43,7 @@
   background: #1b232c;
   border: 1px solid var(--line);
   border-radius: 10px;
-  /* The list is over a panel of nearly the same colour; the shadow is what
-     says it is in front of it and not part of it. */
+
   box-shadow: 0 10px 24px rgb(0 0 0 / 0.45);
 }
 
@@ -67,15 +63,11 @@
   cursor: pointer;
 }
 
-/* One class for the pointer and the keyboard, because they are one position:
-   moving the mouse over a row is also what Enter would then take. */
 .result.on {
   background: #2a3542;
 }
 
-/* Names run to seventy-six characters —a Portuguese merger carries both
-   parishes and their patron saints— and the panel is 320 px. The province
-   keeps its width, because that is what tells two equal names apart. */
+/* Allow long municipality names to shrink while retaining the disambiguating province label. */
 .name {
   overflow: hidden;
   text-overflow: ellipsis;

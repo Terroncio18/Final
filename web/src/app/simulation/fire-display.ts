@@ -54,9 +54,8 @@ export function arrivalTexture(arrival: Float32Array, size: number): Float32Arra
       y > 0 ? arrival[i - size] : Infinity,
       y + 1 < size ? arrival[i + size] : Infinity,
     );
-    // Minutes per cell. The ceiling is high on purpose: under a closed canopy
-    // the front creeps at a metre a minute, half an hour per cell, and a low
-    // ceiling there makes every line drawn from this field several cells wide.
+    // Keep a high minutes/cell ceiling: slow canopy fronts otherwise turn forecast lines several
+    // cells wide.
     data[2 * i + 1] = Math.max(0.04, Math.min(240, Math.hypot(dx, dy)));
   }
   return data;
@@ -68,11 +67,8 @@ interface FrontSegment {
   x1: number;
   y1: number;
   length: number;
-  /**
-   * Minutes the front takes to cross one cell there, from the slope of the
-   * arrival times across the triangle: what the fire is really doing, barriers,
-   * water and waits included. Large where the front is stalled.
-   */
+  // Local minutes per cell come from the arrival-time gradient and include waits and treatments;
+  // larger values mean slower fronts.
   pace: number;
   /** The cell the front is about to enter: the corner reached next. */
   ahead: number;

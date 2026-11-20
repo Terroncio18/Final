@@ -47,7 +47,7 @@ describe('agents', () => {
     expect(groundAgentsAt([measure], 9, new Map())).toEqual([]);
     const [start] = groundAgentsAt([measure], 10, new Map());
     expect(start).toMatchObject({ id: 'ground', kind: expected, point: drop });
-    // The line runs east.
+
     expect(start.heading).toBeCloseTo(90, 3);
     const [working] = groundAgentsAt([measure], 40, new Map());
     expect(working.point[0]).toBeGreaterThan(drop[0]);

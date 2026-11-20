@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach, type Mocked } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mocked, type Mock } from 'vitest';
 vi.mock('./domain', () => ({
   GRID: 8,
   CELL_M: 30,
@@ -29,9 +29,12 @@ import { readTerrain, cellOf, groundAt, type Terrain } from './terrain';
 import type { CustomRenderMethodInput, Map as LibreMap } from 'maplibre-gl';
 import type { GroundAgent, Pass } from './agents';
 
-/** A WebGL2 context that records its calls, typed after the real one so it cannot drift from it. */
+type GraphicsContext = Omit<Mocked<WebGL2RenderingContext>, 'createProgram'> & {
+  createProgram: Mock<() => WebGLProgram | null>;
+};
+
 function graphics() {
-  const gl: Record<string, unknown> = {};
+  const gl: Record<string, number | Mock> = {};
   for (const [index, key] of [
     'VERTEX_SHADER',
     'FRAGMENT_SHADER',
@@ -107,17 +110,21 @@ function graphics() {
   gl['getShaderInfoLog'] = vi.fn(() => 'shader failed');
   gl['getProgramInfoLog'] = vi.fn(() => 'link failed');
   gl['getParameter'] = vi.fn(() => null);
-  gl['getUniformLocation'] = vi.fn((_p: unknown, name: string) => name);
+  gl['getUniformLocation'] = vi.fn((_p: WebGLProgram, name: string) => name);
   gl['getAttribLocation'] = vi.fn(() => 1);
   gl['isContextLost'] = vi.fn(() => false);
   gl['getExtension'] = vi.fn(() => ({ loseContext: vi.fn() }));
   gl['drawingBufferWidth'] = 800;
   gl['drawingBufferHeight'] = 600;
-  return gl as unknown as Mocked<WebGL2RenderingContext>;
+  const context: Partial<GraphicsContext> = Object.assign(
+    { drawingBufferWidth: 800, drawingBufferHeight: 600 },
+    gl,
+  );
+  return context as GraphicsContext;
 }
 const projection = {
   defaultProjectionData: { mainMatrix: new THREE.Matrix4().elements },
-} as unknown as CustomRenderMethodInput;
+} as CustomRenderMethodInput;
 const emitters: Emitters = {
   positions: new Float32Array([0.5, 0.5, 0.001, 0.51, 0.51, 0.002, 0.52, 0.52, 0.003]),
   count: 3,
@@ -129,9 +136,9 @@ const emitters: Emitters = {
 describe('fire rendering at the graphics boundary', () => {
   let gl: ReturnType<typeof graphics>,
     map: {
-      triggerRepaint: ReturnType<typeof vi.fn>;
-      getTerrain: ReturnType<typeof vi.fn>;
-      queryTerrainElevation: ReturnType<typeof vi.fn>;
+      triggerRepaint: Mock<() => void>;
+      getTerrain: Mock<() => object | null>;
+      queryTerrainElevation: Mock<() => number | null | undefined>;
     };
   beforeEach(() => {
     gl = graphics();
@@ -147,8 +154,16 @@ describe('fire rendering at the graphics boundary', () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
-  const gpu = () => gl as unknown as WebGL2RenderingContext;
-  const libre = () => map as unknown as LibreMap;
+  const gpu = () => {
+    const context: Partial<WebGL2RenderingContext> = { createProgram: () => gl.createProgram()! };
+    Object.assign(context, gl);
+    return context as WebGL2RenderingContext;
+  };
+  const libre = () => {
+    const boundary: Partial<LibreMap> = { triggerRepaint: map.triggerRepaint };
+    Object.assign(boundary, map);
+    return boundary as LibreMap;
+  };
 
   it('uploads finite flame and smoke geometry, restores GL state and pauses hidden frames', () => {
     const layer = new FireParticles('fire'),
@@ -271,8 +286,7 @@ describe('fire rendering at the graphics boundary', () => {
         failure === 'context' ? null : gpu(),
       );
       // The DOM types say it never returns null; a lost context does.
-      if (failure === 'program-allocation')
-        gl['createProgram'].mockReturnValue(null as unknown as WebGLProgram);
+      if (failure === 'program-allocation') gl['createProgram'].mockReturnValue(null);
       if (failure.startsWith('shader')) gl['getShaderParameter'].mockReturnValue(false);
       if (failure.startsWith('link')) gl['getProgramParameter'].mockReturnValue(false);
       if (failure.endsWith('no-message')) {
@@ -286,12 +300,20 @@ describe('fire rendering at the graphics boundary', () => {
   }
 
   it('maps slope bands to pixels and copies interior slopes to the border', () => {
-    const image = { data: new Uint8ClampedArray(64 * 4) },
+    const image: ImageData = {
+        data: new Uint8ClampedArray(64 * 4),
+        width: 8,
+        height: 8,
+        colorSpace: 'srgb',
+      },
       putImageData = vi.fn();
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    const context: Partial<CanvasRenderingContext2D> = {
       createImageData: () => image,
       putImageData,
-    } as unknown as CanvasRenderingContext2D);
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+      context as CanvasRenderingContext2D,
+    );
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;test');
     const slope = new Float32Array(64);
     for (let i = 0; i < 8; i++) slope.fill(i * 10, i * 8, (i + 1) * 8);
@@ -331,7 +353,9 @@ describe('3D crew and aircraft lifecycle', () => {
     layer.setGround([crew]);
     layer.setGround([{ ...crew, kind: 'bulldozer' }]);
     layer.setGround([]);
-    layer.onAdd(map as unknown as LibreMap, gl);
+    const boundary: Partial<LibreMap> = { getCanvas: map.getCanvas, getZoom: map.getZoom };
+    Object.assign(boundary, map);
+    layer.onAdd(boundary as LibreMap, gl);
     layer.render(gl, projection);
     layer.setGround([crew]);
     layer.fly(pass);
