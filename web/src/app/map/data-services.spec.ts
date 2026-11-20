@@ -429,8 +429,28 @@ describe('geographic and observation services', () => {
     TestBed.tick();
     await settle();
     expect(service.failed()).toBe(true);
+    expect(service.missingKey()).toBe(false);
     expect(service.loading()).toBe(false);
     expect(maps.setHotspots).toHaveBeenCalledTimes(1);
+  });
+
+  it('tells a missing FIRMS key apart from a plain outage', async () => {
+    vi.spyOn(TestBed.inject(StudyArea), 'inside').mockImplementation(async (f) => f);
+    fetcher.mockResolvedValueOnce(
+      response({ error: 'Falta la clau FIRMS_MAP_KEY al servidor', reason: 'missing-key' }, 503),
+    );
+    const service = TestBed.inject(HotspotsService);
+    TestBed.tick();
+    await settle();
+    expect(service.failed()).toBe(true);
+    expect(service.missingKey()).toBe(true);
+    // A later, ordinary outage must not leave the earlier diagnosis stuck on.
+    fetcher.mockResolvedValueOnce(response({}, 500));
+    await TestBed.inject(Router).navigateByUrl('/?des=2024-08-01&fins=2024-08-02');
+    TestBed.tick();
+    await settle();
+    expect(service.failed()).toBe(true);
+    expect(service.missingKey()).toBe(false);
   });
 
   it('writes source updates and reports worker failures without an unhandled rejection', async () => {

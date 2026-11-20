@@ -1509,6 +1509,19 @@ select:focus-visible {
   outline-offset: 3px;
 }
 
+/* Said once, plainly, when the window is the reason the columns moved —see
+   the `@media` rule further down, and NARROW_WORKSPACE_QUERY in the
+   component, which has to name the same width. */
+.narrow-warning {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 7px 26px;
+  font-size: 11px;
+  color: #e8ab80;
+  background: #32241c;
+  border-bottom: 1px solid #6a4731;
+}
+
 /* A laptop screen: the three columns stay, everything gives a little. */
 @media (max-width: 1250px) {
   .workspace {
@@ -1533,6 +1546,40 @@ select:focus-visible {
 
   .metric > span {
     font-size: 9px;
+  }
+}
+
+/* A tablet turned narrow, or a window pulled in past what the laptop rule
+ * above can absorb: 225px and 270px of fixed sidebar no longer leave the
+ * centre column anywhere to shrink to, and the grid would spill past the
+ * edge instead of fitting (§11.6x). Below here the three columns stack
+ * instead, full width and in reading order, and the console scrolls rather
+ * than clipping them — :host's own overflow stays hidden on the cross axis
+ * only. NARROW_WORKSPACE_QUERY in the component has to name this same width.
+ */
+@media (max-width: 860px) {
+  :host {
+    height: auto;
+    min-height: 100dvh;
+    overflow: hidden auto;
+  }
+
+  .console {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+  }
+
+  .sidebar {
+    max-height: 70vh;
+  }
+
+  .map-panel {
+    min-height: 60vh;
   }
 }
 

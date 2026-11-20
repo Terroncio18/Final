@@ -153,12 +153,21 @@ async function readWorldCover(
   }
 }
 
-async function datasets(): Promise<FuelDataset[]> {
+async function datasets(warnings: string[]): Promise<FuelDataset[]> {
   let names: string[];
   try {
     names = await readdir(join(FUEL_DATA_DIR, "datasets"));
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
+      // Silent otherwise: every cell in every answer would fall back to the
+      // WorldCover estimate without the client ever being told why there is
+      // no official map at all, which is not the same thing as one tile of
+      // it being unreachable (§11.6x).
+      warnings.push(
+        "Cap conjunt de combustible oficial configurat: tot el mapa surt estimat a partir d'ESA WorldCover.",
+      );
+      return [];
+    }
     throw e;
   }
   const result: FuelDataset[] = [];
@@ -235,7 +244,11 @@ export async function fuelGrid(
   bounds: Bounds,
   size: number,
 ): Promise<FuelResponse> {
-  const maps = await datasets();
+  // Declared out here, and not inside the job below, because datasets() has
+  // to report into it before the cache key —which depends on `maps`— is even
+  // computed.
+  const warnings: string[] = [];
+  const maps = await datasets(warnings);
   const key = createHash("sha256")
     .update(
       JSON.stringify([FUEL_VERSION, "official-first-v1", bounds, size, maps]),
@@ -258,12 +271,16 @@ export async function fuelGrid(
   const job = (async () => {
     const models = new Uint8Array(size * size).fill(UNKNOWN),
       quality = new Uint8Array(size * size);
-    const warnings: string[] = [];
     const sources: FuelResponse["sources"] = [];
     for (const data of maps)
       if (await overlay(data, bounds, size, models, quality))
         sources.push(data);
+    // Counted, not just checked for emptiness: a missing dataset directory
+    // already warned above and is a stable fact of the deployment, not an
+    // upstream read to retry, so it must not be what decides the cache below.
+    const beforeRaster = warnings.length;
     await readWorldCover(bounds, size, models, quality, warnings);
+    const rasterUnreachable = warnings.length > beforeRaster;
     let officialCells = 0,
       estimatedCells = 0,
       unknownCells = 0,
@@ -307,7 +324,7 @@ export async function fuelGrid(
       generatedAt: new Date().toISOString(),
     };
     // Failed upstream reads must be retryable, not preserved for a month.
-    if (!warnings.length && !unknownCells) {
+    if (!rasterUnreachable && !unknownCells) {
       await mkdir(cacheDir, { recursive: true });
       await writeFile(path + ".tmp", gzipSync(JSON.stringify(result)));
       await rename(path + ".tmp", path);

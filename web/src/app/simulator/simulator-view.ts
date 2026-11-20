@@ -118,6 +118,14 @@ const ANALYSIS_ITEMS = [
 
 const ANALYSIS_KEY = 'ignislab.analysis.hidden';
 
+/**
+ * Below this, the three fixed-width columns no longer fit the window: the
+ * centre one has nowhere left to shrink to and the grid overflows, clipped
+ * by the host instead of reflowing (§11.6x). The figure matches the
+ * `@media` rule in simulator-view.css; the two have to move together.
+ */
+const NARROW_WORKSPACE_QUERY = '(max-width: 860px)';
+
 /** The eight points of the compass, for naming a bearing. */
 const DIRECTIONS = [
   { degrees: 0, short: 'N', name: 'nord' },
@@ -531,6 +539,15 @@ export class SimulatorView {
   protected readonly slopes = signal(false);
   protected readonly slopeClasses = SLOPE_CLASSES;
   protected readonly layersOpen = signal(false);
+
+  /**
+   * True once the window is too narrow for the three columns side by side.
+   *
+   * CSS already stacks them at that width (see the `@media` rule); this is
+   * what tells the reader why the screen just rearranged itself, rather than
+   * leaving them to wonder whether something broke.
+   */
+  protected readonly narrowWorkspace = signal(matchMedia(NARROW_WORKSPACE_QUERY).matches);
 
   // ---- What is real. ----
 
@@ -1251,6 +1268,13 @@ export class SimulatorView {
 
   public constructor() {
     this.plan.guard = (measure) => this.mopUpGuard(measure);
+    // The breakpoint fires a `change` event each time the window crosses it,
+    // in either direction, so the banner tracks a live resize and not only
+    // the width the screen happened to open at.
+    const narrowQuery = matchMedia(NARROW_WORKSPACE_QUERY);
+    const onNarrowChange = (event: MediaQueryListEvent) => this.narrowWorkspace.set(event.matches);
+    narrowQuery.addEventListener('change', onNarrowChange);
+    inject(DestroyRef).onDestroy(() => narrowQuery.removeEventListener('change', onNarrowChange));
     // Where each crew stopped for safety, as the model computed it (12.19).
     effect(() => this.plan.crewStops.set(this.result()?.crewStops ?? new Map()));
     // Who is working at the cursor (12.20, §11.50): only over a computed fire,

@@ -13,7 +13,8 @@ import { MapService } from '../map/map.service';
 import { CELL_M, domainAround, domainRing, GRID, SIDE_M } from './domain';
 import { LevelsService } from './levels.service';
 import { MunicipalitiesService } from './municipalities.service';
-import { formatPoint, parsePoint } from './point';
+import { formatPoint, parsePoint, type Point } from './point';
+import { PointLocator } from './point-locator';
 import { ProvincesService } from './provinces.service';
 import { TerrainService } from './terrain.service';
 
@@ -46,10 +47,14 @@ export class IgnitionStep {
 
   private readonly provinces = inject(ProvincesService);
   private readonly municipalities = inject(MunicipalitiesService);
+  private readonly locator = inject(PointLocator);
   private readonly maps = inject(MapService);
   private readonly terrain = inject(TerrainService);
   private readonly levels = inject(LevelsService);
   private readonly router = inject(Router);
+
+  /** The point a cross-border lookup is answering for, so a later click can supersede it. */
+  private resolving: Point | null = null;
 
   /** Only in the template once there is a point, so it is not required. */
   private readonly relief = viewChild<ElementRef<HTMLCanvasElement>>('relief');
@@ -167,20 +172,50 @@ export class IgnitionStep {
       // The point decides the municipality, and not the other way round. The
       // three steps above chose one, but the map does not stop at its border:
       // clicking two valleys over has to answer about the valley clicked, or
-      // the panel describes a municipality the fire is not in. Nothing under
-      // the point —the sea, the next province— leaves the segment as it was,
-      // and the panel says the point is outside it.
-      const municipality = this.municipalities.at(picked)?.id ?? this.municipality();
-      void this.router.navigate(
-        ['/simulacio', this.region(), this.province(), municipality, formatPoint(picked)],
-        // Moving a point that is already set replaces the entry instead of
-        // stacking one: otherwise the back button would walk a trail of nudges
-        // rather than returning to the list.
-        { replaceUrl: this.ignition() !== null },
-      );
+      // the panel describes a municipality the fire is not in.
+      const local = this.municipalities.at(picked);
+      if (local) {
+        this.goTo(this.region(), this.province(), local.id, picked);
+        return;
+      }
+
+      // Not in the province already on screen: the sea, the next province,
+      // or —this is the one the fallback below cannot tell apart on its
+      // own— the other country. PointLocator answers from the whole study
+      // area and not only what is loaded, so a point that crossed the border
+      // gets the address it actually fell in rather than keeping Spain's.
+      this.resolving = picked;
+      this.locator
+        .locate(picked)
+        .then((place) => {
+          if (this.resolving !== picked) return; // superseded by a later click
+          if (place) this.goTo(place.region, place.province, place.municipality, picked);
+          // The sea, or nothing PointLocator could read either: there is
+          // nothing better to put in it, so the segment stays as it was and
+          // the panel says the point is outside it.
+          else this.goTo(this.region(), this.province(), this.municipality(), picked);
+        })
+        .catch((error: unknown) => {
+          console.error('[ignition]', error);
+          if (this.resolving !== picked) return;
+          this.goTo(this.region(), this.province(), this.municipality(), picked);
+        });
     });
 
     inject(DestroyRef).onDestroy(() => this.terrain.clear());
+  }
+
+  /**
+   * Moves the URL to a point, under whichever address answers for it.
+   *
+   * Moving a point that is already set replaces the entry instead of
+   * stacking one: otherwise the back button would walk a trail of nudges
+   * rather than returning to the list.
+   */
+  private goTo(region: string, province: string, municipality: string, point: Point): void {
+    void this.router.navigate(['/simulacio', region, province, municipality, formatPoint(point)], {
+      replaceUrl: this.ignition() !== null,
+    });
   }
 
   /**

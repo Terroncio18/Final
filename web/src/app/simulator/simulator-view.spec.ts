@@ -192,14 +192,17 @@ describe('simulator screen', () => {
     navigate: ReturnType<typeof vi.fn<Router['navigate']>>;
   let frames: Map<number, FrameRequestCallback>,
     frameId: number,
-    reduced: { matches: boolean },
+    reduced: { matches: boolean; addEventListener: Mock; removeEventListener: Mock },
     clock: number;
   beforeEach(() => {
     localStorage.clear();
     frames = new Map();
     frameId = 0;
     clock = 0;
-    reduced = { matches: true };
+    // Shared by every `matchMedia()` call the component makes —reduced motion
+    // and the narrow-workspace query alike— since nothing here tells queries
+    // apart. Only the latter listens for `change`.
+    reduced = { matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() };
     vi.stubGlobal(
       'matchMedia',
       vi.fn(() => reduced),
@@ -304,6 +307,29 @@ describe('simulator screen', () => {
     await fixture.whenStable();
     return result;
   }
+
+  it('warns about a narrow window, tracks a live resize and stops listening on exit', async () => {
+    reduced.matches = true;
+    await open();
+    expect(fixture.nativeElement.querySelector('.narrow-warning')).not.toBeNull();
+    expect(c['narrowWorkspace']()).toBe(true);
+    expect(reduced.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+    const onChange = reduced.addEventListener.mock.calls[0][1] as (
+      event: Pick<MediaQueryListEvent, 'matches'>,
+    ) => void;
+
+    onChange({ matches: false });
+    await fixture.whenStable();
+    expect(c['narrowWorkspace']()).toBe(false);
+    expect(fixture.nativeElement.querySelector('.narrow-warning')).toBeNull();
+
+    onChange({ matches: true });
+    await fixture.whenStable();
+    expect(c['narrowWorkspace']()).toBe(true);
+
+    fixture.destroy();
+    expect(reduced.removeEventListener).toHaveBeenCalledWith('change', onChange);
+  });
 
   it('opens the simulation, controls its layers and restores the application on exit', async () => {
     await open();

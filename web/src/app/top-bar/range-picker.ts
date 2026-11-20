@@ -36,6 +36,7 @@ export class RangePicker {
   protected readonly range = this.hotspots.range;
   protected readonly loading = this.hotspots.loading;
   protected readonly failed = this.hotspots.failed;
+  protected readonly missingKey = this.hotspots.missingKey;
   protected readonly count = this.hotspots.countInScope;
   protected readonly earliest = this.hotspots.earliest;
   protected readonly open = signal(false);

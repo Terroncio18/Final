@@ -11,6 +11,8 @@
     <span class="when">{{ label() }}</span>
     @if (loading()) {
       <small class="state">carregant…</small>
+    } @else if (missingKey()) {
+      <small class="state warn">falta la clau FIRMS</small>
     } @else if (failed()) {
       <small class="state warn">sense resposta</small>
     } @else {

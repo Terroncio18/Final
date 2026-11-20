@@ -120,6 +120,15 @@ app.get<{ Querystring: { from?: string; to?: string; days?: string } }>(
       return body;
     } catch (error) {
       request.log.error(error);
+      // Distinguished from a plain outage: a missing key never comes back on
+      // its own, however long the client waits or how often it retries, so
+      // the two cannot share one message (§11.6x). /api/health already tells
+      // the same thing; this is the same check, asked at the moment it bites.
+      if (!FIRMS_MAP_KEY) {
+        return reply
+          .status(503)
+          .send({ error: 'Falta la clau FIRMS_MAP_KEY al servidor', reason: 'missing-key' });
+      }
       return reply.status(502).send({ error: 'FIRMS is unreachable and nothing is cached yet' });
     }
   },

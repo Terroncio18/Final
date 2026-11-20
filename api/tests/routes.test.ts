@@ -162,11 +162,26 @@ test('when FIRMS falls over, what is held is served and it says that it is old',
 });
 
 test('when FIRMS falls over with nothing held, the fault is said to be upstream', async () => {
+  // A key is configured here: without one, every outage would look like a
+  // missing key, which is exactly the mix-up the next test guards against.
+  vi.stubEnv('FIRMS_MAP_KEY', 'a-key-for-the-tests');
   fetchHotspots.mockRejectedValue(new Error('FIRMS answered 503'));
 
   const answer = await (await serve()).inject('/api/hotspots?days=1');
   assert.equal(answer.statusCode, 502);
   assert.match(answer.json().error, /FIRMS/);
+  vi.unstubAllEnvs();
+});
+
+test('a missing key is said plainly, and not folded into the generic outage', async () => {
+  vi.stubEnv('FIRMS_MAP_KEY', '');
+  fetchHotspots.mockRejectedValue(new Error('FIRMS_MAP_KEY is not set'));
+
+  const answer = await (await serve()).inject('/api/hotspots?days=1');
+  assert.equal(answer.statusCode, 503);
+  assert.equal(answer.json().reason, 'missing-key');
+  assert.match(answer.json().error, /clau/);
+  vi.unstubAllEnvs();
 });
 
 test('the weather asks for a country and a place, and refuses anything else', async () => {

@@ -84,7 +84,10 @@ test('with no official map, every cell is estimated from the land cover', async 
   // Tree cover is the model 8 of the table in §11.21.
   assert.deepEqual(grid.models, [{ id: 8, cells: CELLS }]);
   assert.deepEqual(grid.runs, [8, 2, CELLS], 'one run: model 8, estimated, sixteen cells');
-  assert.equal(grid.warnings.length, 0);
+  // No datasets directory at all: the client is told there is no official
+  // map anywhere, not only that this box happens to miss one.
+  assert.equal(grid.warnings.length, 1);
+  assert.match(grid.warnings[0]!, /[Cc]ap conjunt.*oficial/);
   assert.equal(grid.sources.length, 1);
   assert.match(grid.sources[0]!.label, /WorldCover/);
   assert.match(grid.sources[0]!.attribution, /ESA WorldCover project 2021/);
@@ -146,10 +149,25 @@ test('a land cover that cannot be read leaves the cells unknown, and says so', a
 
   assert.equal(grid.unknownCells, CELLS);
   assert.equal(grid.estimatedCells, 0);
-  assert.equal(grid.warnings.length, 1);
-  assert.match(grid.warnings[0]!, /WorldCover N39E000/);
+  // Both named: there is no official map at all, and on top of that the
+  // fallback itself could not be read.
+  assert.equal(grid.warnings.length, 2);
+  assert.match(grid.warnings[1]!, /WorldCover N39E000/);
   // And nothing of this is kept: a failure upstream has to be retryable.
   assert.deepEqual(await readdir(dir), [], 'no cache is written');
+});
+
+test('a missing dataset directory is said once, and does not block caching on its own', async () => {
+  const { fuelGrid } = await fuels();
+
+  const grid = await fuelGrid([...BOUNDS], SIZE);
+  assert.equal(grid.warnings.length, 1);
+  assert.match(grid.warnings[0]!, /[Cc]ap conjunt.*oficial/);
+  // Stable, not transient: unlike a raster that failed to load, the absence
+  // of a datasets directory is a fact about the deployment and is already
+  // part of the cache key through `maps`, so the answer is still cached.
+  const cached = await readdir(join(dir, 'cache'));
+  assert.equal(cached.length, 1);
 });
 
 test('an answer with everything known is kept, and the second question does not ask the raster', async () => {

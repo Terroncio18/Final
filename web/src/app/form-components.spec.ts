@@ -111,6 +111,7 @@ describe('form, navigation and overview components', () => {
     range: ReturnType<typeof signal<{ from: string; to: string }>>;
     loading: ReturnType<typeof signal<boolean>>;
     failed: ReturnType<typeof signal<boolean>>;
+    missingKey: ReturnType<typeof signal<boolean>>;
     countInScope: ReturnType<typeof signal<number>>;
     earliest: ReturnType<typeof signal<string | null>>;
     choose: ReturnType<typeof vi.fn>;
@@ -148,6 +149,7 @@ describe('form, navigation and overview components', () => {
       range: signal({ from: '2024-08-01', to: '2024-08-03' }),
       loading: signal(false),
       failed: signal(false),
+      missingKey: signal(false),
       countInScope: signal(3),
       earliest: signal<string | null>(null),
       choose: vi.fn(),
@@ -475,6 +477,45 @@ describe('form, navigation and overview components', () => {
     fixture.destroy();
     expect(maps.setPicking).toHaveBeenLastCalledWith(false);
     expect(terrain.clear).toHaveBeenCalled();
+  });
+
+  it('re-resolves the whole address when a click lands outside the province, in another country', async () => {
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    const fixture = TestBed.createComponent(IgnitionStep);
+    for (const [key, value] of Object.entries({
+      region: 'ES53',
+      province: 'ES531',
+      municipality: 'one',
+      point: '@2,3',
+    }))
+      fixture.componentRef.setInput(key, value);
+    await fixture.whenStable();
+
+    // The click fell outside every municipality loaded for Spain's province,
+    // but it is not the sea: the located address is Portugal's, not Spain's.
+    municipalities.at.mockReturnValue(null);
+    locator.locate.mockResolvedValueOnce({
+      region: 'PT11',
+      province: 'PT111',
+      municipality: 'lisboa',
+    });
+    maps.picked.set([-9, 38.7]);
+    await fixture.whenStable();
+    expect(navigate).toHaveBeenLastCalledWith(
+      ['/simulacio', 'PT11', 'PT111', 'lisboa', '@-9.00000,38.70000'],
+      { replaceUrl: true },
+    );
+
+    // A point that answers to nothing at all —the sea— keeps the address it
+    // came with, same as before PointLocator was asked. The route inputs
+    // themselves never changed here: `navigate` is a spy, not a real router.
+    locator.locate.mockResolvedValueOnce(null);
+    maps.picked.set([1, 1]);
+    await fixture.whenStable();
+    expect(navigate).toHaveBeenLastCalledWith(
+      ['/simulacio', 'ES53', 'ES531', 'one', '@1.00000,1.00000'],
+      { replaceUrl: true },
+    );
   });
 
   it('renders terrain statistics and the relief preview, tolerating a missing canvas context', async () => {

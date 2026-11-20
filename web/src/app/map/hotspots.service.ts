@@ -29,6 +29,8 @@ export class HotspotsService {
 
   public readonly loading = signal(false);
   public readonly failed = signal(false);
+  /** Set when the server said the cause is a missing FIRMS key, not an outage. */
+  public readonly missingKey = signal(false);
   public readonly earliest = signal<string | null>(null);
 
   private readonly insideStudyArea = signal<FeatureCollection | null>(null);
@@ -81,12 +83,18 @@ export class HotspotsService {
     const request = ++this.requests;
     this.loading.set(true);
     this.failed.set(false);
+    this.missingKey.set(false);
 
     const url = `${HOTSPOTS_URL}?from=${range.from}&to=${range.to}`;
 
     fetch(url)
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      .then(async (response) => {
+        if (!response.ok) {
+          // The body says why, when the server knows: a missing key is not
+          // the same thing to tell the reader as FIRMS being down (§11.6x).
+          const body = (await response.json().catch(() => null)) as { reason?: string } | null;
+          throw new HotspotFetchError(`${response.status} ${response.statusText}`, body?.reason);
+        }
         const earliest = response.headers.get('x-earliest');
         if (earliest) this.earliest.set(earliest);
         return response.json() as Promise<FeatureCollection>;
@@ -111,7 +119,18 @@ export class HotspotsService {
         console.error('[hotspots]', error);
         if (request !== this.requests) return;
         this.failed.set(true);
+        this.missingKey.set(error instanceof HotspotFetchError && error.reason === 'missing-key');
         this.loading.set(false);
       });
+  }
+}
+
+/** Carries the server's `reason`, when it gave one, through the `.catch()`. */
+class HotspotFetchError extends Error {
+  public constructor(
+    message: string,
+    public readonly reason?: string,
+  ) {
+    super(message);
   }
 }

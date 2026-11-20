@@ -1,4 +1,11 @@
 <div class="console">
+  @if (narrowWorkspace()) {
+    <p class="narrow-warning" role="status">
+      La finestra és massa estreta per a les tres columnes: configuració, mapa i anàlisi s'apilen.
+      Amplia-la per veure-les una al costat de l'altra.
+    </p>
+  }
+
   <!-- The bar carries what IgnisLab actually has here: the mark, which
        simulation this is, and the way back. No tabs that lead nowhere. -->
   <header class="topbar">
