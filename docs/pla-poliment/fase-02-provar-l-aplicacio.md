@@ -4,7 +4,9 @@
 **Depèn de**: res. **Acaba quan**: hi ha una llista de defectes, cadascun amb
 com reproduir-lo i què s'esperava.
 
-- [ ] Escriure el guió amb Pere.
+- [x] Escriure el guió amb Pere: [`fase-02-guio.md`](fase-02-guio.md), en
+      quatre seients, amb dos escenaris de referència (Mallorca per al
+      combustible oficial, un de la península per a l'estimat).
 - [ ] Passar-lo i escriure la llista de defectes.
 
 El guió ha de cobrir, com a mínim:

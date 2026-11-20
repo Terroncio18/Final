@@ -38,7 +38,7 @@ La xarxa de seguretat ja hi és: 97,9 % de cobertura i 0 avisos de Sonar
 | 0 | [El full d'estil](fase-00-full-d-estil.md) | — | **A mitges**: 4 regles escrites, 4 decisions obertes | Claude |
 | 0b | [El linter](fase-00b-linter.md) | 0 | **A mitges**: `web/` en verd (§11.63); falta `api/` | Claude |
 | 1 | [Inventari](fase-01-inventari.md) | — | **Feta**: dues llistes a `docs/inventari-web.md` i `docs/inventari-api.md`, les sis categories cobertes | Claude |
-| 2 | [Provar l'aplicació sencera](fase-02-provar-l-aplicacio.md) | — | Per començar (guió per escriure amb Pere) | — |
+| 2 | [Provar l'aplicació sencera](fase-02-provar-l-aplicacio.md) | — | **A mitges**: [el guió](fase-02-guio.md) escrit, en quatre seients; queda passar-lo | Pere |
 | 3 | [Errors](fase-03-errors.md) | 1, 2 | Per començar | — |
 | 4 | [Codi mort](fase-04-codi-mort.md) | 1 | Per començar | — |
 | 5 | [Estil](fase-05-estil.md) | 0, 0b, 4 | **A mitges**: regles 1 a 3 fetes menys els dos grans; 10 funcions al trinquet | Claude |
