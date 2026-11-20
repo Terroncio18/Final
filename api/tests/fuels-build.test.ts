@@ -198,10 +198,19 @@ test('the same box asked twice at once is one job, and a third box is busy', asy
   const first = fuelGrid([...BOUNDS], SIZE);
   const same = fuelGrid([...BOUNDS], SIZE);
   const other = fuelGrid([2.7, 39.55, 2.75, 39.6], SIZE);
-  const third = fuelGrid([2.75, 39.55, 2.8, 39.6], SIZE);
 
-  await assert.rejects(() => third, /FUEL_BUSY/, 'two at a time is the ceiling');
-  release();
+  try {
+    // Wait until both slots are occupied so filesystem scheduling cannot
+    // affect the assertion about the request limit.
+    await vi.waitFor(() => assert.equal(fromUrl.mock.calls.length, 2));
+    await assert.rejects(
+      () => fuelGrid([2.75, 39.55, 2.8, 39.6], SIZE),
+      /FUEL_BUSY/,
+      'two at a time is the ceiling',
+    );
+  } finally {
+    release();
+  }
   const [a, b] = await Promise.all([first, same, other]);
   assert.equal(a!.generatedAt, b!.generatedAt, 'the repeated question waited for the first');
   assert.equal(fromUrl.mock.calls.length, 2, 'one read per box, not per question');

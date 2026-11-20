@@ -32,6 +32,7 @@ import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { roundGeoJSONCoordinates } from './geojson-precision.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -228,7 +229,10 @@ async function main() {
     byProvince.get(province.id).push({
       type: 'Feature',
       id: feature.properties.GISCO_ID,
-      geometry: feature.geometry,
+      geometry: {
+        ...feature.geometry,
+        coordinates: roundGeoJSONCoordinates(feature.geometry.coordinates),
+      },
       properties: {
         id: feature.properties.GISCO_ID,
         name: feature.properties.LAU_NAME,

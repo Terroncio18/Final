@@ -1,16 +1,9 @@
 import { createHash } from "node:crypto";
-import {
-  mkdir,
-  readFile,
-  readdir,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { readFile, readdir, rm, stat } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { fromUrl } from "geotiff";
+import { writeFuelCache } from "./fuel-cache.js";
 import {
   encodeRuns,
   tileBounds,
@@ -325,25 +318,29 @@ export async function fuelGrid(
     };
     // Failed upstream reads must be retryable, not preserved for a month.
     if (!rasterUnreachable && !unknownCells) {
-      await mkdir(cacheDir, { recursive: true });
-      await writeFile(path + ".tmp", gzipSync(JSON.stringify(result)));
-      await rename(path + ".tmp", path);
-      const names = (await readdir(cacheDir)).filter((s) =>
-        /^[a-f0-9]{64}\.json\.gz$/.test(s),
+      const saved = await writeFuelCache(
+        cacheDir,
+        path,
+        gzipSync(JSON.stringify(result)),
       );
-      if (names.length > 96) {
-        const found = await Promise.allSettled(
-          names.map(async (name) => ({
-            name,
-            time: (await stat(join(cacheDir, name))).mtimeMs,
-          })),
+      if (saved) {
+        const names = (await readdir(cacheDir)).filter((s) =>
+          /^[a-f0-9]{64}\.json\.gz$/.test(s),
         );
-        const files = found.flatMap((result) =>
-          result.status === "fulfilled" ? [result.value] : [],
-        );
-        files.sort((a, b) => a.time - b.time);
-        for (const file of files.slice(0, Math.max(0, files.length - 96)))
-          await rm(join(cacheDir, file.name), { force: true });
+        if (names.length > 96) {
+          const found = await Promise.allSettled(
+            names.map(async (name) => ({
+              name,
+              time: (await stat(join(cacheDir, name))).mtimeMs,
+            })),
+          );
+          const files = found.flatMap((result) =>
+            result.status === "fulfilled" ? [result.value] : [],
+          );
+          files.sort((a, b) => a.time - b.time);
+          for (const file of files.slice(0, Math.max(0, files.length - 96)))
+            await rm(join(cacheDir, file.name), { force: true });
+        }
       }
     }
     return result;

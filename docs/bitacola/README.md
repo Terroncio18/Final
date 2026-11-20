@@ -137,6 +137,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.64** El combustible oficial surt de Balears
 - **11.65** El codi mort es retira amb prudència
 - **11.66** Fora el punt de càrrega antic i els pintors que no es feien servir
+- **11.67** Les dades de municipis es publiquen amb precisió útil
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):
@@ -160,4 +161,4 @@ amb el que es plantejava):
 
 I, al costat: `13-troballes-tecniques.md` —set coses que només es veuen
 provant: què drapeja MapLibre, per què el foc sortia tallat, per què les
-proves del model no corren amb el *builder* d'Angular— i `14-fonts-de-dades.md`.
+proves del model no corren amb el _builder_ d'Angular— i `14-fonts-de-dades.md`.
