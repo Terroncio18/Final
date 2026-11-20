@@ -33,20 +33,20 @@ La xarxa de seguretat ja hi és: 97,9 % de cobertura i 0 avisos de Sonar
 
 ## Estat
 
-| #   | Fase                                                        | Depèn de    | Estat                                                                                                          | Qui    |
-| --- | ----------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------- | ------ |
-| 0   | [El full d'estil](fase-00-full-d-estil.md)                  | —           | **A mitges**: 4 regles escrites, 4 decisions obertes                                                           | Claude |
-| 0b  | [El linter](fase-00b-linter.md)                             | 0           | **A mitges**: `web/` en verd (§11.63); falta `api/`                                                            | Claude |
-| 1   | [Inventari](fase-01-inventari.md)                           | —           | **Feta**: dues llistes a `docs/inventari-web.md` i `docs/inventari-api.md`, les sis categories cobertes        | Claude |
-| 2   | [Provar l'aplicació sencera](fase-02-provar-l-aplicacio.md) | —           | **A mitges**: [el guió](fase-02-guio.md) escrit, en quatre seients; queda passar-lo                            | Pere   |
-| 3   | [Errors](fase-03-errors.md)                                 | 1, 2        | **Feta**: 4 defectes de la fase 2 arreglats, cada un amb la seva prova                                         | Claude |
-| 4   | [Codi mort](fase-04-codi-mort.md)                           | 1           | **Feta** el 20/11/2026: rutes de càrrega i pintors sense importador retirats; inventaris revisats              | Codex  |
-| 5   | [Estil](fase-05-estil.md)                                   | 0, 0b, 4    | **A mitges**: regles 1 a 3 fetes menys els dos grans; 10 funcions al trinquet                                  | Claude |
-| 6   | [Optimitzacions](fase-06-optimitzacions.md)                 | 1, 2        | **Feta** 20/11: dades −17,9%; recuperació `ENOSPC`; bundle dins del límit (autoritzada abans de tancar fase 2) | Codex  |
-| 7   | [Prova global final](fase-07-prova-global.md)               | 3, 4, 5, 6  | Per començar                                                                                                   | —      |
-| 8   | [Manuals i README](fase-08-manuals.md)                      | 7           | Per començar                                                                                                   | —      |
-| 9   | [Publicar](fase-09-publicar.md)                             | 8 + decisió | **Bloquejada per una decisió**                                                                                 | —      |
-| 10  | [Sonar i tancament](fase-10-sonar-i-tancament.md)           | 9           | Per començar                                                                                                   | —      |
+| #   | Fase                                                        | Depèn de    | Estat                                                                                                   | Qui    |
+| --- | ----------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------- | ------ |
+| 0   | [El full d'estil](fase-00-full-d-estil.md)                  | —           | **A mitges**: 4 regles escrites, 4 decisions obertes                                                    | Claude |
+| 0b  | [El linter](fase-00b-linter.md)                             | 0           | **A mitges**: `web/` en verd (§11.63); falta `api/`                                                     | Claude |
+| 1   | [Inventari](fase-01-inventari.md)                           | —           | **Feta**: dues llistes a `docs/inventari-web.md` i `docs/inventari-api.md`, les sis categories cobertes | Claude |
+| 2   | [Provar l'aplicació sencera](fase-02-provar-l-aplicacio.md) | —           | **Feta** 20/11: prova manual completada; quatre defectes resolts a la fase 3                            | Pere   |
+| 3   | [Errors](fase-03-errors.md)                                 | 1, 2        | **Feta**: 4 defectes de la fase 2 arreglats, cada un amb la seva prova                                  | Claude |
+| 4   | [Codi mort](fase-04-codi-mort.md)                           | 1           | **Feta** el 20/11/2026: rutes de càrrega i pintors sense importador retirats; inventaris revisats       | Codex  |
+| 5   | [Estil](fase-05-estil.md)                                   | 0, 0b, 4    | **A mitges**: regles 1 a 3 fetes menys els dos grans; 10 funcions al trinquet                           | Claude |
+| 6   | [Optimitzacions](fase-06-optimitzacions.md)                 | 1, 2        | **Feta** 20/11: dades −17,9%; recuperació `ENOSPC`; paquet inicial dins del límit                       | Codex  |
+| 7   | [Prova global final](fase-07-prova-global.md)               | 3, 4, 5, 6  | Per començar                                                                                            | —      |
+| 8   | [Manuals i README](fase-08-manuals.md)                      | 7           | Per començar                                                                                            | —      |
+| 9   | [Publicar](fase-09-publicar.md)                             | 8 + decisió | **Bloquejada per una decisió**                                                                          | —      |
+| 10  | [Sonar i tancament](fase-10-sonar-i-tancament.md)           | 9           | Per començar                                                                                            | —      |
 
 **Les independents de debò són la 1 i la 2**: es poden fer avui, alhora, i les
 dues només llegeixen. La 0 i la 0b també són independents de tot.

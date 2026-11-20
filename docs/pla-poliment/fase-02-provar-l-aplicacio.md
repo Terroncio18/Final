@@ -7,7 +7,9 @@ com reproduir-lo i què s'esperava.
 - [x] Escriure el guió amb Pere: [`fase-02-guio.md`](fase-02-guio.md), en
       quatre seients, amb dos escenaris de referència (Mallorca per al
       combustible oficial, un de la península per a l'estimat).
-- [ ] Passar-lo i escriure la llista de defectes.
+- [x] Passar-lo i escriure la llista de defectes: Pere confirma que la prova
+      manual s'ha completat el 20/11/2026; els quatre defectes trobats es van
+      documentar i resoldre a la fase 3.
 
 El guió ha de cobrir, com a mínim:
 

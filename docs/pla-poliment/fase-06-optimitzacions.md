@@ -12,7 +12,10 @@ Candidats que ja es veuen:
 
 ## Progrés — 20/11/2026
 
-La fase 2 continua pendent (vegeu [`fase-02-provar-l-aplicacio.md`](fase-02-provar-l-aplicacio.md)); Pere ha autoritzat completar la fase 6 abans de tancar aquella prova manual. Els canvis són a `web/scripts`, `web/public/data` i `api/`, sense tocar els fitxers de la fase 5.
+En començar, la fase 2 encara constava pendent. Pere confirma que la prova
+manual s'ha completat el 20/11/2026 i l'estat ja és actualitzat a l'índex.
+Els canvis són a `web/scripts`, `web/public/data` i `api/`, sense tocar els
+fitxers de la fase 5.
 
 - [x] Paquet inicial: 1,50 MB abans i després, per sota de l'avís de 1,60 MB.
 - [x] Dades públiques: 25.369.174 → 20.836.889 bytes en 165 fitxers; estalvi
@@ -33,7 +36,7 @@ canvi màxim és 0,0000005° (uns 5,6 cm en latitud). Decisió a §11.67.
 
 Comprovació: build web i API; proves web (273), API (74), i les dues proves de
 precisió; lint i Prettier en verd. El cas de disc ple s'ha simulat amb `ENOSPC`;
-no s'ha omplert cap disc real. La fase 2 manual continua pendent per a la fase 7.
+no s'ha omplert cap disc real.
 
 Si `spreadRun()` es parteix a la fase 5, els seus números d'abans i després
 també serveixen aquí.
