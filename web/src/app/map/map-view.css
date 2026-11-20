@@ -1,5 +1,4 @@
-/* Top left, under the bar. The bottom left is MapLibre's —the credits and the
-   scale— and the right is where the panel of a detection opens. */
+/* Keep the legend clear of bottom-left attribution and the right-side hotspot panel. */
 .hotspot-legend {
   position: absolute;
   z-index: 1;
@@ -54,15 +53,13 @@
   height: 32px;
 }
 
-/* The same dark ring the layer draws, for the same reason (§2.16). */
 .swatch i {
   border: 1px solid #2b1403cc;
   border-radius: 50%;
   opacity: 0.9;
 }
 
-/* Size only: with the colour given to the date, a circle here must not
-   suggest that amber still means power. */
+/* When colour represents date, size-only legend circles must not imply amber still means power. */
 .swatch i.plain {
   background: #c9d3db;
 }

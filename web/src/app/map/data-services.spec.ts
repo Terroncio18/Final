@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter, Router, UrlTree } from '@angular/router';
 import { vi } from 'vitest';
-import type { Feature, FeatureCollection } from 'geojson';
+import type { Feature, FeatureCollection, Point } from 'geojson';
 import { MapService } from './map.service';
 import { RegionsService } from '../simulation/regions.service';
 import { ProvincesService } from '../simulation/provinces.service';
@@ -15,6 +15,7 @@ import { WeatherService, type Observation } from '../simulator/weather.service';
 import { HotspotsService } from './hotspots.service';
 import { writeSource } from './source-data';
 import * as ranges from './hotspot-range';
+import type { JsonValue } from '../simulation/json-value';
 
 const polygon = {
   type: 'Polygon' as const,
@@ -51,19 +52,29 @@ const area = (id: string, parent = 'ES531'): Feature => ({
   },
   geometry: polygon,
 });
-const point = (x: number, y: number, properties: Record<string, unknown> | null = {}): Feature => ({
+const point = (
+  x: number,
+  y: number,
+  properties: Record<string, string | number> | null = {},
+): Feature<Point> => ({
   type: 'Feature',
   properties,
   geometry: { type: 'Point', coordinates: [x, y] },
 });
-const response = (body: unknown, status = 200, headers = {}): Response =>
-  new Response(JSON.stringify(body), { status, headers });
+type OneShotService = typeof RegionsService | typeof ProvincesService | typeof SearchService;
+const mallorca: readonly [number, number] = [2, 39];
+const portugal: readonly [number, number] = [-8, 40];
+const response = (
+  body: JsonValue | FeatureCollection | Observation,
+  status = 200,
+  headers = {},
+): Response => new Response(JSON.stringify(body), { status, headers });
 const settle = async () => {
   for (let i = 0; i < 15; i++) await Promise.resolve();
 };
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  let reject!: (reason: unknown) => void;
+  let reject!: (reason: Error) => void;
   const promise = new Promise<T>((yes, no) => {
     resolve = yes;
     reject = no;
@@ -137,14 +148,29 @@ describe('geographic and observation services', () => {
     expect(maps.addProvinces).toHaveBeenCalledWith(data);
   });
 
-  for (const Service of [RegionsService, ProvincesService, SearchService]) {
-    it(`${Service.name} exposes failed HTTP reads`, async () => {
-      fetcher.mockResolvedValue(response({}, 503));
+  /* Each service that reads its data once, with a body it accepts. */
+  const oneShot: readonly (readonly [OneShotService, JsonValue | FeatureCollection])[] = [
+    [RegionsService, collection([area('ES53')])],
+    [ProvincesService, collection([area('ES53')])],
+    [SearchService, { municipalities: [['Sóller', 'ES_07061', 'ES532', 'Mallorca']] }],
+  ];
+
+  for (const [Service, readable] of oneShot) {
+    it(`${Service.name} exposes failed HTTP reads and reads them again later`, async () => {
+      fetcher.mockResolvedValueOnce(response({}, 503));
       const service = TestBed.inject(Service as typeof RegionsService);
       service.load();
       await settle();
       expect(service.failed()).toBe(true);
       expect(console.error).toHaveBeenCalled();
+
+      /* Asked once per session: a kept failure would leave the screen without a way back. */
+
+      fetcher.mockResolvedValue(response(readable));
+      service.load();
+      await settle();
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(service.failed()).toBe(false);
     });
   }
 
@@ -205,6 +231,14 @@ describe('geographic and observation services', () => {
     service.load('new');
     await settle();
     expect(service.failed()).toBe(true);
+
+    /* The same province has to be readable again, not only another one. */
+
+    fetcher.mockResolvedValue(response(collection([area('one')])));
+    service.load('new');
+    await settle();
+    expect(service.failed()).toBe(false);
+    expect(service.find('one')?.name).toBe('one');
   });
 
   it('finds accents, bilingual names, trailing articles and ranks word boundaries', async () => {
@@ -282,6 +316,14 @@ describe('geographic and observation services', () => {
     service.load('missing');
     await settle();
     expect(console.error).toHaveBeenCalled();
+    expect(maps.setPlaces).toHaveBeenCalledTimes(1);
+
+    /* A province whose labels failed must be readable again. */
+
+    fetcher.mockResolvedValue(response(collection([point(0, 0, { kind: 'town' })])));
+    service.load('missing');
+    await settle();
+    expect(maps.setPlaces).toHaveBeenLastCalledWith(collection([point(0, 0, { kind: 'town' })]));
   });
 
   it('filters detections using the study area including polygon holes', async () => {
@@ -302,12 +344,20 @@ describe('geographic and observation services', () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
-  it('preserves detections when study outlines cannot be read', async () => {
-    fetcher.mockResolvedValue(response({}, 500));
+  it('preserves detections when study outlines cannot be read, and reads them again later', async () => {
+    fetcher.mockResolvedValueOnce(response({}, 500));
     const service = TestBed.inject(StudyArea),
       features = [point(0, 0)];
     expect(await service.inside(features)).toBe(features);
     expect(service.failed()).toBe(true);
+
+    /* The outlines were never read: a later filter has to ask for them again. */
+
+    fetcher.mockResolvedValue(response(collection([area('ES53')])));
+    const inside = point(0.5, 0.5);
+    expect(await service.inside([inside, point(2, 2)])).toEqual([inside]);
+    expect(service.failed()).toBe(false);
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
   it('changes administrative levels consistently and clears the form overlays', () => {
@@ -334,48 +384,71 @@ describe('geographic and observation services', () => {
     expect(release).toHaveBeenCalled();
   });
 
-  it('keeps the latest weather and retains it on a refresh failure', async () => {
+  it('keeps the weather of the domain it asked about and retains it on a refresh failure', async () => {
     const old = deferred<Response>(),
-      latest = { station: { name: 'Sóller' }, temperature: 25 } as Observation;
+      lisbon = { station: { name: 'Lisboa' }, temperature: 30 } as Observation;
     fetcher
       .mockReturnValueOnce(old.promise)
-      .mockResolvedValueOnce(response(latest))
+      .mockResolvedValueOnce(response(lisbon))
       .mockResolvedValueOnce(response({}, 503));
     const service = TestBed.inject(WeatherService);
-    service.load('ES', [2, 39]);
+    service.load('ES', mallorca);
     expect(service.loading()).toBe(true);
-    service.load('PT', [-8, 40]);
+    service.load('PT', portugal);
     await settle();
-    old.resolve(response({ temperature: 10 }));
+    old.resolve(response({ station: { name: 'Sóller' }, temperature: 25 }));
     await settle();
-    expect(service.observation()).toEqual(latest);
-    service.load('PT', [-8, 40]);
+    expect(service.observationFor('PT', portugal)).toEqual(lisbon);
+    expect(service.observationFor('ES', mallorca)).toBeNull();
+    expect(service.observationFor('PT', [-8.1, 40])).toBeNull();
+    expect(service.observationFor('ES', portugal)).toBeNull();
+    expect(service.observationFor('PT', null)).toBeNull();
+    service.load('PT', portugal);
     await settle();
-    expect(service.observation()).toEqual(latest);
+    expect(service.observationFor('PT', portugal)).toEqual(lisbon);
     expect(service.failed()).toBe(true);
     expect(service.loading()).toBe(false);
     service.clear();
-    expect(service.observation()).toBeNull();
+    expect(service.observationFor('PT', portugal)).toBeNull();
     expect(service.failed()).toBe(false);
+  });
+
+  it('stops answering for the old domain as soon as another one is asked about', async () => {
+    const pending = deferred<Response>(),
+      palma = { station: { name: 'Sóller' }, temperature: 25 } as Observation;
+    fetcher.mockResolvedValueOnce(response(palma)).mockReturnValueOnce(pending.promise);
+    const service = TestBed.inject(WeatherService);
+    service.load('ES', mallorca);
+    await settle();
+    expect(service.observationFor('ES', mallorca)).toEqual(palma);
+    service.load('PT', portugal);
+    expect(service.observationFor('PT', portugal)).toBeNull();
+    expect(service.observationFor('ES', mallorca)).toBeNull();
+    pending.reject(new Error('offline'));
+    await settle();
+    expect(service.failed()).toBe(true);
+    expect(service.loading()).toBe(false);
+    expect(service.observationFor('PT', portugal)).toBeNull();
   });
 
   it('ignores a weather rejection after leaving the simulation', async () => {
     const pending = deferred<Response>();
     fetcher.mockReturnValue(pending.promise);
     const service = TestBed.inject(WeatherService);
-    service.load('ES', [2, 39]);
+    service.load('ES', mallorca);
     service.clear();
     pending.reject(new Error('offline'));
     await settle();
     expect(service.failed()).toBe(false);
     expect(service.loading()).toBe(false);
+    expect(service.observationFor('ES', mallorca)).toBeNull();
   });
 
   it('loads dated hotspots, filters by scope, and puts range choices in the URL', async () => {
     const router = TestBed.inject(Router);
-    vi.spyOn(router, 'parseUrl').mockReturnValue({
-      queryParams: { des: '2024-08-01', fins: '2024-08-03' },
-    } as unknown as ReturnType<Router['parseUrl']>);
+    vi.spyOn(router, 'parseUrl').mockReturnValue(
+      new UrlTree(undefined, { des: '2024-08-01', fins: '2024-08-03' }),
+    );
     const navigate = vi.spyOn(router, 'navigate').mockResolvedValue(true);
     const features = [
       point(0, 0, { scope: 'peninsula', observedAt: '2024-08-02T12:00:00Z' }),
@@ -424,7 +497,7 @@ describe('geographic and observation services', () => {
     TestBed.tick();
     await settle();
     expect(maps.setHotspotColourBy).toHaveBeenLastCalledWith('power');
-    // A new URL is the public trigger for another load.
+
     await TestBed.inject(Router).navigateByUrl('/?des=2024-08-01&fins=2024-08-02');
     TestBed.tick();
     await settle();
@@ -459,7 +532,7 @@ describe('geographic and observation services', () => {
     const data = collection([]),
       source = { setData: vi.fn().mockRejectedValue(error) };
     writeSource(undefined, data);
-    writeSource(source as unknown as Parameters<typeof writeSource>[0], data);
+    writeSource(source, data);
     await settle();
     expect(source.setData).toHaveBeenCalledWith(data);
     expect(warn).toHaveBeenCalledWith(expect.any(String), error);
@@ -468,7 +541,7 @@ describe('geographic and observation services', () => {
   for (const phase of ['fetch', 'filter', 'failure']) {
     it(`ignores a stale hotspot ${phase} after the requested range changes`, async () => {
       const old = deferred<Response>(),
-        filtered = deferred<readonly Feature[]>();
+        filtered = deferred<readonly Feature<Point>[]>();
       const inside = vi
         .spyOn(TestBed.inject(StudyArea), 'inside')
         .mockImplementation(async (f) => f);

@@ -2,7 +2,7 @@ import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter } from 'rxjs';
-import type { FeatureCollection } from 'geojson';
+import type { FeatureCollection, Point } from 'geojson';
 import { HOTSPOTS_URL } from './map.config';
 import { MapService } from './map.service';
 import { StudyArea } from './study-area';
@@ -29,11 +29,10 @@ export class HotspotsService {
 
   public readonly loading = signal(false);
   public readonly failed = signal(false);
-  /** Set when the server said the cause is a missing FIRMS key, not an outage. */
   public readonly missingKey = signal(false);
   public readonly earliest = signal<string | null>(null);
 
-  private readonly insideStudyArea = signal<FeatureCollection | null>(null);
+  private readonly insideStudyArea = signal<FeatureCollection<Point> | null>(null);
   private requests = 0;
 
   public readonly range = computed<Range>(
@@ -90,14 +89,12 @@ export class HotspotsService {
     fetch(url)
       .then(async (response) => {
         if (!response.ok) {
-          // The body says why, when the server knows: a missing key is not
-          // the same thing to tell the reader as FIRMS being down (§11.6x).
           const body = (await response.json().catch(() => null)) as { reason?: string } | null;
           throw new HotspotFetchError(`${response.status} ${response.statusText}`, body?.reason);
         }
         const earliest = response.headers.get('x-earliest');
         if (earliest) this.earliest.set(earliest);
-        return response.json() as Promise<FeatureCollection>;
+        return response.json() as Promise<FeatureCollection<Point>>;
       })
       .then(async (collection) => {
         if (request !== this.requests) return;
@@ -105,7 +102,10 @@ export class HotspotsService {
         const features = await this.area.inside(collection.features);
         if (request !== this.requests) return;
 
-        const kept: FeatureCollection = { type: 'FeatureCollection', features: [...features] };
+        const kept: FeatureCollection<Point> = {
+          type: 'FeatureCollection',
+          features: [...features],
+        };
 
         const colourByDate = spanOf(range) > 1;
         if (colourByDate) this.stampPositionInRange(kept, range);
@@ -115,7 +115,7 @@ export class HotspotsService {
         this.maps.setHotspotColourBy(colourByDate ? 'date' : 'power');
         this.loading.set(false);
       })
-      .catch((error: unknown) => {
+      .catch((error: Error) => {
         console.error('[hotspots]', error);
         if (request !== this.requests) return;
         this.failed.set(true);
@@ -125,7 +125,6 @@ export class HotspotsService {
   }
 }
 
-/** Carries the server's `reason`, when it gave one, through the `.catch()`. */
 class HotspotFetchError extends Error {
   public constructor(
     message: string,

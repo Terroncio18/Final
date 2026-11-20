@@ -1,26 +1,24 @@
-/**
- * One FIRMS detection, as the API serves it.
- *
- * Declared here as well as in `api/src/firms.ts` on purpose: the two projects
- * share no package, and inventing one for a handful of fields would cost more
- * than it saves. Same reasoning as the framings in `map.config.ts`.
- *
- * `lon` and `lat` do not travel in the properties —they are the geometry— but
- * the panel needs them and should not have to know about GeoJSON to get them.
- */
+export type HotspotScope = 'peninsula' | 'canaries';
+
+export type HotspotSatellite = 'N' | 'N20' | 'N21' | '?';
+
+/** FIRMS VIIRS confidence codes: `l` low, `n` nominal, `h` high. */
+export type HotspotConfidence = 'l' | 'n' | 'h' | '';
+
+export type HotspotDaynight = 'D' | 'N' | '';
+
+// The panel gets lon/lat from feature geometry; those coordinates are not API properties.
 export interface Hotspot {
   readonly id: string;
-  readonly scope: string;
-  /** Platform that saw it, as FIRMS writes it: `N`, `N20`, `N21`. */
-  readonly satellite: string;
+  readonly scope: HotspotScope;
+  /** Platform code from FIRMS; `?` is used when its value is missing. */
+  readonly satellite: HotspotSatellite;
   /** Overpass time, UTC, ISO 8601. */
   readonly observedAt: string;
-  /** Fire radiative power, in megawatts: how much energy the fire is releasing. */
+  // Fire radiative power, in megawatts.
   readonly frp: number;
-  /** VIIRS codes confidence as a letter: low, nominal, high. */
-  readonly confidence: string;
-  /** `D` or `N`. A night detection is more reliable: no sunglint. */
-  readonly daynight: string;
+  readonly confidence: HotspotConfidence;
+  readonly daynight: HotspotDaynight;
   readonly lon: number;
   readonly lat: number;
 }

@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import type { FeatureCollection } from 'geojson';
-import type { Map as LibreMap, MapMouseEvent, StyleSpecification } from 'maplibre-gl';
+import type {
+  Map as LibreMap,
+  MapMouseEvent,
+  StyleSpecification,
+  MapOptions,
+  SourceSpecification,
+} from 'maplibre-gl';
 import { MapService } from './map.service';
 import {
   DOMAIN_SOURCE,
@@ -17,15 +23,17 @@ import { SpottingDisplay, spotPoint } from './spotting-display';
 import { GRID } from '../simulation/domain';
 import type { GroundAgent, Pass } from '../simulation/agents';
 
+type TestMapEvent = Partial<ReturnType<typeof event>> & { error?: Error | string };
+
 const doubles = vi.hoisted(() => ({
-  makeMap: (() => {}) as (options: unknown) => unknown,
+  makeMap: (_options: MapOptions): object => ({}),
   markers: [] as { options: { element: HTMLElement }; remove: ReturnType<typeof vi.fn> }[],
 }));
 vi.mock('maplibre-gl', async () => {
   const { vi } = await import('vitest');
   return {
     MapLibreMap: class {
-      public constructor(options: unknown) {
+      public constructor(options: MapOptions) {
         return doubles.makeMap(options) as object;
       }
     },
@@ -56,11 +64,10 @@ vi.mock('maplibre-contour', () => ({
   },
 }));
 
-/** A map boundary with real source/layer ownership and controllable events; no GPU or network. */
 function mapDouble() {
   const sources = new Map<string, ReturnType<typeof source>>(),
     layers = new Map<string, { id: string }>();
-  const handlers = new Map<string, Set<(event: unknown) => void>>();
+  const handlers = new Map<string, Set<(event: TestMapEvent) => void>>();
   const canvas = document.createElement('canvas'),
     container = document.createElement('div');
   const handler = () => ({ enable: vi.fn(), disable: vi.fn() });
@@ -70,27 +77,27 @@ function mapDouble() {
     canvas,
     container,
     handlers,
-    on: vi.fn((name: string, fn: (event: unknown) => void) => {
+    on: vi.fn((name: string, fn: (event: TestMapEvent) => void) => {
       if (!handlers.has(name)) handlers.set(name, new Set());
       handlers.get(name)!.add(fn);
     }),
-    off: vi.fn((name: string, fn: (event: unknown) => void) => {
+    off: vi.fn((name: string, fn: (event: TestMapEvent) => void) => {
       handlers.get(name)?.delete(fn);
     }),
-    once: vi.fn((name: string, fn: (event: unknown) => void) => {
-      const once = (event: unknown) => {
+    once: vi.fn((name: string, fn: (event: TestMapEvent) => void) => {
+      const once = (event: TestMapEvent) => {
         handlers.get(name)?.delete(once);
         fn(event);
       };
       map.on(name, once);
     }),
-    emit: (name: string, event: unknown = {}) => {
+    emit: (name: string, event: TestMapEvent = {}) => {
       for (const fn of [...(handlers.get(name) ?? [])]) fn(event);
     },
     addControl: vi.fn(),
     getCanvas: () => canvas,
     getCanvasContainer: () => container,
-    addSource: vi.fn((id: string, options: unknown) => {
+    addSource: vi.fn((id: string, options: SourceSpecification) => {
       sources.set(id, source(options));
     }),
     getSource: (id: string) => sources.get(id),
@@ -117,7 +124,12 @@ function mapDouble() {
     setFeatureState: vi.fn(),
     triggerRepaint: vi.fn(),
     remove: vi.fn(),
-    queryRenderedFeatures: vi.fn((): unknown[] => []),
+    queryRenderedFeatures: vi.fn(
+      (): {
+        properties: { id: string | number; frp?: number };
+        geometry?: { type: string; coordinates: number[] };
+      }[] => [],
+    ),
     dragRotate: handler(),
     touchPitch: handler(),
     dragPan: handler(),
@@ -125,7 +137,7 @@ function mapDouble() {
   };
   return map;
 }
-function source(options: unknown) {
+function source(options: SourceSpecification) {
   return {
     options,
     setData: vi.fn().mockResolvedValue(undefined),
@@ -134,8 +146,22 @@ function source(options: unknown) {
     pause: vi.fn(),
   };
 }
+
+function mapBoundary(map: ReturnType<typeof mapDouble>): LibreMap {
+  const boundary: Partial<LibreMap> = {
+    getCanvas: map.getCanvas,
+    getZoom: map.getZoom,
+    getBearing: map.getBearing,
+  };
+  Object.assign(boundary, map);
+  return boundary as LibreMap;
+}
+
 const empty: FeatureCollection = { type: 'FeatureCollection', features: [] };
 const bounds: [number, number, number, number] = [0, 0, 4, 4];
+const settle = async () => {
+  for (let i = 0; i < 20; i++) await Promise.resolve();
+};
 const event = (button = 0, x = 10, y = 10) => ({
   point: { x, y },
   lngLat: { lng: 2, lat: 3 },
@@ -148,15 +174,18 @@ describe('MapService and map overlays', () => {
     service.create(document.createElement('div'));
     if (load) map.emit('styledata');
   };
+  const install =
+    (target: ReturnType<typeof mapDouble>) =>
+    (options: MapOptions): object => {
+      const { style } = options as { style: StyleSpecification };
+      for (const [id, value] of Object.entries(style.sources)) target.addSource(id, value);
+      for (const layer of style.layers) target.addLayer(layer);
+      return target;
+    };
   beforeEach(() => {
     map = mapDouble();
     doubles.markers.length = 0;
-    doubles.makeMap = (options: unknown) => {
-      const { style } = options as { style: StyleSpecification };
-      for (const [id, value] of Object.entries(style.sources)) map.addSource(id, value);
-      for (const layer of style.layers) map.addLayer(layer);
-      return map;
-    };
+    doubles.makeMap = install(map);
     service = TestBed.inject(MapService);
   });
   afterEach(() => {
@@ -202,7 +231,7 @@ describe('MapService and map overlays', () => {
   });
 
   it('picks the strongest overlapping detection and distinguishes clicks from rotations', () => {
-    expect(service['featureAt'](event() as unknown as MapMouseEvent)).toBeNull();
+    expect(service['featureAt'](event() as MapMouseEvent)).toBeNull();
     start();
     expect(map.fitBounds).toHaveBeenCalledTimes(1);
     map.layers.delete(LAYERS.hotspots);
@@ -475,7 +504,7 @@ describe('MapService and map overlays', () => {
       kind: 'crew',
       point: [2, 3],
       heading: 90,
-    } as unknown as GroundAgent;
+    } as GroundAgent;
     service.setGroundAgents([ground]);
     await vi.waitFor(() => expect(map.getLayer(LAYERS.agents)).toBeDefined());
     service.setGroundAgents([]);
@@ -488,13 +517,42 @@ describe('MapService and map overlays', () => {
     expect(map.getLayer(LAYERS.agents)).toBeDefined();
   });
 
+  it('drops 3D figures whose map was destroyed or replaced while three.js loaded', async () => {
+    const pass = {
+      id: 'air',
+      kind: 'helicopter',
+      drop: [2, 3],
+      heading: 90,
+      liquid: 'water',
+    } as Pass;
+    const ground = { id: 'crew', kind: 'crew', point: [2, 3], heading: 90 } as GroundAgent;
+    start();
+    service.setGroundAgents([ground]);
+    service.flyPass(pass);
+    expect(map.getLayer(LAYERS.agents)).toBeUndefined();
+    service.destroy();
+    await settle();
+    expect(map.getLayer(LAYERS.agents)).toBeUndefined();
+
+    const second = mapDouble();
+    doubles.makeMap = install(second);
+    service.create(document.createElement('div'));
+    second.emit('styledata');
+    await settle();
+    expect(second.getLayer(LAYERS.agents)).toBeUndefined();
+
+    service.setGroundAgents([ground]);
+    await vi.waitFor(() => expect(second.getLayer(LAYERS.agents)).toBeDefined());
+    expect(map.getLayer(LAYERS.agents)).toBeUndefined();
+  });
+
   it('draws and selects countermeasures, previews brushes and safely detaches', () => {
     const display = new CountermeasureDisplay(),
       selected = vi.fn();
-    const libre = map as unknown as LibreMap;
+    const libre = mapBoundary(map);
     display.setMeasures([], null);
     display.setDraft(null);
-    display['clicked'](event() as unknown as MapMouseEvent);
+    display['clicked'](event() as MapMouseEvent);
     display.detach();
     display.attach(libre, selected);
     display.attach(libre, selected);
@@ -574,7 +632,7 @@ describe('MapService and map overlays', () => {
   it('places spotting ignitions at cell centres and transfers its layer between maps', () => {
     const display = new SpottingDisplay();
     display.detach();
-    const libre = map as unknown as LibreMap;
+    const libre = mapBoundary(map);
     const spot = { cell: 0, minute: 5 } as Parameters<SpottingDisplay['set']>[2][number];
     display.set(libre, [2, 39], [spot]);
     expect(map.getSource('spot-ignitions')!.options).toMatchObject({
@@ -589,7 +647,7 @@ describe('MapService and map overlays', () => {
     display.set(libre, [2, 39], []);
     expect(map.getSource('spot-ignitions')!.setData).toHaveBeenCalledWith(empty);
     const other = mapDouble();
-    display.set(other as unknown as LibreMap, [2, 39], []);
+    display.set(mapBoundary(other), [2, 39], []);
     expect(map.sources.size).toBe(0);
     other.layers.clear();
     other.sources.clear();

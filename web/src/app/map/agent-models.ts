@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 export type ModelKind = 'crew' | 'bulldozer' | 'fire-engine' | 'helicopter' | 'scooper' | 'tanker';
 
-/** Real length along X in metres, including tools, blades and stationary rotors. */
+// Real length along X in metres, including tools, blades and stationary rotors.
 export const MODEL_LENGTH_M: Readonly<Record<ModelKind, number>> = Object.freeze({
   crew: 4.15,
   bulldozer: 6,
@@ -20,7 +20,7 @@ const dark = 0x29323a;
 const glass = 0x426d80;
 const metal = 0x78858a;
 
-// Each factory owns its resources so fading or disposing one agent cannot affect another.
+// Each factory owns its resources so disposing one agent cannot affect another.
 class Parts {
   public readonly root = new THREE.Group();
   private readonly materials = new Map<number, THREE.MeshLambertMaterial>();
@@ -83,7 +83,6 @@ class Parts {
     return mesh;
   }
 
-  // An extruded side profile gives the boat a keel and the fins crisp silhouettes.
   public profile(outline: [number, number][], width: number, at: Point, color: number): THREE.Mesh {
     const shape = new THREE.Shape(outline.map(([x, z]) => new THREE.Vector2(x, z)));
     const geometry = new THREE.ExtrudeGeometry(shape, {
@@ -147,7 +146,7 @@ class Parts {
   }
 
   public finish(): THREE.Group {
-    // Some designs use only one primitive; release the unused factory geometries too.
+    // Some designs use one primitive; release unused factory geometries too.
     const used = new Set<THREE.BufferGeometry>();
     this.root.traverse((child) => {
       if (child instanceof THREE.Mesh) used.add(child.geometry);
@@ -269,7 +268,7 @@ function helicopter(p: Parts): void {
   p.box([13.2, 0.32, 0.09], [0, 0, 0], dark, rotor);
   p.box([0.32, 13.2, 0.09], [0, 0, 0], dark, rotor);
   p.ellipsoid([0.35, 0.35, 0.18], [0, 0, 0], white, rotor);
-  // The bucket pivot is its suspension point, allowing the entire sling to sway together.
+  // The bucket pivot is its suspension point so the whole sling sways together.
   const bucket = p.pivot('bucket', [0, 0, -1.25]);
   p.rod([0, 0, 0], [0, 0, -5.8], 0.035, dark, bucket);
   for (const y of [-0.65, 0.65]) p.rod([0, 0, -5.8], [0, y, -6.6], 0.035, metal, bucket);
@@ -375,11 +374,8 @@ function tanker(p: Parts): void {
   }
 }
 
-/**
- * A new agent at real size in metres: +X forward, +Y left, +Z up.
- * Ground origins are centred on ground contact (z = 0); aircraft origins approximate
- * the airframe centre of mass, excluding suspended equipment.
- */
+// Axes: +X forward, +Y left, +Z up, in metres. Ground origins touch z = 0; aircraft origins
+// approximate the airframe centre of mass.
 export function buildModel(kind: ModelKind): THREE.Group {
   const p = new Parts();
   p.root.name = kind;
@@ -406,12 +402,12 @@ export function buildModel(kind: ModelKind): THREE.Group {
   return p.finish();
 }
 
-/** A trailing cloud from the release point, extending about 40 m down -Z and back -X. */
+// The release cloud extends about 40 m down -Z and back -X.
 export function buildDropCurtain(kind: 'water' | 'retardant'): THREE.Object3D {
   const p = new Parts();
   p.root.name = `${kind}-drop`;
   const color = kind === 'water' ? 0xcdeefa : 0xe86d83;
-  // Overlapping closed puffs stay visible from either side without double-sided planes.
+  // Closed puffs remain visible from either side without double-sided planes.
   for (let i = 0; i < 9; i++) {
     const spread = 0.45 + i * 0.52;
     const depth = i === 0 ? 2.6 : 4.2;
@@ -419,7 +415,7 @@ export function buildDropCurtain(kind: 'water' | 'retardant'): THREE.Object3D {
   }
   const result = p.finish();
   setOpacity(result, 0.38);
-  // Transparent clouds should not punch opaque depth holes in terrain or other puffs.
+  // Transparent clouds must not write opaque depth holes in the terrain.
   p.material(color).depthWrite = false;
   return result;
 }
@@ -433,7 +429,6 @@ function visitMaterials(object: THREE.Object3D, visit: (material: THREE.Material
   });
 }
 
-/** Sets all material opacities; values below one enable transparency, one restores opacity. */
 export function setOpacity(object: THREE.Object3D, opacity: number): void {
   const value = THREE.MathUtils.clamp(opacity, 0, 1);
   visitMaterials(object, (material) => {
@@ -446,7 +441,6 @@ export function setOpacity(object: THREE.Object3D, opacity: number): void {
   });
 }
 
-/** Releases each geometry and material once, including resources shared within the object. */
 export function disposeModel(object: THREE.Object3D): void {
   const geometries = new Set<THREE.BufferGeometry>();
   const materials = new Set<THREE.Material>();

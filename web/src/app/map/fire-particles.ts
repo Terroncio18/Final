@@ -4,44 +4,21 @@ import type {
   Map as MapLibreMap,
 } from 'maplibre-gl';
 
-/**
- * Flames and smoke over the simulated fire, as particles standing in the air.
- *
- * The raster of the fire is draped on the ground (§13.1), and that is right for
- * what has burned and wrong for a flame: painted there it would lie flat on the
- * hillside. This is the second layer the fire needs, a MapLibre custom layer
- * that draws points in the same space as the terrain —Mercator coordinates
- * with the altitude as the third— so they share its camera and its depth, and
- * a ridge in front hides them.
- *
- * The look is the FireCast prototype's, which is the reference (§11.7): bright
- * points that rise and thin out, blended additively so that where they overlap
- * they glow, and a few large grey ones that drift downwind. The anchors come from the continuous isochrone of the computed arrival times.
- * The visual animation never feeds back into propagation.
- *
- * **Presentation, like the colours of the raster.** A particle's height, size
- * and life are chosen to be seen from thirty kilometres away and are not flame
- * lengths computed by Rothermel: a real flame at this scale is under a pixel.
- *
- * Everything is worked out on the CPU each frame and sent as one buffer. A
- * thousand-odd points is nothing to compute, and it keeps the shader to what a
- * shader has to do: place a point and shade a disc.
- */
-
-/** A place a particle can be born: Mercator x and y, altitude in Mercator units. */
+// Visual particles share the terrain camera and depth. Their size and lifetime are presentation
+// values, not Rothermel flame lengths; animation never changes propagation.
 export interface Emitters {
-  /** x, y, z per emitter. */
+  // Packed x, y, z per emitter, in Mercator units.
   readonly positions: Float32Array;
   readonly count: number;
-  /** Mercator units per metre at the latitude of the domain. */
+  // Mercator units per metre at the domain latitude.
   readonly unitsPerMetre: number;
-  /** How big the flame is drawn at each emitter, 0 to 1 (fire-emitters.ts). */
+  // Visual emitter strength in [0, 1], from fire-emitters.ts.
   readonly strength: Float32Array;
-  /** Running total of each emitter's chance of being picked. */
+
   readonly weights: Float32Array;
 }
 
-/** The emitter whose share of `weights` holds `u`, a number in [0, 1). */
+// Select the emitter whose cumulative weight contains u in [0, 1).
 function pick(weights: Float32Array, count: number, u: number): number {
   const target = u * weights[count - 1];
   let low = 0,
@@ -57,10 +34,9 @@ function pick(weights: Float32Array, count: number, u: number): number {
 const FLAMES = 1000;
 const SMOKE = 150;
 
-/** x, y, z, size in Mercator units, alpha. */
+// Packed x, y, z, size in Mercator units, then alpha.
 const STRIDE = 5;
 
-/** The same cheap, repeatable noise the prototype uses: a particle's character. */
 function random(seed: number): number {
   const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453123;
   return x - Math.floor(x);
@@ -164,7 +140,7 @@ function compile(gl: WebGL2RenderingContext, vertex: string, fragment: string): 
 export class FireParticles implements CustomLayerInterface {
   public readonly id: string;
   public readonly type = 'custom' as const;
-  /** `3d`, so the layer is drawn against the terrain's depth. */
+
   public readonly renderingMode = '3d' as const;
 
   private map: MapLibreMap | null = null;
@@ -175,17 +151,17 @@ export class FireParticles implements CustomLayerInterface {
   private readonly flameData = new Float32Array(FLAMES * STRIDE);
   private readonly smokeData = new Float32Array(SMOKE * STRIDE);
 
-  /** Flame anchors follow the interpolated front; smoke keeps its birthplace. */
+  // Flames follow the current front; smoke keeps its birthplace.
   private readonly flameBirth = new Float32Array(FLAMES * 3);
   private readonly flamePhase = new Float32Array(FLAMES).fill(2);
-  /** The strength of the emitter each flame was born at. */
+
   private readonly flameStrength = new Float32Array(FLAMES);
   private readonly smokeBirth = new Float32Array(SMOKE * 3);
   private readonly smokePhase = new Float32Array(SMOKE).fill(2);
 
   private emitters: Emitters | null = null;
   private sampledEmitters: Emitters | null = null;
-  /** Where the wind blows towards, as a unit vector east and north. */
+  // Wind towards, as a unit vector east and north.
   private windEast = 0;
   private windNorth = 0;
   private windKmh = 0;
@@ -193,17 +169,14 @@ export class FireParticles implements CustomLayerInterface {
   private seconds = 0;
   private lastFrame = performance.now();
   private vao: WebGLVertexArrayObject | null = null;
-  /** False under `prefers-reduced-motion`: nothing rises, so nothing is drawn. */
+
   private motion = true;
 
   public constructor(id: string) {
     this.id = id;
   }
 
-  /** The cells the fire is in now. With none, the layer draws nothing. */
   public setEmitters(emitters: Emitters | null): void {
-    // After a spell with no fire every particle is born afresh, rather than
-    // carrying on from wherever the last fire left it.
     if (!this.emitters || !this.motion) {
       this.flamePhase.fill(2);
       this.smokePhase.fill(2);
@@ -212,7 +185,7 @@ export class FireParticles implements CustomLayerInterface {
     this.map?.triggerRepaint();
   }
 
-  /** `towardsDeg` is where the wind goes; it is not turned again here. */
+  // towardsDeg is already the wind destination bearing.
   public setWind(towardsDeg: number, kmh: number): void {
     const towards = (towardsDeg * Math.PI) / 180;
     this.windEast = Math.sin(towards);
@@ -235,9 +208,7 @@ export class FireParticles implements CustomLayerInterface {
 
   public onAdd(map: MapLibreMap, gl: WebGL2RenderingContext): void {
     this.map = map;
-    // A shader that will not build on some card must cost the flames and not
-    // the map: the layer then draws nothing, and the raster underneath still
-    // shows where the fire is.
+    // Shader failure disables particles while leaving the ground raster usable.
     try {
       this.flames = compile(gl, VERTEX, FLAME_FRAGMENT);
       this.smoke = compile(gl, VERTEX, SMOKE_FRAGMENT);
@@ -268,12 +239,12 @@ export class FireParticles implements CustomLayerInterface {
     this.lastFrame = now;
     this.place(emitters, this.seconds);
 
-    const matrix = options.defaultProjectionData.mainMatrix as unknown as Float32List;
+    const matrix = Array.from(options.defaultProjectionData.mainMatrix);
     const viewport = [gl.drawingBufferWidth, gl.drawingBufferHeight];
 
     gl.enable(gl.BLEND);
-    // Tested against the terrain and never written: a ridge hides a flame, and
-    // one particle does not cut a hole in the one behind it.
+    // Depth-test against terrain without writing depth: ridges hide particles, particles do not
+    // cut holes in each other.
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
     gl.depthMask(false);
@@ -281,7 +252,6 @@ export class FireParticles implements CustomLayerInterface {
     gl.bindVertexArray(this.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
 
-    // Same ordering and blending as FireCast: flames, then smoke over them.
     gl.blendFunc(gl.ONE, gl.ONE);
     this.draw(gl, this.flames, this.flameData, FLAMES, matrix, viewport);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
@@ -291,8 +261,6 @@ export class FireParticles implements CustomLayerInterface {
     gl.bindVertexArray(oldVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
-    // The particles move by themselves, so the map has to keep drawing while
-    // there is a fire on it —and only then.
     if (this.motion && !document.hidden) this.map?.triggerRepaint();
   }
 
@@ -322,14 +290,9 @@ export class FireParticles implements CustomLayerInterface {
     gl.drawArrays(gl.POINTS, 0, count);
   }
 
-  /** FireCast particle lifecycles, sampled along the computed front.
-   * Flames track its current position; smoke drifts from where it was emitted.
-   * Coordinates are Mercator; all visual lengths are metres, not model outputs.
-   */
   private place(emitters: Emitters, seconds: number): void {
     const { positions, count, unitsPerMetre: unit, strength, weights } = emitters;
 
-    /** Gives particle `i` a new birthplace if its phase has started over. */
     const born = (
       birth: Float32Array,
       phases: Float32Array,
@@ -346,7 +309,7 @@ export class FireParticles implements CustomLayerInterface {
         birth[i * 3] = positions[emitter];
         birth[i * 3 + 1] = positions[emitter + 1];
         birth[i * 3 + 2] = positions[emitter + 2];
-        // Anchor to the terrain actually rendered, including flat mode and LOD.
+        // Anchor to rendered terrain, including flat mode and level of detail.
         const lon = positions[emitter] * 360 - 180;
         const lat =
           (Math.atan(Math.sinh(Math.PI * (1 - 2 * positions[emitter + 1]))) * 180) / Math.PI;
@@ -361,7 +324,7 @@ export class FireParticles implements CustomLayerInterface {
     for (let i = 0; i < FLAMES; i += 1) {
       const phase = fract(random(i + 57) + seconds * (0.3 + random(i + 112) * 0.45));
       born(this.flameBirth, this.flamePhase, i, phase, true, this.flameStrength);
-      // A weak front's flames are lower and narrower, a strong one's taller.
+
       const s = this.flameStrength[i];
       const lean = phase * 12 * s;
       const rise = (5 + phase * (24 + random(i + 40) * 65)) * (0.3 + 0.9 * s);
@@ -387,7 +350,7 @@ export class FireParticles implements CustomLayerInterface {
         this.smokeBirth[i * 3 + 1] - (this.windNorth * drift - this.windEast * sway) * unit;
       this.smokeData[out + 2] = this.smokeBirth[i * 3 + 2] + (25 + phase * 450) * unit;
       this.smokeData[out + 3] = (95 + phase * 300) * (1 + random(i + 615) * 0.6) * unit;
-      // The sine is zero at both ends, so smoke already fades in and out.
+
       this.smokeData[out + 4] = Math.sin(phase * Math.PI) * 0.2;
     }
     this.sampledEmitters = emitters;

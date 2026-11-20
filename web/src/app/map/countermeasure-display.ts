@@ -1,22 +1,28 @@
-import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent } from 'maplibre-gl';
+import type {
+  ExpressionSpecification,
+  FilterSpecification,
+  LayerSpecification,
+  GeoJSONSource,
+  Map as MapLibreMap,
+  MapMouseEvent,
+} from 'maplibre-gl';
 import type { Feature, FeatureCollection } from 'geojson';
 import { writeSource } from './source-data';
 
 type Point = readonly [number, number];
 
-/** What the display needs of a measure: where, how wide, what colour. */
 interface DrawnMeasure {
   readonly id: string;
   readonly points: readonly Point[];
   readonly widthM: number;
   readonly colour: string;
-  /** A disc of that diameter, not a strip of that width. */
+  // For a disc this is its diameter, rather than a strip width.
   readonly disc: boolean;
 }
 
 interface DrawnDraft {
   readonly points: readonly Point[];
-  /** Where the pointer is, for the segment not yet clicked. */
+
   readonly pointer: Point | null;
   readonly widthM: number;
   readonly colour: string;
@@ -39,21 +45,14 @@ const LAYERS = {
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
-/** Metres per pixel at zoom 0 on the equator, for MapLibre's 512 px tiles. */
+// Metres per pixel at zoom 0 on the equator, using MapLibre 512 px tiles.
 const M_PER_PX_Z0 = 78_271.517;
 const M_PER_DEGREE = 111_320;
 const HIT_SLOP = 4;
 
-/**
- * A line as wide as the strip really is.
- *
- * `line-width` is in pixels, and a strip is in metres. Pixels per metre double
- * with every zoom level, so the width is `w0 · 2^zoom`, where `w0` —the width
- * at zoom 0, worked out per feature from its latitude— travels as a property.
- * An exponential interpolation of base 2 between two zooms is exactly that
- * curve, and it is the only shape MapLibre lets a zoom expression take.
- */
-const WIDTH_IN_METRES = [
+// MapLibre line widths are pixels: w0 × 2^zoom converts a ground width at the feature latitude.
+// Zoom expressions require exponential interpolation.
+const WIDTH_IN_METRES: ExpressionSpecification = [
   'interpolate',
   ['exponential', 2],
   ['zoom'],
@@ -61,13 +60,13 @@ const WIDTH_IN_METRES = [
   ['get', 'w0'],
   24,
   ['*', ['get', 'w0'], 2 ** 24],
-] as unknown as number;
+];
 
 function widthAtZoom0(widthM: number, latitude: number): number {
   return widthM / (M_PER_PX_Z0 * Math.cos((latitude * Math.PI) / 180));
 }
 
-/** A circle on the ground as a polygon: a `fill` drapes over the relief. */
+// A fill polygon drapes the disc over terrain.
 function discRing(centre: Point, diameterM: number): [number, number][] {
   const radius = diameterM / 2;
   const dLat = radius / M_PER_DEGREE;
@@ -85,7 +84,8 @@ function shape(
   points: readonly Point[],
   widthM: number,
   disc: boolean,
-  properties: Record<string, unknown>,
+  properties:
+    { id: string; colour: string; selected: boolean } | { part: 'disc' | 'band'; colour: string },
 ): Feature | null {
   if (disc) {
     if (!points.length) return null;
@@ -103,40 +103,14 @@ function shape(
   };
 }
 
-/**
- * The countermeasures on the map: the plan, and the line being drawn.
- *
- * Layers of the style and not DOM markers, unlike the ignitions: a strip has a
- * width on the ground and has to lie on the hillside it crosses, which is what
- * `line` and `fill` layers do on the relief and an element cannot.
- *
- * Each strip is drawn twice. A translucent band of its true width says how
- * much ground it takes —thirty metres is a hair at the framing of the whole
- * domain—, and a thin axis over it keeps the measure findable at any zoom.
- *
- * Owns its two sources and its layers and nothing else on the map: attach()
- * puts them up, detach() takes down exactly those and the click listener.
- */
-export class CountermeasureDisplay {
-  private map: MapLibreMap | null = null;
-  private drawing = false;
-  private onSelect: ((id: string | null) => void) | null = null;
-
-  /** Puts the layers up. The style must have loaded: wait for MapService.ready. */
-  public attach(map: MapLibreMap, onSelect: (id: string | null) => void): void {
-    if (this.map === map) return;
-    this.detach();
-    this.map = map;
-    this.onSelect = onSelect;
-
-    map.addSource(SOURCE, { type: 'geojson', data: EMPTY });
-    map.addSource(DRAFT_SOURCE, { type: 'geojson', data: EMPTY });
-
-    const lines = ['==', ['geometry-type'], 'LineString'] as unknown as never;
-    const polygons = ['==', ['geometry-type'], 'Polygon'] as unknown as never;
-    const round = { 'line-cap': 'round', 'line-join': 'round' } as const;
-
-    map.addLayer({
+// Each strip has a band at its true ground width and a thin axis that remains visible at domain
+// scale.
+function measureLayers(): LayerSpecification[] {
+  const lines: FilterSpecification = ['==', ['geometry-type'], 'LineString'];
+  const polygons: FilterSpecification = ['==', ['geometry-type'], 'Polygon'];
+  const round = { 'line-cap': 'round', 'line-join': 'round' } as const;
+  return [
+    {
       id: LAYERS.band,
       type: 'line',
       source: SOURCE,
@@ -147,40 +121,44 @@ export class CountermeasureDisplay {
         'line-width': WIDTH_IN_METRES,
         'line-opacity': 0.4,
       },
-    });
-    map.addLayer({
+    },
+    {
       id: LAYERS.disc,
       type: 'fill',
       source: SOURCE,
       filter: polygons,
       paint: { 'fill-color': ['get', 'colour'], 'fill-opacity': 0.4 },
-    });
-    map.addLayer({
+    },
+    {
       id: LAYERS.discEdge,
       type: 'line',
       source: SOURCE,
       filter: polygons,
       paint: { 'line-color': ['get', 'colour'], 'line-width': 1.5 },
-    });
-    map.addLayer({
+    },
+    {
       id: LAYERS.axis,
       type: 'line',
       source: SOURCE,
       filter: lines,
       layout: round,
       paint: { 'line-color': ['get', 'colour'], 'line-width': 2 },
-    });
-    // The selected one, outlined in white over whatever colour it has.
-    map.addLayer({
+    },
+    {
       id: LAYERS.selected,
       type: 'line',
       source: SOURCE,
       filter: ['==', ['get', 'selected'], true],
       layout: round,
       paint: { 'line-color': '#ffffff', 'line-width': 1.5, 'line-gap-width': 3 },
-    });
+    },
+  ];
+}
 
-    map.addLayer({
+function draftLayers(): LayerSpecification[] {
+  const round = { 'line-cap': 'round', 'line-join': 'round' } as const;
+  return [
+    {
       id: LAYERS.draftBand,
       type: 'line',
       source: DRAFT_SOURCE,
@@ -191,23 +169,23 @@ export class CountermeasureDisplay {
         'line-width': WIDTH_IN_METRES,
         'line-opacity': 0.25,
       },
-    });
-    map.addLayer({
+    },
+    {
       id: LAYERS.draftDisc,
       type: 'fill',
       source: DRAFT_SOURCE,
       filter: ['==', ['get', 'part'], 'disc'],
       paint: { 'fill-color': ['get', 'colour'], 'fill-opacity': 0.25 },
-    });
-    map.addLayer({
+    },
+    {
       id: LAYERS.draftAxis,
       type: 'line',
       source: DRAFT_SOURCE,
       filter: ['==', ['get', 'part'], 'band'],
       layout: round,
       paint: { 'line-color': '#ffffff', 'line-width': 1.5, 'line-dasharray': [2, 2] },
-    });
-    map.addLayer({
+    },
+    {
       id: LAYERS.draftVertex,
       type: 'circle',
       source: DRAFT_SOURCE,
@@ -218,12 +196,28 @@ export class CountermeasureDisplay {
         'circle-stroke-color': ['get', 'colour'],
         'circle-stroke-width': 2,
       },
-    });
+    },
+  ];
+}
 
+export class CountermeasureDisplay {
+  private map: MapLibreMap | null = null;
+  private drawing = false;
+  private onSelect: ((id: string | null) => void) | null = null;
+
+  // Wait for MapService.ready before attaching layers.
+  public attach(map: MapLibreMap, onSelect: (id: string | null) => void): void {
+    if (this.map === map) return;
+    this.detach();
+    this.map = map;
+    this.onSelect = onSelect;
+    map.addSource(SOURCE, { type: 'geojson', data: EMPTY });
+    map.addSource(DRAFT_SOURCE, { type: 'geojson', data: EMPTY });
+    for (const layer of measureLayers()) map.addLayer(layer);
+    for (const layer of draftLayers()) map.addLayer(layer);
     map.on('click', this.clicked);
   }
 
-  /** The plan, with one of its measures marked as the selected one. */
   public setMeasures(measures: readonly DrawnMeasure[], selected: string | null): void {
     const features = measures
       .map((measure) =>
@@ -237,13 +231,6 @@ export class CountermeasureDisplay {
     this.write(SOURCE, { type: 'FeatureCollection', features });
   }
 
-  /**
-   * The line in progress, or nothing.
-   *
-   * The vertices clicked, and one more that follows the pointer, so the next
-   * segment is seen before it is committed. For a point tool the pointer alone
-   * is the preview: the disc that a click would leave.
-   */
   public setDraft(draft: DrawnDraft | null): void {
     this.drawing = draft !== null;
     if (!draft) {
@@ -257,8 +244,7 @@ export class CountermeasureDisplay {
         : null;
       if (disc) features.push(disc);
     } else {
-      // Before the first vertex, the brush: a disc as wide as the strip, under
-      // the pointer, so the tool shows the ground it will take (§11.39).
+      // Before the first vertex, preview a disc with the strip width.
       if (draft.pointer && !draft.points.length) {
         const brush = shape([draft.pointer], draft.widthM, true, {
           part: 'disc',
@@ -281,7 +267,6 @@ export class CountermeasureDisplay {
     this.write(DRAFT_SOURCE, { type: 'FeatureCollection', features });
   }
 
-  /** Takes down what attach() put up. Safe on a map already removed. */
   public detach(): void {
     const map = this.map;
     this.map = null;
@@ -293,13 +278,13 @@ export class CountermeasureDisplay {
       for (const id of Object.values(LAYERS)) if (map.getLayer(id)) map.removeLayer(id);
       for (const id of [SOURCE, DRAFT_SOURCE]) if (map.getSource(id)) map.removeSource(id);
     } catch {
-      // The map was removed first and took its layers with it: nothing left to undo.
+      // A removed map has already discarded its layers.
     }
   }
 
   private readonly clicked = (event: MapMouseEvent) => {
     const map = this.map;
-    // While a tool is in the hand a click is a vertex, not a selection.
+    // While drawing, clicks add vertices instead of selecting measures.
     if (!map || this.drawing || !this.onSelect) return;
     const { x, y } = event.point;
     const hits = map.queryRenderedFeatures(
