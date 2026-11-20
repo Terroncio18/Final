@@ -25,6 +25,10 @@ const WETTING = {
 } as const;
 type Drop = { minute: number; litresM2: number };
 type Removal = { minute: number; remaining: number };
+interface History {
+  readonly drops: Drop[];
+  readonly removals: Removal[];
+}
 interface TreatedFuel {
   readonly bed: FuelBed;
   readonly moisture1h: number;
@@ -32,9 +36,63 @@ interface TreatedFuel {
   readonly until: number;
 }
 
+function firstEvent(history: History): number {
+  return Math.min(history.drops[0]?.minute ?? Infinity, history.removals[0]?.minute ?? Infinity);
+}
+
+/** The latest drop or removal by a minute, and never before the first. */
+function lastEventBy(history: History, first: number, minute: number): number {
+  return Math.max(
+    first,
+    ...history.drops.filter((d) => d.minute <= minute).map((d) => d.minute),
+    ...history.removals.filter((r) => r.minute <= minute).map((r) => r.minute),
+  );
+}
+
+/** The share of the original load left by a minute. */
+function remainingAt(history: History, time: number): number {
+  return Math.min(1, ...history.removals.filter((r) => r.minute <= time).map((r) => r.remaining));
+}
+
+function nextRemoval(history: History, minute: number): number {
+  return history.removals.find((r) => r.minute > minute)?.minute ?? Infinity;
+}
+
+/** Where a wet interval ends: the next event, or the next moisture step once wetted. */
+function intervalEnd(history: History, minute: number): number {
+  const tick = Math.floor(minute / WETTING.stepMin) * WETTING.stepMin;
+  return Math.min(
+    history.drops.find((d) => d.minute > minute)?.minute ?? Infinity,
+    nextRemoval(history, minute),
+    history.drops.some((d) => d.minute <= minute) ? tick + WETTING.stepMin : Infinity,
+  );
+}
+
+/** Fine dead fuel moisture added by the drops up to `from`, each drying since it fell. */
+function addedMoisture(history: History, model: FuelModel, from: number, dead1: number): number {
+  // tons/acre -> kg/m². Only fine dead fuel is wetted; live tissue is unchanged.
+  const fineKgM2 = model.particles
+    .filter((p) => p.kind === 'dead1')
+    .reduce((sum, p) => sum + p.load * 0.22417, 0);
+  let excess = 0,
+    previous = 0;
+  for (const drop of history.drops) {
+    if (drop.minute > from) break;
+    excess *= Math.exp(-(drop.minute - previous) / WETTING.dryingTimeMin);
+    const increment =
+      fineKgM2 > 0
+        ? (drop.litresM2 * WETTING.retainedFraction) /
+          (fineKgM2 * remainingAt(history, drop.minute))
+        : 0;
+    excess = Math.min(Math.max(0, WETTING.maxMoisture - dead1), excess + increment);
+    previous = drop.minute;
+  }
+  return excess * Math.exp(-(from - previous) / WETTING.dryingTimeMin);
+}
+
 /** Sparse dose histories. Fuel inputs and the land-cover grid remain immutable. */
 export class FuelTreatments {
-  private readonly histories = new Map<number, { drops: Drop[]; removals: Removal[] }>();
+  private readonly histories = new Map<number, History>();
   /** Per cell, the state from each quantised minute: it depends on nothing else. */
   private readonly cache = new Map<number, Map<number, TreatedFuel>>();
   /** Per cell, the plain-fuel state once its water has dried off, and since when. */
@@ -64,80 +122,26 @@ export class FuelTreatments {
     return this.histories.keys();
   }
 
-  // eslint-disable-next-line complexity -- pending (docs/estil.md §4): called per cell and step from spreadRun; split measuring, with it.
+  /**
+   * The treated fuel of a cell at a minute, or undefined before its first
+   * treatment. Called for every step through a treated cell, so the saved
+   * states are looked up first and only a miss works one out.
+   */
   public at(cell: number, minute: number): TreatedFuel | undefined {
     const history = this.histories.get(cell),
       model = this.models[this.fuels?.[cell] ?? 1];
     if (!history || !model) return undefined;
-    const first = Math.min(
-      history.drops[0]?.minute ?? Infinity,
-      history.removals[0]?.minute ?? Infinity,
-    );
+    const first = firstEvent(history);
     if (minute < first) return undefined;
     const settled = this.dried.get(cell);
     if (settled && minute >= settled.from && minute < settled.state.until) return settled.state;
-    const remainingAt = (time: number) =>
-      Math.min(1, ...history.removals.filter((r) => r.minute <= time).map((r) => r.remaining));
-    const remaining = remainingAt(minute);
     // Piecewise-constant moisture for exact FIFO integration of each interval.
     const tick = Math.floor(minute / WETTING.stepMin) * WETTING.stepMin;
-    const lastEvent = Math.max(
-      first,
-      ...history.drops.filter((d) => d.minute <= minute).map((d) => d.minute),
-      ...history.removals.filter((r) => r.minute <= minute).map((r) => r.minute),
-    );
+    const lastEvent = lastEventBy(history, first, minute);
     const from = history.drops.length ? Math.max(tick, lastEvent) : lastEvent;
-    let states = this.cache.get(cell);
-    const saved = states?.get(from);
+    const saved = this.cache.get(cell)?.get(from);
     if (saved && minute < saved.until) return saved;
-    let until = Math.min(
-      history.drops.find((d) => d.minute > minute)?.minute ?? Infinity,
-      history.removals.find((r) => r.minute > minute)?.minute ?? Infinity,
-      history.drops.some((d) => d.minute <= minute) ? tick + WETTING.stepMin : Infinity,
-    );
-    // tons/acre -> kg/m². Only fine dead fuel is wetted; live tissue is unchanged.
-    const fineKgM2 = model.particles
-      .filter((p) => p.kind === 'dead1')
-      .reduce((sum, p) => sum + p.load * 0.22417, 0);
-    let excess = 0,
-      previous = 0;
-    for (const drop of history.drops) {
-      if (drop.minute > from) break;
-      excess *= Math.exp(-(drop.minute - previous) / WETTING.dryingTimeMin);
-      const increment =
-        fineKgM2 > 0
-          ? (drop.litresM2 * WETTING.retainedFraction) / (fineKgM2 * remainingAt(drop.minute))
-          : 0;
-      excess = Math.min(
-        Math.max(0, WETTING.maxMoisture - this.moistures.dead1),
-        excess + increment,
-      );
-      previous = drop.minute;
-    }
-    excess *= Math.exp(-(from - previous) / WETTING.dryingTimeMin);
-    // Dried off, and no other drop to come: plain fuel until the next removal.
-    const dry = excess < WETTING.driedMoisture && !history.drops.some((d) => d.minute > minute);
-    if (dry) {
-      excess = 0;
-      until = history.removals.find((r) => r.minute > minute)?.minute ?? Infinity;
-    }
-    const moisture1h = this.moistures.dead1 + excess;
-    const reduced: FuelModel = {
-      ...model,
-      particles: model.particles.map((p) => ({ ...p, load: p.load * remaining })),
-    };
-    const state = {
-      bed: fuelBed(reduced, { ...this.moistures, dead1: moisture1h }),
-      moisture1h,
-      remaining,
-      until,
-    };
-    if (dry) this.dried.set(cell, { from, state });
-    else {
-      if (!states) this.cache.set(cell, (states = new Map()));
-      states.set(from, state);
-    }
-    return state;
+    return this.settle(cell, model, history, minute, from);
   }
 
   public next(cell: number, minute: number): number {
@@ -147,6 +151,38 @@ export class FuelTreatments {
       h.drops.find((d) => d.minute > minute)?.minute ?? Infinity,
       h.removals.find((r) => r.minute > minute)?.minute ?? Infinity,
     );
+  }
+
+  /** Works out the state of an interval that starts at `from`, and saves it. */
+  private settle(
+    cell: number,
+    model: FuelModel,
+    history: History,
+    minute: number,
+    from: number,
+  ): TreatedFuel {
+    const excess = addedMoisture(history, model, from, this.moistures.dead1);
+    // Dried off, and no other drop to come: plain fuel until the next removal.
+    const dry = excess < WETTING.driedMoisture && !history.drops.some((d) => d.minute > minute);
+    const remaining = remainingAt(history, minute);
+    const moisture1h = this.moistures.dead1 + (dry ? 0 : excess);
+    const reduced: FuelModel = {
+      ...model,
+      particles: model.particles.map((p) => ({ ...p, load: p.load * remaining })),
+    };
+    const state = {
+      bed: fuelBed(reduced, { ...this.moistures, dead1: moisture1h }),
+      moisture1h,
+      remaining,
+      until: dry ? nextRemoval(history, minute) : intervalEnd(history, minute),
+    };
+    if (dry) this.dried.set(cell, { from, state });
+    else {
+      let states = this.cache.get(cell);
+      if (!states) this.cache.set(cell, (states = new Map()));
+      states.set(from, state);
+    }
+    return state;
   }
 
   /** Writes one measure into the history of every cell it reaches, up to its crew's stop. */
