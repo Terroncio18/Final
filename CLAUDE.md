@@ -8,8 +8,9 @@ monorepo: cada meitat té el seu `package.json` i s'hi entra per separat.
 
 - **Decisions i motius: `docs/README.md`, i l'índex a `docs/bitacola/README.md`.**
   Mira-hi abans de proposar res: gairebé tot ja s'hi ha discutit, i els
-  comentaris del codi citen aquests números (§2.29, §11.27). Una decisió és un
-  fitxer; no llegeixis la carpeta sencera.
+  motius són a la bitàcola. Els comentaris només aclareixen comportaments
+  no evidents o instruccions per a eines. Una decisió és un fitxer; no
+  llegeixis la carpeta sencera.
 - Model de foc: `web/src/app/simulation/` —Rothermel, propagació, brases,
   contramesures, combustible—, amb les seves proves al costat.
 - Pantalla: `web/src/app/map/` (MapLibre i three.js), `simulator/` (la consola)
@@ -26,6 +27,9 @@ cd web && npm run build
 cd web && npx prettier --check .
 cd web && npm run lint          # ESLint: el full d'estil que una eina pot mirar
 cd api && npm test              # les de l'API, que llegeixen src/ i no dist/
+cd api && npm run build
+cd api && npm run lint
+cd api && npm run format:check
 
 # La cobertura, a cada meitat. Deixa l'lcov a punt per a Sonar, amb els
 # camins des de l'arrel; l'escàner es llança des de l'arrel (§11.55).

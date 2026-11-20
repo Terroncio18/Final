@@ -3,7 +3,7 @@
 Registre de **decisions preses**: què s'ha decidit i per quins motius. Material
 de base per a la memòria del TFG.
 
-Darrera actualització: 14 de novembre de 2026.
+Darrera actualització: 20 de novembre de 2026.
 
 **Fase tancada el 5 de novembre de 2026.** Entrega la portada de focus actius,
 el formulari de quatre nivells fins al punt d'ignició, el domini dibuixat al
@@ -11,8 +11,10 @@ voltant del punt i l'elevació del domini llegida al navegador.
 
 Tancada vol dir que no s'hi afegeixen decisions noves, no que sigui intocable:
 una esmena a una decisió d'aquí es continua escrivint aquí, com la del 5 de
-novembre al §2.29. Els números §2.x i §3.x els cita el codi als comentaris i
-no es renumeren mai.
+novembre al §2.29. Els números §2.x i §3.x no es renumeren mai; fins al
+20/11/2026 el codi els citava als comentaris. Des de la §11.70, els
+comentaris es treuen per defecte; només s'hi mantenen aclariments de
+comportaments no evidents i instruccions per a eines. Les cites viuen aquí.
 
 La fase 2 —el simulador i la vista 3D— té bitàcola pròpia a
 [`fase-2/`](../fase-2/), numerada des del §10 perquè cap

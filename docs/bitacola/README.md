@@ -139,6 +139,13 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.66** Fora el punt de càrrega antic i els pintors que no es feien servir
 - **11.67** Les dades de municipis es publiquen amb precisió útil
 - **11.69** El benchmark de `spreadRun` i el split de `simulator-view`
+- **11.70** El codi es queda sense comentaris
+- **11.71** L'API entra al full d'estil: linter, Prettier i `JsonValue`
+- **11.72** Cau l'última excepció del linter; els comentaris, revisats
+  fitxer per fitxer
+
+- **11.73** Les cinc funcions es divideixen i la meteorologia es valida
+- **11.74** La revisió de qualitat es reparteix i es corregeix
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):

@@ -11,7 +11,9 @@ docs/bitacola` ja diu quin és el fitxer i s'estalvia fins i tot l'índex.
   la memòria. L'índex és `README.md`; la fase 1 —el mapa i el formulari,
   tancada el 5/11/2026— a `fase-1/`, i la fase 2 —el simulador i la vista 3D,
   oberta— a `fase-2/`. Una decisió és un fitxer de menys de 150 línies i els
-  números no es renumeren mai.
+  números no es renumeren mai. Des del 20/11/2026 (§11.70), els comentaris de
+  codi són excepcionals: només expliquen comportaments que no s'entenen bé
+  llegint el codi o instruccions per a eines.
 - **`estil.md`** — com és un fitxer d'aquest projecte: l'ordre de dins d'una
   classe i el que Prettier no mira. S'hi va afegint el que es decideix.
 - **`pla-poliment/`** — el pla de deixar l'aplicació acabada, per fases. El
@@ -41,5 +43,5 @@ són 13 MB de geometria, ni `api/data/`, que no és al repositori.
 ## Si hi escrius
 
 Una decisió nova és un fitxer nou a la fase oberta, amb el número següent, i
-una línia a l'índex. Mai no es renumera res: el codi cita aquests números als
-comentaris (§2.29, §11.27).
+una línia a l'índex. Mai no es renumera res: les referències es conserven
+a la bitàcola.

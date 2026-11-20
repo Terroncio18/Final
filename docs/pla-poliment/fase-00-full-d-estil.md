@@ -13,7 +13,15 @@
 - [x] **`simulator-view.ts` i `countermeasure-plan.ts`**, que agrupen l'estat
       per tema i no per tipus. Decidit per Pere el 19/11/2026 (§11.63): ara no
       s'hi aplica la regla 1, i el que cal és partir-los (fase 5). Fins llavors
-      queden fora de `member-ordering`.
+      quedaven fora de `member-ordering`. Excepcions retirades el
+      20/11/2026 després de dividir i ordenar les dues classes.
+
+- [x] **Cicle de vida explícit.** Decidit per Pere el 20/11/2026: els
+      components implementen `OnDestroy` i concentren la neteja a
+      `public ngOnDestroy(): void`. Regla 6 a `estil.md`, amb l'ordre de
+      destrucció i els casos propis de `effect` i MapLibre. La inicialització
+      també és explícita amb `OnInit`: aplicada als cinc components del
+      formulari el 20/11/2026, mantenint els efectes reactius al constructor.
 
 ## Queda decidir
 
@@ -24,10 +32,10 @@ Són a «Per decidir» d'`estil.md`.
 - [ ] **Cadena de promeses o `async`/`await`**.
 - [ ] **Com es diu «això no l'espero»**: `void` o un ajudant que enganxi el
       `catch`.
-- [ ] **Els comentaris.** Pere vol codi sense comentaris. S'ha fet la prova a
-      `map/hotspots.service.ts`, que ha passat de 182 a 117 línies sense
-      perdre res que no sigui a la bitàcola —es perd el punter, no el
-      coneixement—. Cal decidir si es fa a tot el repositori. Si es fa, s'ha
-      d'esmenar la portada de la fase 1 de la bitàcola, que diu que el codi
-      cita els números de les decisions als comentaris. **Afecta la fase 5**:
-      les funcions noves de la §11.63 porten comentari, com la resta.
+- [x] **Els comentaris.** Decidit per Pere el 20/11/2026 (§11.70): es treuen
+      per defecte; es mantenen només per aclarir comportaments no evidents o
+      instruccions per a eines. Regla 5 a `estil.md`. S'ha esmenat la portada de
+      la fase 1 de la bitàcola i `docs/README.md`, que deien que el codi cita
+      els números de les decisions als comentaris. **Afecta la fase 5**: es
+      fa fitxer per fitxer dins del seu repartiment per carpetes; les
+      funcions noves de la §11.63/§11.69 hi entren igual que la resta.

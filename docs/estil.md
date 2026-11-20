@@ -78,24 +78,12 @@ segueixen passant.
 
 </details>
 
-### Qui no la compleix, avui
+### Com es comprova
 
-**Totes la compleixen, menys dues**, des del 19/11/2026 (§11.63). El linter en
-comprova la meitat que pot veure —`@typescript-eslint/member-ordering`: camps,
-constructor, mètodes públics i protegits, privats—. L'ordre de dins dels camps
-(punts 1 a 4) es va posar a mà en sis classes: `map/map-view.ts`,
-`simulation/ignition-step.ts`, `simulation/search.service.ts`,
-`top-bar/range-picker.ts`, `simulation/municipality-step.ts` i
-`simulation/province-step.ts`. Aquestes dues últimes tenien les entrades després
-de les injeccions i el recompte del matí no les havia vist.
-
-Les dues que queden són un cas a part: `simulator-view.ts` —2.169 línies, més
-de vuitanta peces d'estat— i `countermeasure-plan.ts`. No estan desordenades
-per descuit, sinó **agrupades per tema**: el senyal i el derivat d'una mateixa
-cosa, un al costat de l'altre. Posar-les per tipus escamparia coses que es
-llegeixen juntes al llarg de mil línies. **Decidit per Pere el 19/11/2026**: no
-s'hi aplica, perquè el que cal és partir el component. Fins llavors queden fora
-de `member-ordering`, i `eslint.config.mjs` en diu el motiu.
+ESLint comprova camps, constructor, mètodes públics/protegits i privats a
+web i API. L’ordre dels camps es revisa a mà, preservant les dependències
+d’inicialització. El 20/11/2026 també s’han ordenat `simulator-view.ts` i
+`countermeasure-plan.ts`; ja no tenen excepcions a `member-ordering`.
 
 ## 2. Cap membre sense dir qui el pot veure
 
@@ -139,8 +127,6 @@ amb línies en blanc al mig del bloc, 35 a `web/` i `api/src/app.ts`. **No la
 comprova cap regla**: caldria un connector, `eslint-plugin-import-x`, que no
 s'ha afegit. Prettier no la desfà, però tampoc no la manté.
 
-
-
 ## 4. Res de codi espagueti
 
 **Una funció fa una cosa, cap en una pantalla i no s'endinsa més de dos o tres
@@ -153,40 +139,129 @@ l'objectiu, és el senyal d'alarma; una funció de 14 també pot ser
 inintel·ligible. Ho comprova sol el linter (`complexity: ['error', 15]`) i
 també Sonar, amb la seva complexitat cognitiva.
 
-**On és l'espagueti, avui.** De 329 funcions amb nom, **13 passen de 15**, i
-quatre són les que de debò pesen:
+**Estat el 20/11/2026:** totes les funcions de producció passen el límit
+15 d’ESLint a web i API, sense silenciadors ni excepcions per fitxer. Les
+funcions del bucle de propagació es van comparar amb nou escenaris abans i
+després de dividir-les: mateixos resultats, sense alentiment (§11.69).
 
-| Funció | Complexitat | Línies |
-| --- | --- | --- |
-| `simulation/fire-spread.ts` · `spreadRun()` | ~185 | 483 |
-| `simulation/countermeasures.ts` · `finite()` | ~91 | 153 |
-| `simulator/simulator-view.ts` · `constructor()` | ~84 | 443 |
-| `simulation/scenario.ts` · `readScenario()` | ~52 | 123 |
+La longitud també es revisa a mà. Pere ha aprovat dividir les cinc
+funcions que quedaven amb 80 línies o més, inclòs el catàleg declaratiu de
+capes. Ara totes les funcions revisades queden per sota de 80 línies;
+complexitat màxima 15 al web i 13 a l’API. La fase 5 recull les etapes i
+les comparacions de comportament (§11.73).
 
-Per fitxer, Sonar diu el mateix: `fire-spread.ts` (complexitat cognitiva 365),
-`simulator-view.ts` (285) i `countermeasures.ts` (199) són els tres que
-concentren el problema.
+## 5. Comentaris excepcionals
 
-**On som, 19/11/2026 (§11.63).** Se n'han partit cinc —les que es podien
-partir sense tocar el bucle de la graella— i les altres deu porten una marca de
-trinquet: `// eslint-disable-next-line complexity -- pending (docs/estil.md §4): …`,
-amb el motiu. La regla és `error`: el que hi ha marcat es tolera, però una funció
-nova que passi de 15 no passa. Es llisten amb
-`grep -rn "complexity -- pending" web/src`. El recompte del linter no és el de
-la taula, perquè compta cada clausura a part: `spreadRun()` hi fa 160, i les
-dues clausures que porta dins, 20 i 19.
+**Els comentaris es treuen per defecte.** Es mantenen només quan expliquen un
+comportament concret que no es pot deduir fàcilment del codi, o quan una eina
+els necessita —Prettier, el linter, el compilador—, com un
+`eslint-disable-next-line`. La decisió general la va prendre Pere el
+20/11/2026 (§11.70); aquesta excepció s'aplica en la revisió fitxer per fitxer.
+Les cites de decisions es busquen a la bitàcola, no al codi.
 
-**Un avís abans de desfer el primer**: `spreadRun()` és el bucle que recorre
-la graella cel·la a cel·la —1.024² cel·les— i partir-lo en funcions petites es
-paga en temps de càlcul. Aquí la claredat i la velocitat estiren cap a
-costats diferents, i la §11.36 diu que el càlcul ha d'anar per sota del segon.
-Es parteix, però mesurant abans i després; si costa massa, el que es fa és
-deixar-lo sencer i explicar per què, que també és una decisió.
+**Les plantilles `.html` no porten comentaris**, tampoc directives per
+desactivar ESLint. Les incidències d'accessibilitat es resolen al control.
+Decidit per Pere el 20/11/2026.
+
+**On som avui**: revisió completada el 20/11/2026 a les sis carpetes de la
+fase 5, també a les proves, els fitxers arrel de l’aplicació i el CSS.
+La passada de comentaris conserva els tokens TS i les regles CSS.
+
+## 6. Cicle de vida explícit
+
+**La inicialització que es fa una sola vegada va a `public ngOnInit(): void`,
+i la classe implementa `OnInit`.** Decidit per Pere el 20/11/2026: les
+càrregues inicials i les accions d'entrada a una pantalla es troben en aquest
+mètode. Els `effect` que reaccionen als canvis de dades i d'entrades es
+registren al constructor, dins del context d'injecció d'Angular.
+
+**La neteja d'un component va a `public ngOnDestroy(): void`, i la classe
+implementa `OnDestroy`.** Decidit per Pere el 20/11/2026: els mètodes del cicle
+de vida han de ser fàcils de trobar i llegir. Les dependències que necessita
+aquesta neteja es declaren com a camps, amb `private readonly ... = inject(...)`.
+
+```ts
+export class MapShell implements OnDestroy {
+  private readonly maps = inject(MapService);
+
+  public ngOnDestroy(): void {
+    this.maps.destroy();
+  }
+}
+```
+
+S'agrupa en aquest mètode la retirada de listeners, la cancel·lació de tasques
+i l'alliberament de recursos que pertanyen al component. Un listener que
+s'ha de retirar conserva la mateixa referència de funció en registrar-lo i
+retirar-lo. Les animacions i els recursos que fan servir el mapa s'aturen
+abans de destruir-lo.
+
+**Cada recurs es neteja quan acaba la seva vida útil.** Un `effect` pot
+recrear un recurs diverses vegades mentre el component continua viu:
+`onCleanup` el neteja abans de la següent execució i en destruir l'efecte.
+Aquesta neteja es manté dins de l'efecte. Si l'ordre de destrucció importa,
+el component conserva l'`EffectRef` i el destrueix explícitament des de
+`ngOnDestroy()` abans dels recursos dels quals depèn.
+
+`afterNextRender` es conserva quan cal esperar que Angular hagi renderitzat
+el DOM, com en crear MapLibre. Passar-lo a un altre hook requereix comprovar
+el moment de creació i el comportament al navegador. Les classes de MapLibre
+o WebGL continuen amb els seus propis contractes (`onRemove`, `dispose`):
+`OnDestroy` correspon als components gestionats per Angular.
+
+**On som avui**: aplicat a `map/map-shell.ts`,
+`simulation/simulation-flow.ts`, `simulation/ignition-step.ts` i
+`simulator/simulator-view.ts`. Ja no hi ha registres directes amb
+`inject(DestroyRef).onDestroy(...)` a `web/src`.
+La inicialització amb `OnInit` està aplicada a `simulation/region-step.ts`,
+`simulation/province-step.ts`, `simulation/municipality-step.ts`,
+`simulation/ignition-step.ts` i `simulation/simulation-flow.ts`.
+Els efectes de `simulator/simulator-view.ts` es registren des de 13 mètodes
+privats amb nom, cridats pel constructor dins del context d'injecció. El
+constructor té 17 línies; els 24 efectes conserven l’ordre de registre,
+i cap funció del fitxer supera la complexitat 15 d'ESLint.
+
+## 7. Tipus explícits
+
+**No es fan servir `any` ni `unknown` com a tipus.** És el criteri del
+projecte acordat amb Pere el 20/11/2026. Cada dada ha de tenir el seu
+contracte expressat amb tipus concrets, interfícies, unions o genèrics
+segons el cas. També s'aplica a les proves.
+
+Les dades externes continuen requerint validació: una asserció `as Tipus`
+no demostra que un JSON compleixi el contracte. Els validadors han de
+comprovar els camps abans de construir el resultat tipat.
+
+Ho detecta ESLint a `web/` i `api/`: `@typescript-eslint/no-explicit-any` i
+`no-restricted-syntax` amb el selector `TSUnknownKeyword`, totes dues com
+a error. No s'afegeixen excepcions per silenciar els usos existents.
+
+Per a dades JSON abans de validar, Pere ha aprovat `JsonValue`: una unió
+explícita de text, nombres, booleans, `null`, arrays i objectes JSON. Després
+de validar es retorna el contracte específic de cada dada.
+
+**La validació es fa on entra la dada.** L’API interpreta les respostes de
+FIRMS, AEMET i IPMA i exposa contractes coneguts al web. El navegador valida
+els fitxers d’escenari que l’usuari hi importa directament. La descodificació
+i comprovació del transport de combustibles també es manté al límit de
+xarxa del frontend: els tipus estàtics no validen el JSON rebut. `JsonValue`
+es limita a aquestes entrades; el model i els components reben tipus
+específics després de validar.
+
+**On som avui**: resolts els 99 usos de `unknown` que la primera passada
+detectava en 33 fitxers de `web/` (42 d'aplicació i 57 de proves). Els
+parsers mantenen la validació; les proves fan servir esdeveniments DOM,
+fixtures completes i dobles amb contractes tipats. ESLint i la comprovació
+de tipus passen. ESLint també està configurat a `api/`; resolts els seus
+usos explícits i verificades les 88 proves. Les respostes meteorològiques
+externes també es validen abans de convertir-les al contracte conegut.
 
 ## Per decidir
 
-Surten de llegir `map/hotspots.service.ts` junts, el 19/11/2026. Cap no s'ha
-aplicat encara.
+Les primeres propostes surten de llegir `map/hotspots.service.ts` junts, el
+19/11/2026. La revisió del cicle de vida del 20/11/2026 hi afegeix el cas
+del muntatge del mapa. La inicialització explícita i l'agrupació d'efectes
+ja formen part de la regla 6; les propostes següents són pendents de decidir.
 
 - **Com es diu «aquesta resposta ja no la vull».** El mateix problema està
   resolt de dues maneres: un comptador a `map/hotspots.service.ts`
@@ -209,3 +284,7 @@ aplicat encara.
   avui deixa el simulador i les figures 3D fora de la primera càrrega (1,5 MB
   contra 0,7 MB). Val la pena per carpeta tancada —`simulation/` i `map/` ho
   són—, i mesurant el paquet abans i després.
+- **Muntatge del mapa amb nom propi.** A `map/map-shell.ts` i
+  `simulator/simulator-view.ts`, valorar un mètode privat amb nom explícit
+  per crear el mapa, cridat des de `afterNextRender`. Es conserva l'espera
+  del renderitzat; s'ha de comprovar si el mètode aporta claredat a cada cas.
