@@ -42,7 +42,7 @@ La xarxa de seguretat ja hi és: 97,9 % de cobertura i 0 avisos de Sonar
 | 3 | [Errors](fase-03-errors.md) | 1, 2 | **Feta**: 4 defectes de la fase 2 arreglats, cada un amb la seva prova | Claude |
 | 4 | [Codi mort](fase-04-codi-mort.md) | 1 | **Feta** el 20/11/2026: rutes de càrrega i pintors sense importador retirats; inventaris revisats | Codex |
 | 5 | [Estil](fase-05-estil.md) | 0, 0b, 4 | **A mitges**: regles 1 a 3 fetes menys els dos grans; 10 funcions al trinquet | Claude |
-| 6 | [Optimitzacions](fase-06-optimitzacions.md) | 1, 2 | Per començar | — |
+| 6 | [Optimitzacions](fase-06-optimitzacions.md) | 1, 2 | **En curs**: mesures de partida; fase 2 encara pendent | Codex |
 | 7 | [Prova global final](fase-07-prova-global.md) | 3, 4, 5, 6 | Per començar | — |
 | 8 | [Manuals i README](fase-08-manuals.md) | 7 | Per començar | — |
 | 9 | [Publicar](fase-09-publicar.md) | 8 + decisió | **Bloquejada per una decisió** | — |
