@@ -145,30 +145,8 @@ export function formatScenario(scenario: Scenario, saved: Date): string {
 export const MAX_SCENARIO_SIZE = 1_000_000;
 export const SCENARIO_TOO_LARGE = 'El fitxer d’escenari és massa gran.';
 
-/**
- * Reads a scenario back, or says why it cannot.
- *
- * - **A newer version is refused whole**: what it adds may change the fire,
- *   and opening it without that would answer another question in silence.
- * - **Strict with what changes the fire.** Without the domain or the weather
- *   the file is refused; a malformed plan, wind or ember block is refused
- *   whole, and so is a countermeasure carrying a field this version does not
- *   know.
- * - **Lenient with the rest**: an unknown `key = value` line is skipped,
- *   which is what lets a file edited by hand carry notes; a slider value out
- *   of range is clamped; and an ignition that does not parse is dropped
- *   rather than guessed, as in the address (§11.16).
- * - **An older file is brought up to date** (§11.33): a key it does not
- *   carry takes its default, and is named in `filled`. Without the domain
- *   it is still refused, because nothing can stand for where the fire is;
- *   a key that is there but unreadable is refused too, as it is not missing
- *   but wrong.
- */
-// eslint-disable-next-line complexity -- pending (docs/estil.md §4): a reader, one check per key of the file.
-export function readScenario(text: string): ScenarioRead | string {
-  if (text.length > MAX_SCENARIO_SIZE) return SCENARIO_TOO_LARGE;
-  if (!text.includes('IgnisLab')) return 'El fitxer no és un escenari d’IgnisLab.';
-
+/** The `key = value` lines of a scenario file, skipping notes and blanks. */
+function readValues(text: string): Map<string, string> {
   const values = new Map<string, string>();
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
@@ -177,24 +155,26 @@ export function readScenario(text: string): ScenarioRead | string {
     if (cut < 0) continue;
     values.set(line.slice(0, cut).trim().toLowerCase(), line.slice(cut + 1).trim());
   }
+  return values;
+}
 
+/** A newer version is refused whole: what it adds may change the fire. */
+function checkVersionSupported(version: string | undefined): string | null {
+  const known = ['1', '2', '3', '4', '5', '6', '7', VERSION];
+  if (version !== undefined && !known.includes(version)) {
+    return 'Versió d’escenari no compatible.';
+  }
+  return null;
+}
+
+/** The domain: the four codes of the address and the centre. Nothing stands for it missing. */
+function readDomain(
+  values: Map<string, string>,
+): { region: string; province: string; municipality: string; centre: Point } | string {
   const code = (key: string) => {
     const value = values.get(key) ?? '';
     return /^[A-Za-z0-9_]+$/.test(value) ? value : null;
   };
-  const version = values.get('versio');
-  if (
-    version !== undefined &&
-    version !== '1' &&
-    version !== '2' &&
-    version !== '3' &&
-    version !== '4' &&
-    version !== '5' &&
-    version !== '6' &&
-    version !== '7' &&
-    version !== VERSION
-  )
-    return 'Versió d’escenari no compatible.';
   const region = code('regio');
   const province = code('provincia');
   const municipality = code('municipi');
@@ -202,10 +182,18 @@ export function readScenario(text: string): ScenarioRead | string {
   if (!region || !province || !municipality || !centre) {
     return 'A l’escenari li falta el domini: regió, província, municipi o centre.';
   }
+  return { region, province, municipality, centre };
+}
 
-  const filled: string[] = [];
-  // By the key the file uses. A decimal comma is what a hand writes here.
-  // Absent, it takes the default and says so; there and unreadable, null.
+/**
+ * The weather sliders. By the key the file uses. A decimal comma is what a
+ * hand writes here. Absent, each takes its default and is named in `filled`;
+ * there and unreadable, the whole block is refused.
+ */
+function readWeather(
+  values: Map<string, string>,
+  filled: string[],
+): { wind: number; from: number; humidity: number; temperature: number } | string {
   const number = (
     key: string,
     label: string,
@@ -229,48 +217,119 @@ export function readScenario(text: string): ScenarioRead | string {
   if (wind === null || humidity === null || temperature === null || from === null) {
     return 'La meteorologia de l’escenari no es pot llegir: vent, direcció, humitat o temperatura.';
   }
-  if (!values.has('brases')) filled.push('brases');
-  if (!values.has('canvis_vent')) filled.push('canvis de vent');
-  if (!values.has('contramesures')) filled.push('contramesures');
-  let spotting: SpottingOptions | undefined;
-  if (values.has('brases')) {
-    let raw: unknown;
-    try {
-      raw = JSON.parse(values.get('brases')!);
-    } catch {
-      return 'Les brases no són un JSON vàlid.';
-    }
-    const checked = parseSpotting(raw);
-    if (typeof checked === 'string') return checked;
-    spotting = checked;
+  return { wind, from, humidity, temperature };
+}
+
+/** The ember block: absent takes no spotting and is named in `filled`; there and wrong, refused. */
+function readSpottingKey(
+  values: Map<string, string>,
+  filled: string[],
+): SpottingOptions | undefined | string {
+  if (!values.has('brases')) {
+    filled.push('brases');
+    return undefined;
   }
-  let windChanges: readonly WindChange[] | undefined;
-  if (values.has('canvis_vent')) {
-    let raw: unknown;
-    try {
-      raw = JSON.parse(values.get('canvis_vent')!);
-    } catch {
-      return 'Els canvis de vent no són un JSON vàlid.';
-    }
-    const checked = parseWindChanges(raw);
-    if (typeof checked === 'string') return checked;
-    windChanges = checked;
+  let raw: unknown;
+  try {
+    raw = JSON.parse(values.get('brases')!);
+  } catch {
+    return 'Les brases no són un JSON vàlid.';
   }
-  let countermeasures: readonly Countermeasure[] | undefined;
-  if (values.has('contramesures')) {
-    let raw: unknown;
-    try {
-      raw = JSON.parse(values.get('contramesures')!);
-    } catch {
-      return 'El pla de contramesures no és un JSON vàlid.';
-    }
-    const parsed = parseCountermeasures(raw);
-    if (typeof parsed === 'string') return parsed;
-    const [w, s, e, n] = domainAround(centre);
-    if (parsed.some((m) => m.points.some(([lon, lat]) => lon < w || lon > e || lat < s || lat > n)))
-      return 'Una contramesura surt del domini de l’escenari.';
-    countermeasures = parsed;
+  return parseSpotting(raw);
+}
+
+/** The wind-history block: absent takes a steady wind and is named in `filled`; there and wrong, refused. */
+function readWindChangesKey(
+  values: Map<string, string>,
+  filled: string[],
+): readonly WindChange[] | undefined | string {
+  if (!values.has('canvis_vent')) {
+    filled.push('canvis de vent');
+    return undefined;
   }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(values.get('canvis_vent')!);
+  } catch {
+    return 'Els canvis de vent no són un JSON vàlid.';
+  }
+  return parseWindChanges(raw);
+}
+
+/**
+ * The countermeasures plan: absent takes no plan and is named in `filled`;
+ * there and wrong, or outside the scenario's domain, refused.
+ */
+function readCountermeasuresKey(
+  values: Map<string, string>,
+  filled: string[],
+  centre: Point,
+): readonly Countermeasure[] | undefined | string {
+  if (!values.has('contramesures')) {
+    filled.push('contramesures');
+    return undefined;
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(values.get('contramesures')!);
+  } catch {
+    return 'El pla de contramesures no és un JSON vàlid.';
+  }
+  const parsed = parseCountermeasures(raw);
+  if (typeof parsed === 'string') return parsed;
+  const [w, s, e, n] = domainAround(centre);
+  if (parsed.some((m) => m.points.some(([lon, lat]) => lon < w || lon > e || lat < s || lat > n))) {
+    return 'Una contramesura surt del domini de l’escenari.';
+  }
+  return parsed;
+}
+
+/**
+ * Reads a scenario back, or says why it cannot.
+ *
+ * - **A newer version is refused whole**: what it adds may change the fire,
+ *   and opening it without that would answer another question in silence.
+ * - **Strict with what changes the fire.** Without the domain or the weather
+ *   the file is refused; a malformed plan, wind or ember block is refused
+ *   whole, and so is a countermeasure carrying a field this version does not
+ *   know.
+ * - **Lenient with the rest**: an unknown `key = value` line is skipped,
+ *   which is what lets a file edited by hand carry notes; a slider value out
+ *   of range is clamped; and an ignition that does not parse is dropped
+ *   rather than guessed, as in the address (§11.16).
+ * - **An older file is brought up to date** (§11.33): a key it does not
+ *   carry takes its default, and is named in `filled`. Without the domain
+ *   it is still refused, because nothing can stand for where the fire is;
+ *   a key that is there but unreadable is refused too, as it is not missing
+ *   but wrong.
+ */
+export function readScenario(text: string): ScenarioRead | string {
+  if (text.length > MAX_SCENARIO_SIZE) return SCENARIO_TOO_LARGE;
+  if (!text.includes('IgnisLab')) return 'El fitxer no és un escenari d’IgnisLab.';
+
+  const values = readValues(text);
+
+  const version = values.get('versio');
+  const versionError = checkVersionSupported(version);
+  if (versionError) return versionError;
+
+  const domain = readDomain(values);
+  if (typeof domain === 'string') return domain;
+  const { region, province, municipality, centre } = domain;
+
+  const filled: string[] = [];
+  const weather = readWeather(values, filled);
+  if (typeof weather === 'string') return weather;
+  const { wind, from, humidity, temperature } = weather;
+
+  const spotting = readSpottingKey(values, filled);
+  if (typeof spotting === 'string') return spotting;
+
+  const windChanges = readWindChangesKey(values, filled);
+  if (typeof windChanges === 'string') return windChanges;
+
+  const countermeasures = readCountermeasuresKey(values, filled, centre);
+  if (typeof countermeasures === 'string') return countermeasures;
 
   const scenario: Scenario = {
     name: values.get('nom') ?? '',
