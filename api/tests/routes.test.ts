@@ -2,11 +2,8 @@ import { afterEach, beforeEach, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import type { FastifyInstance } from 'fastify';
 import { addDays, today } from '../src/firms.js';
+import { MAX_HOTSPOT_CACHE_ENTRIES } from '../src/config.js';
 
-// The routes are asked without a socket, with `app.inject()`. What FIRMS and
-// the weather services answer is replaced —they are tested on their own— but
-// the dates are the real ones: what is being tested here is precisely how a
-// question is turned into a range of days.
 const fetchHotspots = vi.hoisted(() => vi.fn());
 const earliest = vi.hoisted(() => vi.fn());
 const availability = vi.hoisted(() => vi.fn());
@@ -53,7 +50,9 @@ beforeEach(() => {
   vi.resetModules();
   fetchHotspots.mockResolvedValue({ body: detections(2), sources: ['VIIRS_SNPP_NRT'] });
   earliest.mockResolvedValue('2012-01-20');
-  availability.mockResolvedValue(new Map([['VIIRS_SNPP_NRT', { min: '2026-08-01', max: today() }]]));
+  availability.mockResolvedValue(
+    new Map([['VIIRS_SNPP_NRT', { min: '2026-08-01', max: today() }]]),
+  );
 });
 
 afterEach(async () => {
@@ -88,7 +87,7 @@ test('more days than the ceiling is the ceiling, and nonsense is one day', async
   const zero = await app.inject('/api/hotspots?days=0');
   assert.equal(zero.headers['x-from'], today(), 'nor is zero');
   assert.equal(zero.headers['x-to'], today());
-  // And it is not asked again: today has just been asked for.
+
   assert.equal(fetchHotspots.mock.calls.length, 2);
 });
 
@@ -132,7 +131,10 @@ test('the answer carries the range, the sources, the age and the first date ther
   assert.equal(answer.headers['x-earliest'], '2012-01-20');
   assert.equal(answer.headers['x-stale'], 'false');
   assert.equal(answer.headers['cache-control'], 'public, max-age=300');
-  assert.ok(Date.parse(String(answer.headers['x-fetched-at'])), 'an instant, so the age can be shown');
+  assert.ok(
+    Date.parse(String(answer.headers['x-fetched-at'])),
+    'an instant, so the age can be shown',
+  );
 });
 
 test('the same range twice is one question to FIRMS', async () => {
@@ -146,6 +148,22 @@ test('the same range twice is one question to FIRMS', async () => {
   assert.equal(fetchHotspots.mock.calls.length, 2, 'another range is another question');
 });
 
+test('the range cache is bounded and retains recently visited ranges', async () => {
+  const app = await serve();
+  const query = (offset: number) => `/api/hotspots?from=${addDays('2024-06-01', offset)}`;
+  for (let i = 0; i < MAX_HOTSPOT_CACHE_ENTRIES; i++) await app.inject(query(i));
+  await app.inject(query(0));
+  assert.equal(fetchHotspots.mock.calls.length, MAX_HOTSPOT_CACHE_ENTRIES);
+  await app.inject(query(MAX_HOTSPOT_CACHE_ENTRIES));
+  const health = await app.inject('/api/health');
+  const ranges = health.json<{ cached: { range: string }[] }>().cached.map((entry) => entry.range);
+  assert.equal(ranges.length, MAX_HOTSPOT_CACHE_ENTRIES);
+  assert.ok(ranges.includes('2024-06-01:2024-06-01'));
+  assert.ok(!ranges.includes('2024-06-02:2024-06-02'));
+  await app.inject(query(1));
+  assert.equal(fetchHotspots.mock.calls.length, MAX_HOTSPOT_CACHE_ENTRIES + 2);
+});
+
 test('when FIRMS falls over, what is held is served and it says that it is old', async () => {
   const app = await serve();
   await app.inject('/api/hotspots?from=2024-08-01&to=2024-08-01');
@@ -156,14 +174,18 @@ test('when FIRMS falls over, what is held is served and it says that it is old',
 
   const answer = await app.inject('/api/hotspots?from=2024-08-01&to=2024-08-01');
   assert.equal(answer.statusCode, 200);
-  assert.equal(answer.headers['x-stale'], 'true', 'an empty map would read as «nothing is burning»');
+  assert.equal(
+    answer.headers['x-stale'],
+    'true',
+    'an empty map would read as «nothing is burning»',
+  );
   assert.equal(answer.json().features.length, 2);
   vi.useRealTimers();
 });
 
 test('when FIRMS falls over with nothing held, the fault is said to be upstream', async () => {
-  // A key is configured here: without one, every outage would look like a
-  // missing key, which is exactly the mix-up the next test guards against.
+  /* Configure a key so an ordinary outage is not mistaken for a missing-key error. */
+
   vi.stubEnv('FIRMS_MAP_KEY', 'a-key-for-the-tests');
   fetchHotspots.mockRejectedValue(new Error('FIRMS answered 503'));
 

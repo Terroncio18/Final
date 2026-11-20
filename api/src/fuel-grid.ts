@@ -1,4 +1,4 @@
-/** Shared by the offline importer and API. Categorical values never interpolate. */
+// Categorical fuel classes must never be interpolated.
 export type Bounds = readonly [number, number, number, number];
 export const UNKNOWN = 255;
 const TILE_DEGREES = 0.125;
@@ -10,11 +10,19 @@ export function validateGrid(
   bbox: string | undefined,
   sizeText?: string,
 ): { bounds: Bounds; size: number } {
-  const parts = bbox?.split(",");
+  const parts = bbox?.split(',');
   if (!parts || parts.length !== 4 || parts.some((s) => !s.trim()))
-    throw new Error("Cal bbox=oest,sud,est,nord");
+    throw new Error('Cal bbox=oest,sud,est,nord');
   const [w, s, e, n] = parts.map(Number) as [number, number, number, number];
   const size = Number(sizeText ?? 1024);
+  validateBounds([w, s, e, n]);
+  if (!Number.isInteger(size) || size < 16 || size > 1024) {
+    throw new Error('Domini fora de rang (Espanya/Portugal, màxim 0,8 graus; mida 16–1024)');
+  }
+  return { bounds: [w, s, e, n], size };
+}
+
+function validateBounds([w, s, e, n]: Bounds): void {
   if (
     ![w, s, e, n].every(Number.isFinite) ||
     w >= e ||
@@ -24,19 +32,14 @@ export function validateGrid(
     w < -32 ||
     e > 5 ||
     s < 27 ||
-    n > 44.5 ||
-    !Number.isInteger(size) ||
-    size < 16 ||
-    size > 1024
+    n > 44.5
   ) {
-    throw new Error(
-      "Domini fora de rang (Espanya/Portugal, màxim 0,8 graus; mida 16–1024)",
-    );
+    throw new Error('Domini fora de rang (Espanya/Portugal, màxim 0,8 graus; mida 16–1024)');
   }
-  return { bounds: [w, s, e, n], size };
 }
 
-/** A declared approximation, versioned separately from the satellite product. */
+// WorldCover-to-fuel mapping is an explicit approximation, versioned separately from the satellite
+// product.
 export function worldCoverModel(cover: number): number {
   switch (cover) {
     case 10:
@@ -62,27 +65,14 @@ export function worldCoverModel(cover: number): number {
 }
 
 export function tileBounds(x: number, y: number): Bounds {
-  return [
-    x * TILE_DEGREES,
-    y * TILE_DEGREES,
-    (x + 1) * TILE_DEGREES,
-    (y + 1) * TILE_DEGREES,
-  ];
+  return [x * TILE_DEGREES, y * TILE_DEGREES, (x + 1) * TILE_DEGREES, (y + 1) * TILE_DEGREES];
 }
 
 export function tileKeys(bounds: Bounds): [number, number][] {
   const [w, s, e, n] = bounds;
   const keys: [number, number][] = [];
-  for (
-    let y = Math.floor(s / TILE_DEGREES);
-    y < Math.ceil(n / TILE_DEGREES);
-    y++
-  ) {
-    for (
-      let x = Math.floor(w / TILE_DEGREES);
-      x < Math.ceil(e / TILE_DEGREES);
-      x++
-    )
+  for (let y = Math.floor(s / TILE_DEGREES); y < Math.ceil(n / TILE_DEGREES); y++) {
+    for (let x = Math.floor(w / TILE_DEGREES); x < Math.ceil(e / TILE_DEGREES); x++)
       keys.push([x, y]);
   }
   return keys;
@@ -116,36 +106,25 @@ export function paintPolygon(
         const a = ring[j]!,
           b = ring[i]!;
         if (a[1]! > lat !== b[1]! > lat)
-          crossings.push(
-            a[0]! + ((lat - a[1]!) * (b[0]! - a[0]!)) / (b[1]! - a[1]!),
-          );
+          crossings.push(a[0]! + ((lat - a[1]!) * (b[0]! - a[0]!)) / (b[1]! - a[1]!));
       }
     }
     crossings.sort((a, b) => a - b);
     for (let i = 0; i + 1 < crossings.length; i += 2) {
       const left = Math.max(0, Math.ceil((crossings[i]! - w) / dx - 0.5));
-      const right = Math.min(
-        size,
-        Math.ceil((crossings[i + 1]! - w) / dx - 0.5),
-      );
-      if (right > left)
-        target.fill(model, row * size + left, row * size + right);
+      const right = Math.min(size, Math.ceil((crossings[i + 1]! - w) / dx - 0.5));
+      if (right > left) target.fill(model, row * size + left, row * size + right);
     }
   }
 }
 
 /** Flattened triples: model, provenance (0 unknown / 1 official / 2 estimated), count. */
 export function encodeRuns(models: Uint8Array, quality: Uint8Array): number[] {
-  if (models.length !== quality.length) throw new Error("Grid lengths differ");
+  if (models.length !== quality.length) throw new Error('Grid lengths differ');
   const runs: number[] = [];
-  for (let i = 0; i < models.length;) {
+  for (let i = 0; i < models.length; ) {
     let j = i + 1;
-    while (
-      j < models.length &&
-      models[j] === models[i] &&
-      quality[j] === quality[i]
-    )
-      j++;
+    while (j < models.length && models[j] === models[i] && quality[j] === quality[i]) j++;
     runs.push(models[i]!, quality[i]!, j - i);
     i = j;
   }

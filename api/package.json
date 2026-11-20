@@ -11,20 +11,27 @@
     "fuels:official": "npm run build && node scripts/prepare-official-fuels.mjs",
     "fuels:verify": "vitest run --config vitest.live.config.ts",
     "start": "node --env-file=.env dist/server.js",
-    "dev": "tsc --watch --preserveWatchOutput & node --env-file=.env --watch dist/server.js"
+    "dev": "tsc --watch --preserveWatchOutput & node --env-file=.env --watch dist/server.js",
+    "lint": "eslint .",
+    "format": "prettier --write src tests integration *.ts *.mjs *.json .prettierrc",
+    "format:check": "prettier --check src tests integration *.ts *.mjs *.json .prettierrc"
   },
   "dependencies": {
     "fastify": "^5.6.1",
     "geotiff": "^3.0.5"
   },
   "devDependencies": {
-    "fflate": "^0.8.3",
-    "proj4": "^2.23.0",
-    "shapefile": "^0.6.6",
+    "@eslint/js": "10.0.1",
     "@types/node": "^22.10.2",
     "@types/shapefile": "^0.6.4",
     "@vitest/coverage-v8": "^5.1.1",
+    "eslint": "10.15.0",
+    "fflate": "^0.8.3",
+    "prettier": "3.8.1",
+    "proj4": "^2.23.0",
+    "shapefile": "^0.6.6",
     "typescript": "~6.0.2",
+    "typescript-eslint": "8.73.0",
     "vitest": "^5.1.1"
   }
 }

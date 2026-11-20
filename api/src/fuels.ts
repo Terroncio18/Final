@@ -1,9 +1,9 @@
-import { createHash } from "node:crypto";
-import { readFile, readdir, rm, stat } from "node:fs/promises";
-import { resolve, join } from "node:path";
-import { gzipSync, gunzipSync } from "node:zlib";
-import { fromUrl } from "geotiff";
-import { writeFuelCache } from "./fuel-cache.js";
+import { createHash } from 'node:crypto';
+import { readFile, readdir, rm, stat } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
+import { gzipSync, gunzipSync } from 'node:zlib';
+import { fromUrl, type GeoTIFFImage, type TypedArrayWithDimensions } from 'geotiff';
+import { writeFuelCache } from './fuel-cache.js';
 import {
   encodeRuns,
   tileBounds,
@@ -12,10 +12,10 @@ import {
   UNKNOWN,
   worldCoverModel,
   type Bounds,
-} from "./fuel-grid.js";
+} from './fuel-grid.js';
 
-const FUEL_DATA_DIR = resolve(process.env.FUEL_DATA_DIR ?? "data/fuels");
-const FUEL_VERSION = "anderson13-worldcover2021-v2";
+const FUEL_DATA_DIR = resolve(process.env['FUEL_DATA_DIR'] ?? 'data/fuels');
+const FUEL_VERSION = 'anderson13-worldcover2021-v2';
 interface FuelDataset {
   id: string;
   label: string;
@@ -46,12 +46,135 @@ interface FuelResponse {
   generatedAt: string;
 }
 
-const WC_ROOT =
-  "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/";
+const WC_ROOT = 'https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/';
 export function worldCoverTile(lon: number, lat: number): string {
   const x = Math.floor(lon / 3) * 3,
     y = Math.floor(lat / 3) * 3;
-  return `${y < 0 ? "S" : "N"}${Math.abs(y).toString().padStart(2, "0")}${x < 0 ? "W" : "E"}${Math.abs(x).toString().padStart(3, "0")}`;
+  return `${y < 0 ? 'S' : 'N'}${Math.abs(y).toString().padStart(2, '0')}${x < 0 ? 'W' : 'E'}${Math.abs(x).toString().padStart(3, '0')}`;
+}
+
+function needsWorldCover(
+  bounds: Bounds,
+  size: number,
+  quality: Uint8Array,
+  tileWest: number,
+  tileSouth: number,
+): boolean {
+  const [w, s, e, n] = bounds;
+  const dx = (e - w) / size,
+    dy = (n - s) / size;
+
+  for (let row = 0; row < size; row++) {
+    const lat = n - (row + 0.5) * dy;
+    if (lat < tileSouth || lat >= tileSouth + 3) continue;
+    for (let col = 0; col < size; col++) {
+      const lon = w + (col + 0.5) * dx;
+      if (lon >= tileWest && lon < tileWest + 3 && quality[row * size + col] !== 1) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+interface WorldCoverWindow {
+  readonly tileWestEdge: number;
+  readonly tileNorth: number;
+  readonly cellX: number;
+  readonly cellY: number;
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
+function worldCoverWindow(
+  image: GeoTIFFImage,
+  bounds: Bounds,
+  tileWest: number,
+  tileSouth: number,
+): WorldCoverWindow | null {
+  const [west, south, east, north] = bounds;
+  const [tileWestEdge, , tileEastEdge, tileNorth] = image.getBoundingBox() as [
+    number,
+    number,
+    number,
+    number,
+  ];
+  const [resolutionX, resolutionY] = image.getResolution();
+  const cellX = Math.abs(resolutionX!),
+    cellY = Math.abs(resolutionY!);
+  const x0 = Math.max(0, Math.floor((Math.max(west, tileWest) - tileWestEdge) / cellX));
+  const x1 = Math.min(
+    image.getWidth(),
+    Math.ceil((Math.min(east, tileEastEdge) - tileWestEdge) / cellX),
+  );
+  const y0 = Math.max(0, Math.floor((tileNorth - Math.min(north, tileSouth + 3)) / cellY));
+  const y1 = Math.min(
+    image.getHeight(),
+    Math.ceil((tileNorth - Math.max(south, tileSouth)) / cellY),
+  );
+  if (x1 <= x0 || y1 <= y0) return null;
+  return { tileWestEdge, tileNorth, cellX, cellY, x0, y0, x1, y1 };
+}
+
+function applyWorldCoverValues(
+  values: TypedArrayWithDimensions,
+  window: WorldCoverWindow,
+  tileWest: number,
+  tileSouth: number,
+  bounds: Bounds,
+  size: number,
+  models: Uint8Array,
+  quality: Uint8Array,
+): void {
+  const [west, south, east, north] = bounds;
+  const dx = (east - west) / size,
+    dy = (north - south) / size;
+  for (let row = 0; row < size; row++) {
+    const lat = north - (row + 0.5) * dy;
+    if (lat < tileSouth || lat >= tileSouth + 3) continue;
+    const pixelY = Math.floor((window.tileNorth - lat) / window.cellY) - window.y0;
+    for (let col = 0; col < size; col++) {
+      const lon = west + (col + 0.5) * dx;
+      if (lon < tileWest || lon >= tileWest + 3) continue;
+      const pixelX = Math.floor((lon - window.tileWestEdge) / window.cellX) - window.x0;
+      const model = worldCoverModel(Number(values[pixelY * (window.x1 - window.x0) + pixelX]));
+      const index = row * size + col;
+      if (quality[index] === 1) continue;
+      models[index] = model;
+      quality[index] = model === UNKNOWN ? 0 : 2;
+    }
+  }
+}
+
+async function applyWorldCoverTile(
+  id: string,
+  tileWest: number,
+  tileSouth: number,
+  bounds: Bounds,
+  size: number,
+  models: Uint8Array,
+  quality: Uint8Array,
+  signal: AbortSignal,
+): Promise<void> {
+  const url = `${WC_ROOT}ESA_WorldCover_10m_2021_v200_${id}_Map.tif`;
+  const tiff = await fromUrl(url, { allowFullFile: false }, signal);
+  try {
+    const image = await tiff.getImage();
+    const window = worldCoverWindow(image, bounds, tileWest, tileSouth);
+    if (!window) return;
+
+    const values = await image.readRasters({
+      window: [window.x0, window.y0, window.x1, window.y1],
+      samples: [0],
+      interleave: true,
+      signal,
+    });
+    applyWorldCoverValues(values, window, tileWest, tileSouth, bounds, size, models, quality);
+  } finally {
+    await tiff.close();
+  }
 }
 
 /** Native class pixels, not RGB colours from a WMS or averaged overviews. */
@@ -61,82 +184,24 @@ async function readWorldCover(
   models: Uint8Array,
   quality: Uint8Array,
   warnings: string[],
-) {
-  const [w, s, e, n] = bounds;
-  const dx = (e - w) / size,
-    dy = (n - s) / size;
-  for (let lat = Math.floor(s / 3) * 3; lat < n; lat += 3) {
-    for (let lon = Math.floor(w / 3) * 3; lon < e; lon += 3) {
+): Promise<void> {
+  const [west, south, east, north] = bounds;
+  for (let tileSouth = Math.floor(south / 3) * 3; tileSouth < north; tileSouth += 3) {
+    for (let tileWest = Math.floor(west / 3) * 3; tileWest < east; tileWest += 3) {
       // Official coverage must not depend on the availability of the fallback.
-      let needsFallback = false;
-      for (let row = 0; row < size && !needsFallback; row++) {
-        const y = n - (row + 0.5) * dy;
-        if (y < lat || y >= lat + 3) continue;
-        for (let col = 0; col < size; col++) {
-          const x = w + (col + 0.5) * dx;
-          if (x >= lon && x < lon + 3 && quality[row * size + col] !== 1) {
-            needsFallback = true;
-            break;
-          }
-        }
-      }
-      if (!needsFallback) continue;
-      const id = worldCoverTile(lon, lat);
-      const url = `${WC_ROOT}ESA_WorldCover_10m_2021_v200_${id}_Map.tif`;
-      const signal = AbortSignal.timeout(60000);
+      if (!needsWorldCover(bounds, size, quality, tileWest, tileSouth)) continue;
+      const id = worldCoverTile(tileWest, tileSouth);
       try {
-        const tiff = await fromUrl(url, { allowFullFile: false }, signal);
-        try {
-          const image = await tiff.getImage();
-          const [tw, , te, tn] = image.getBoundingBox() as [
-            number,
-            number,
-            number,
-            number,
-          ];
-          const [rx, ry] = image.getResolution();
-          const cellX = Math.abs(rx!),
-            cellY = Math.abs(ry!);
-          const x0 = Math.max(0, Math.floor((Math.max(w, lon) - tw) / cellX));
-          const x1 = Math.min(
-            image.getWidth(),
-            Math.ceil((Math.min(e, te) - tw) / cellX),
-          );
-          const y0 = Math.max(
-            0,
-            Math.floor((tn - Math.min(n, lat + 3)) / cellY),
-          );
-          const y1 = Math.min(
-            image.getHeight(),
-            Math.ceil((tn - Math.max(s, lat)) / cellY),
-          );
-          if (x1 <= x0 || y1 <= y0) continue;
-          const values = await image.readRasters({
-            window: [x0, y0, x1, y1],
-            samples: [0],
-            interleave: true,
-            signal,
-          });
-          for (let row = 0; row < size; row++) {
-            const y = n - (row + 0.5) * dy;
-            if (y < lat || y >= lat + 3) continue;
-            const py = Math.floor((tn - y) / cellY) - y0;
-            for (let col = 0; col < size; col++) {
-              const x = w + (col + 0.5) * dx;
-              if (x < lon || x >= lon + 3) continue;
-              const px = Math.floor((x - tw) / cellX) - x0;
-              const model = worldCoverModel(
-                Number(values[py * (x1 - x0) + px]),
-              );
-              const i = row * size + col;
-              if (quality[i] === 1) continue;
-              models[i] = model;
-              quality[i] = model === UNKNOWN ? 0 : 2;
-            }
-          }
-        } finally {
-          await tiff.close();
-        }
+        await applyWorldCoverTile(
+          id,
+          tileWest,
+          tileSouth,
+          bounds,
+          size,
+          models,
+          quality,
+          AbortSignal.timeout(60000),
+        );
       } catch {
         warnings.push(
           `WorldCover ${id}: dades no disponibles; les cel·les sense altra font queden desconegudes.`,
@@ -149,13 +214,11 @@ async function readWorldCover(
 async function datasets(warnings: string[]): Promise<FuelDataset[]> {
   let names: string[];
   try {
-    names = await readdir(join(FUEL_DATA_DIR, "datasets"));
+    names = await readdir(join(FUEL_DATA_DIR, 'datasets'));
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
-      // Silent otherwise: every cell in every answer would fall back to the
-      // WorldCover estimate without the client ever being told why there is
-      // no official map at all, which is not the same thing as one tile of
-      // it being unreachable (§11.6x).
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') {
+      // Warn when the official dataset is absent: a full-domain estimate is different from one
+      // unreachable official tile.
       warnings.push(
         "Cap conjunt de combustible oficial configurat: tot el mapa surt estimat a partir d'ESA WorldCover.",
       );
@@ -168,16 +231,13 @@ async function datasets(warnings: string[]): Promise<FuelDataset[]> {
     if (!/^[a-z0-9-]+$/.test(name)) continue;
     try {
       const data = JSON.parse(
-        await readFile(
-          join(FUEL_DATA_DIR, "datasets", name, "manifest.json"),
-          "utf8",
-        ),
+        await readFile(join(FUEL_DATA_DIR, 'datasets', name, 'manifest.json'), 'utf8'),
       ) as FuelDataset;
       if (data.id !== name || !Array.isArray(data.tiles))
         throw new Error(`Invalid fuel dataset ${name}`);
       result.push(data);
     } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
     }
   }
   return result.sort((a, b) => a.priority - b.priority);
@@ -196,29 +256,21 @@ async function overlay(
   for (const [x, y] of tileKeys(bounds)) {
     const key = `${x}_${y}`;
     if (!available.has(key)) continue;
-    const tile = await readFile(
-      join(FUEL_DATA_DIR, "datasets", data.id, `${key}.bin`),
-    );
+    const tile = await readFile(join(FUEL_DATA_DIR, 'datasets', data.id, `${key}.bin`));
     if (tile.length !== TILE_SIZE * TILE_SIZE)
       throw new Error(`Invalid fuel tile ${data.id}/${key}`);
     const [tw, ts, te, tn] = tileBounds(x, y);
     for (let row = 0; row < size; row++) {
       const lat = n - ((row + 0.5) * (n - s)) / size;
       if (lat < ts || lat >= tn) continue;
-      const py = Math.min(
-        TILE_SIZE - 1,
-        Math.floor(((tn - lat) / (tn - ts)) * TILE_SIZE),
-      );
+      const py = Math.min(TILE_SIZE - 1, Math.floor(((tn - lat) / (tn - ts)) * TILE_SIZE));
       for (let col = 0; col < size; col++) {
         const lon = w + ((col + 0.5) * (e - w)) / size;
         if (lon < tw || lon >= te) continue;
-        const px = Math.min(
-          TILE_SIZE - 1,
-          Math.floor(((lon - tw) / (te - tw)) * TILE_SIZE),
-        );
+        const px = Math.min(TILE_SIZE - 1, Math.floor(((lon - tw) / (te - tw)) * TILE_SIZE));
         const model = tile[py * TILE_SIZE + px]!;
         if (model !== UNKNOWN) {
-          if (model > 13) throw new Error("Invalid official fuel code");
+          if (model > 13) throw new Error('Invalid official fuel code');
           models[row * size + col] = model;
           quality[row * size + col] = 1;
           used = true;
@@ -232,119 +284,137 @@ async function overlay(
 const inFlight = new Map<string, Promise<FuelResponse>>();
 let busy = 0;
 const MAX_REQUESTS = 2;
+const FUEL_CACHE_MAX_AGE_MS = 30 * 86_400_000;
 
-export async function fuelGrid(
+async function readFuelCache(path: string): Promise<FuelResponse | null> {
+  try {
+    if (Date.now() - (await stat(path)).mtimeMs < FUEL_CACHE_MAX_AGE_MS)
+      return JSON.parse(gunzipSync(await readFile(path)).toString()) as FuelResponse;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  return null;
+}
+
+function summarizeCells(models: Uint8Array, quality: Uint8Array) {
+  let officialCells = 0,
+    estimatedCells = 0,
+    unknownCells = 0,
+    nonBurnableCells = 0;
+  const counts = new Map<number, number>();
+
+  for (let i = 0; i < models.length; i++) {
+    if (quality[i] === 1) officialCells++;
+    else if (quality[i] === 2) estimatedCells++;
+    else unknownCells++;
+    if (models[i] === 0) nonBurnableCells++;
+    if (models[i]! >= 1 && models[i]! <= 13)
+      counts.set(models[i]!, (counts.get(models[i]!) ?? 0) + 1);
+  }
+
+  return {
+    officialCells,
+    estimatedCells,
+    unknownCells,
+    nonBurnableCells,
+    models: [...counts].map(([id, cells]) => ({ id, cells })).sort((a, b) => b.cells - a.cells),
+  };
+}
+
+async function pruneFuelCache(cacheDir: string): Promise<void> {
+  const names = (await readdir(cacheDir)).filter((name) => /^[a-f0-9]{64}\.json\.gz$/.test(name));
+  if (names.length <= 96) return;
+
+  const found = await Promise.allSettled(
+    names.map(async (name) => ({
+      name,
+      time: (await stat(join(cacheDir, name))).mtimeMs,
+    })),
+  );
+  const files = found
+    .flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []))
+    .sort((a, b) => a.time - b.time);
+  for (const file of files.slice(0, Math.max(0, files.length - 96)))
+    await rm(join(cacheDir, file.name), { force: true });
+}
+
+async function cacheFuelResponse(
+  cacheDir: string,
+  path: string,
+  response: FuelResponse,
+  rasterUnreachable: boolean,
+): Promise<void> {
+  // Missing static datasets are a stable deployment fact; only failed WorldCover reads block caching.
+  if (rasterUnreachable || response.unknownCells) return;
+
+  const saved = await writeFuelCache(cacheDir, path, gzipSync(JSON.stringify(response)));
+  if (saved) await pruneFuelCache(cacheDir);
+}
+
+async function buildFuelResponse(
   bounds: Bounds,
   size: number,
+  maps: readonly FuelDataset[],
+  warnings: string[],
+  cacheDir: string,
+  path: string,
 ): Promise<FuelResponse> {
-  // Declared out here, and not inside the job below, because datasets() has
-  // to report into it before the cache key —which depends on `maps`— is even
-  // computed.
+  const models = new Uint8Array(size * size).fill(UNKNOWN);
+  const quality = new Uint8Array(size * size);
+  const sources: FuelResponse['sources'] = [];
+  for (const data of maps) {
+    if (await overlay(data, bounds, size, models, quality)) sources.push(data);
+  }
+
+  const warningsBeforeRaster = warnings.length;
+  await readWorldCover(bounds, size, models, quality, warnings);
+  const rasterUnreachable = warnings.length > warningsBeforeRaster;
+  const summary = summarizeCells(models, quality);
+  if (summary.estimatedCells) {
+    sources.push({
+      label: 'ESA WorldCover 2021 · estimació Anderson v2',
+      sourceDate: '2021',
+      sourceUrl: 'https://esa-worldcover.org/en/data-access',
+      attribution:
+        '© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0',
+    });
+  }
+
+  const response: FuelResponse = {
+    version: FUEL_VERSION,
+    bounds,
+    size,
+    runs: encodeRuns(models, quality),
+    ...summary,
+    sources: sources.map(({ label, sourceUrl, sourceDate, attribution }) => ({
+      label,
+      sourceUrl,
+      sourceDate,
+      attribution,
+    })),
+    warnings,
+    generatedAt: new Date().toISOString(),
+  };
+  await cacheFuelResponse(cacheDir, path, response, rasterUnreachable);
+  return response;
+}
+
+export async function fuelGrid(bounds: Bounds, size: number): Promise<FuelResponse> {
   const warnings: string[] = [];
   const maps = await datasets(warnings);
-  const key = createHash("sha256")
-    .update(
-      JSON.stringify([FUEL_VERSION, "official-first-v1", bounds, size, maps]),
-    )
-    .digest("hex");
-  const cacheDir = join(FUEL_DATA_DIR, "cache");
+  const key = createHash('sha256')
+    .update(JSON.stringify([FUEL_VERSION, 'official-first-v1', bounds, size, maps]))
+    .digest('hex');
+  const cacheDir = join(FUEL_DATA_DIR, 'cache');
   const path = join(cacheDir, `${key}.json.gz`);
-  try {
-    if (Date.now() - (await stat(path)).mtimeMs < 30 * 86400000)
-      return JSON.parse(
-        gunzipSync(await readFile(path)).toString(),
-      ) as FuelResponse;
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-  }
+  const cached = await readFuelCache(path);
+  if (cached) return cached;
+
   const pending = inFlight.get(key);
   if (pending) return pending;
-  if (busy >= MAX_REQUESTS) throw new Error("FUEL_BUSY");
+  if (busy >= MAX_REQUESTS) throw new Error('FUEL_BUSY');
   busy++;
-  const job = (async () => {
-    const models = new Uint8Array(size * size).fill(UNKNOWN),
-      quality = new Uint8Array(size * size);
-    const sources: FuelResponse["sources"] = [];
-    for (const data of maps)
-      if (await overlay(data, bounds, size, models, quality))
-        sources.push(data);
-    // Counted, not just checked for emptiness: a missing dataset directory
-    // already warned above and is a stable fact of the deployment, not an
-    // upstream read to retry, so it must not be what decides the cache below.
-    const beforeRaster = warnings.length;
-    await readWorldCover(bounds, size, models, quality, warnings);
-    const rasterUnreachable = warnings.length > beforeRaster;
-    let officialCells = 0,
-      estimatedCells = 0,
-      unknownCells = 0,
-      nonBurnableCells = 0;
-    const counts = new Map<number, number>();
-    for (let i = 0; i < models.length; i++) {
-      if (quality[i] === 1) officialCells++;
-      else if (quality[i] === 2) estimatedCells++;
-      else unknownCells++;
-      if (models[i] === 0) nonBurnableCells++;
-      if (models[i]! >= 1 && models[i]! <= 13)
-        counts.set(models[i]!, (counts.get(models[i]!) ?? 0) + 1);
-    }
-    if (estimatedCells)
-      sources.push({
-        label: "ESA WorldCover 2021 · estimació Anderson v2",
-        sourceDate: "2021",
-        sourceUrl: "https://esa-worldcover.org/en/data-access",
-        attribution:
-          "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium · CC BY 4.0",
-      });
-    const result: FuelResponse = {
-      version: FUEL_VERSION,
-      bounds,
-      size,
-      runs: encodeRuns(models, quality),
-      officialCells,
-      estimatedCells,
-      unknownCells,
-      nonBurnableCells,
-      models: [...counts]
-        .map(([id, cells]) => ({ id, cells }))
-        .sort((a, b) => b.cells - a.cells),
-      sources: sources.map(({ label, sourceUrl, sourceDate, attribution }) => ({
-        label,
-        sourceUrl,
-        sourceDate,
-        attribution,
-      })),
-      warnings,
-      generatedAt: new Date().toISOString(),
-    };
-    // Failed upstream reads must be retryable, not preserved for a month.
-    if (!rasterUnreachable && !unknownCells) {
-      const saved = await writeFuelCache(
-        cacheDir,
-        path,
-        gzipSync(JSON.stringify(result)),
-      );
-      if (saved) {
-        const names = (await readdir(cacheDir)).filter((s) =>
-          /^[a-f0-9]{64}\.json\.gz$/.test(s),
-        );
-        if (names.length > 96) {
-          const found = await Promise.allSettled(
-            names.map(async (name) => ({
-              name,
-              time: (await stat(join(cacheDir, name))).mtimeMs,
-            })),
-          );
-          const files = found.flatMap((result) =>
-            result.status === "fulfilled" ? [result.value] : [],
-          );
-          files.sort((a, b) => a.time - b.time);
-          for (const file of files.slice(0, Math.max(0, files.length - 96)))
-            await rm(join(cacheDir, file.name), { force: true });
-        }
-      }
-    }
-    return result;
-  })();
+  const job = buildFuelResponse(bounds, size, maps, warnings, cacheDir, path);
   inFlight.set(key, job);
   try {
     return await job;

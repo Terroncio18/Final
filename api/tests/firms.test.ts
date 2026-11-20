@@ -23,8 +23,8 @@ test('the distance between two days has a sign and no hours in it', () => {
   assert.equal(daysBetween('2024-02-28', '2024-03-01'), 2, '2024 is a leap year');
   assert.equal(daysBetween('2023-02-28', '2023-03-01'), 1);
   assert.equal(daysBetween('2024-08-10', '2024-08-01'), -9);
-  // The summer time change would make this 30 days and a bit if these were
-  // local dates; they are not, and that is the reason they are strings.
+  /* UTC dates avoid a fractional-day interval across the daylight-saving transition. */
+
   assert.equal(daysBetween('2024-03-01', '2024-03-31'), 30);
   assert.equal(daysBetween('2024-10-01', '2024-10-31'), 30);
 });
@@ -46,9 +46,6 @@ test('a day is ten characters of a real date, and nothing else', () => {
     assert.equal(isDay(bad), false, `${String(bad)} is not a day`);
   }
 
-  // Days that do not exist, which the shape alone would let through: the
-  // month is in range and ten characters is ten characters. These are the
-  // ones that only the date written back out catches.
   assert.equal(isDay('2024-02-30'), false, 'February never has thirty');
   assert.equal(isDay('2023-02-29'), false, '2023 was not a leap year');
   assert.equal(isDay('2024-04-31'), false, 'April has thirty');
@@ -79,7 +76,7 @@ test('a range is cut into windows of at most five days that cover it exactly', (
   for (const window of month) assert.ok(window.days >= 1 && window.days <= WINDOW_DAYS);
   const last = month[month.length - 1]!;
   assert.equal(addDays(last.start, last.days - 1), '2024-08-31', 'the last window ends at the end');
-  // No gaps and no overlaps: each window starts where the previous one ended.
+
   for (let i = 1; i < month.length; i++) {
     assert.equal(addDays(month[i - 1]!.start, month[i - 1]!.days), month[i]!.start);
   }
@@ -98,26 +95,23 @@ test('reprocessed data is preferred where it reaches, and near real time where i
     [NOAA21!.nrt]: ['2026-08-01', '2026-11-19'],
   });
 
-  // A day deep in the record: the two platforms that flew then, reprocessed.
   assert.deepEqual(sourcesFor('2024-08-01', held), [SNPP!.sp, NOAA20!.sp]);
-  // Today: nothing is reprocessed yet, so all three answer in near real time.
+
   assert.deepEqual(sourcesFor('2026-11-19', held), [SNPP!.nrt, NOAA20!.nrt, NOAA21!.nrt]);
-  // The overlap: both processings cover it, and the reprocessed one wins.
+
   assert.deepEqual(sourcesFor('2026-09-01', held), [SNPP!.sp, NOAA20!.sp, NOAA21!.nrt]);
-  // Before VIIRS was in orbit: no source at all, and no exception either.
+
   assert.deepEqual(sourcesFor('2005-06-01', held), []);
 });
 
 test('with no table at all, every platform answers in near real time', () => {
-  // This is what happens when FIRMS cannot be asked: the fallback has to be
-  // the one that is right for today, which is the day that matters then.
   assert.deepEqual(sourcesFor('2026-11-19', new Map()), [SNPP!.nrt, NOAA20!.nrt, NOAA21!.nrt]);
   assert.deepEqual(sourcesFor('2005-06-01', new Map()), [SNPP!.nrt, NOAA20!.nrt, NOAA21!.nrt]);
 });
 
 test('a platform the table knows only in part is not invented for the days it misses', () => {
   const held = table({ [NOAA21!.sp]: ['2023-01-01', '2026-09-30'] });
-  // NOAA-21 is known and does not cover it; the other two are unknown, so
-  // they fall back to near real time.
+  /* A known unavailable NOAA-21 differs from platforms with no availability data, which fall back to NRT. */
+
   assert.deepEqual(sourcesFor('2026-11-19', held), [SNPP!.nrt, NOAA20!.nrt]);
 });

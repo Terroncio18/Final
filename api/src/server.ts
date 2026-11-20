@@ -1,11 +1,5 @@
-/**
- * The server itself: the port, and nothing else.
- *
- * What it serves is `app.ts`, which builds the application and hangs the
- * routes on it without opening anything. The two are apart so that the routes
- * can be asked questions from a test —`app.inject()`— without a socket: a
- * file that listens as it loads cannot be imported (§11.60).
- */
+// Keep listening separate from app construction so route tests can use app.inject() without
+// opening a socket.
 import { HOST, PORT } from './config.js';
 import { app } from './app.js';
 

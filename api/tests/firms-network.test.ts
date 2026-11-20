@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 
-// FIRMS is the only thing these exercise that is not ours, so it is the only
-// thing replaced. The module keeps the availability table in a variable of its
-// own, so every test loads the module again to start without one.
+/* Reload the module per test to reset its cached availability table. */
 
 const AVAILABLE_THROUGH = new Date().toISOString().slice(0, 10);
 const AVAILABILITY = [
@@ -18,12 +16,11 @@ const AVAILABILITY = [
 
 const DETECTIONS = [
   'latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,frp,daynight',
-  '39.5712,2.6501,330.1,0.4,0.4,2024-08-01,1312,N,nominal,12.5,D',
-  '38.7312,-9.1402,350.9,0.5,0.5,2024-08-01,45,N21,high,48.25,N',
-  ',,,,,2024-08-01,0100,N,low,1,D',
+  '39.5712,2.6501,330.1,0.4,0.4,2024-08-01,1312,N,n,12.5,D',
+  '38.7312,-9.1402,350.9,0.5,0.5,2024-08-01,45,N21,h,48.25,N',
+  ',,,,,2024-08-01,0100,N,l,1,D',
 ].join('\n');
 
-/** A `fetch` that answers from the URL, with FIRMS's own habits. */
 function firmsAnswering(reply: (url: string) => { text: string; ok?: boolean; status?: number }) {
   const spy = vi.fn(async (url: string | URL) => {
     const answer = reply(String(url));
@@ -108,8 +105,6 @@ test('the same overpass asked twice becomes one detection, and power sorts them'
 
   const answer = await fetchHotspots('2024-08-01', '2024-08-01');
 
-  // Two areas by the two platforms that were reprocessed in 2024, and the same
-  // rows come back from each: four requests, two detections.
   assert.equal(spy.mock.calls.length, 5, 'the availability table plus four windows');
   assert.equal(answer.body.features.length, 2, 'the row without coordinates does not enter either');
   assert.deepEqual(answer.sources, ['VIIRS_NOAA20_SP', 'VIIRS_SNPP_SP'], 'named and in order');
@@ -120,8 +115,28 @@ test('the same overpass asked twice becomes one detection, and power sorts them'
   assert.equal(first!.properties.observedAt, '2024-08-01T00:45:00Z', 'a short time is padded');
   assert.equal(second!.properties.observedAt, '2024-08-01T13:12:00Z');
   assert.equal(first!.properties.satellite, 'N21');
+  assert.equal(first!.properties.confidence, 'h');
+  assert.equal(second!.properties.confidence, 'n');
+  assert.equal(first!.properties.daynight, 'N');
+  assert.equal(second!.properties.daynight, 'D');
   assert.deepEqual(second!.geometry.coordinates, [2.6501, 39.5712], 'longitude first');
   assert.equal(first!.id, first!.properties.id, 'the feature is identified by the same thing');
+});
+
+test('unknown detection codes use explicit fallback values', async () => {
+  const detections = [
+    'latitude,longitude,acq_date,acq_time,satellite,confidence,frp,daynight',
+    '39.57,2.65,2024-08-01,1312,unexpected,unexpected,12.5,unexpected',
+  ].join('\n');
+  firmsAnswering((url) => ({
+    text: url.includes('data_availability') ? AVAILABILITY : detections,
+  }));
+  const { fetchHotspots } = await firms();
+  const answer = await fetchHotspots('2024-08-01', '2024-08-01');
+  const properties = answer.body.features[0]!.properties;
+  assert.equal(properties.satellite, '?');
+  assert.equal(properties.confidence, '');
+  assert.equal(properties.daynight, '');
 });
 
 test('today is asked for without a date, which is not the same as asking for today', async () => {
@@ -157,8 +172,70 @@ test('one platform failing is a partial answer; every platform failing is an err
 
   vi.resetModules();
   firmsAnswering((url) =>
-    url.includes('data_availability') ? { text: AVAILABILITY } : { text: '', ok: false, status: 500 },
+    url.includes('data_availability')
+      ? { text: AVAILABILITY }
+      : { text: '', ok: false, status: 500 },
   );
   const again = await firms();
   await assert.rejects(() => again.fetchHotspots('2024-08-01', '2024-08-01'), /answered 500/);
+});
+
+const INVALID_DETECTIONS: [string, string][] = [
+  ['latitude text', 'bad,2.65,2024-08-01,1312,N,n,12.5,D'],
+  ['longitude text', '39.57,bad,2024-08-01,1312,N,n,12.5,D'],
+  ['latitude range', '91,2.65,2024-08-01,1312,N,n,12.5,D'],
+  ['longitude range', '39.57,-181,2024-08-01,1312,N,n,12.5,D'],
+  ['infinite coordinate', 'Infinity,2.65,2024-08-01,1312,N,n,12.5,D'],
+  ['blank coordinate', ' ,2.65,2024-08-01,1312,N,n,12.5,D'],
+  ['missing power', '39.57,2.65,2024-08-01,1312,N,n,,D'],
+  ['invalid power', '39.57,2.65,2024-08-01,1312,N,n,bad,D'],
+  ['negative power', '39.57,2.65,2024-08-01,1312,N,n,-1,D'],
+  ['infinite power', '39.57,2.65,2024-08-01,1312,N,n,Infinity,D'],
+  ['invalid date', '39.57,2.65,2024-02-30,1312,N,n,12.5,D'],
+  ['missing date', '39.57,2.65,,1312,N,n,12.5,D'],
+  ['invalid hour', '39.57,2.65,2024-08-01,2400,N,n,12.5,D'],
+  ['invalid minute', '39.57,2.65,2024-08-01,2360,N,n,12.5,D'],
+  ['missing time', '39.57,2.65,2024-08-01,,N,n,12.5,D'],
+  ['non-numeric time', '39.57,2.65,2024-08-01,noon,N,n,12.5,D'],
+];
+const DETECTION_HEADER = 'latitude,longitude,acq_date,acq_time,satellite,confidence,frp,daynight';
+
+function detectionsAnswering(rows: string[]) {
+  firmsAnswering((url) => ({
+    text: url.includes('data_availability') ? AVAILABILITY : [DETECTION_HEADER, ...rows].join('\n'),
+  }));
+}
+
+test.each(INVALID_DETECTIONS)(
+  'invalid detection rows (%s) do not replace valid detections',
+  async (_label, row) => {
+    detectionsAnswering(['38.73,-9.14,2024-08-01,1312,N,n,12.5,D', row]);
+    const { fetchHotspots } = await firms();
+    const { body } = await fetchHotspots('2024-08-01', '2024-08-01');
+    assert.equal(body.features.length, 1);
+    assert.deepEqual(body.features[0]!.geometry.coordinates, [-9.14, 38.73]);
+    assert.equal(body.features[0]!.properties.frp, 12.5);
+  },
+);
+
+test('zero-valued coordinates and power, midnight and leap days remain valid', async () => {
+  detectionsAnswering(['0,0,2024-02-29,0,N,n,0,N']);
+  const { fetchHotspots } = await firms();
+  const { body } = await fetchHotspots('2024-08-01', '2024-08-01');
+  assert.equal(body.features.length, 1);
+  assert.deepEqual(body.features[0]!.geometry.coordinates, [0, 0]);
+  assert.equal(body.features[0]!.properties.frp, 0);
+  assert.equal(body.features[0]!.properties.observedAt, '2024-02-29T00:00:00Z');
+});
+
+test('a wholly malformed feed fails rather than claiming there were no detections', async () => {
+  detectionsAnswering([INVALID_DETECTIONS[0]![1]]);
+  const { fetchHotspots } = await firms();
+  await assert.rejects(() => fetchHotspots('2024-08-01', '2024-08-01'), /valid detections/);
+});
+
+test('a header-only feed is a legitimate empty answer', async () => {
+  detectionsAnswering([]);
+  const { fetchHotspots } = await firms();
+  assert.equal((await fetchHotspots('2024-08-01', '2024-08-01')).body.features.length, 0);
 });

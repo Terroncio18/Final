@@ -1,41 +1,39 @@
-import { test, expect } from "vitest";
-import Fastify from "fastify";
-import { writeFile, mkdir } from "node:fs/promises";
-import { registerFuelRoutes } from "../src/fuel-routes.js";
-import { decodeFuels } from "../../web/src/app/simulation/fuel-data";
-import { domainAround, GRID } from "../../web/src/app/simulation/domain";
-import { spread } from "../../web/src/app/simulation/fire-spread";
-import { FUEL_MODELS, fuelBed } from "../../web/src/app/simulation/rothermel";
+import { test, expect } from 'vitest';
+import Fastify from 'fastify';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { registerFuelRoutes } from '../src/fuel-routes.js';
+import { decodeFuels } from '../../web/src/app/simulation/fuel-data';
+import { domainAround, GRID } from '../../web/src/app/simulation/domain';
+import { spread } from '../../web/src/app/simulation/fire-spread';
+import { FUEL_MODELS, fuelBed } from '../../web/src/app/simulation/rothermel';
 
-test("official archives → API → map decoder → fire engine, at the actual 1024-cell domain size", async () => {
+test('official archives → API → map decoder → fire engine, at the actual 1024-cell domain size', async () => {
   const app = Fastify();
   registerFuelRoutes(app);
   const records = [];
   const locations: [string, [number, number], string | null][] = [
-    ["Asturias (Somiedo)", [-6.25, 43.1], "CETEMAS"],
-    ["Tenerife", [-16.45, 28.36], "Tenerife"],
-    ["Gran Canaria", [-15.6, 27.96], "Gran Canaria"],
-    ["La Palma", [-17.85, 28.71], "La Palma"],
-    ["La Gomera", [-17.24, 28.12], "La Gomera"],
-    ["El Hierro", [-18, 27.73], "El Hierro"],
-    ["Valencia (Serra)", [-0.5, 39.68], "PATFOR"],
-    ["Navarra (Irati)", [-1.1, 42.98], "SITNA"],
-    ["Mallorca (Sóller)", [2.72, 39.75], "IDEIB"],
-    ["Madrid (control)", [-3.7, 40.42], null],
-    ["Portugal (control)", [-8.25, 39.62], null],
-    ["Lanzarote (control)", [-13.6, 29.02], null],
+    ['Asturias (Somiedo)', [-6.25, 43.1], 'CETEMAS'],
+    ['Tenerife', [-16.45, 28.36], 'Tenerife'],
+    ['Gran Canaria', [-15.6, 27.96], 'Gran Canaria'],
+    ['La Palma', [-17.85, 28.71], 'La Palma'],
+    ['La Gomera', [-17.24, 28.12], 'La Gomera'],
+    ['El Hierro', [-18, 27.73], 'El Hierro'],
+    ['Valencia (Serra)', [-0.5, 39.68], 'PATFOR'],
+    ['Navarra (Irati)', [-1.1, 42.98], 'SITNA'],
+    ['Mallorca (Sóller)', [2.72, 39.75], 'IDEIB'],
+    ['Madrid (control)', [-3.7, 40.42], null],
+    ['Portugal (control)', [-8.25, 39.62], null],
+    ['Lanzarote (control)', [-13.6, 29.02], null],
   ];
   try {
     for (const [label, centre, expectedSource] of locations) {
       const bounds = domainAround(centre);
       const start = performance.now();
-      const url = `/api/fuels?bbox=${bounds.join(",")}&size=${GRID}`;
+      const url = `/api/fuels?bbox=${bounds.join(',')}&size=${GRID}`;
       const answer = await app.inject(url);
       expect(answer.statusCode, label).toBe(200);
       const grid = decodeFuels(answer.json(), bounds, GRID);
-      expect(grid.unknownCells, `${label}: ${grid.warnings.join("; ")}`).toBe(
-        0,
-      );
+      expect(grid.unknownCells, `${label}: ${grid.warnings.join('; ')}`).toBe(0);
       expect(grid.officialCells + grid.estimatedCells).toBe(GRID * GRID);
       if (expectedSource) {
         expect(grid.officialCells, label).toBeGreaterThan(0);
@@ -93,9 +91,7 @@ test("official archives → API → map decoder → fire engine, at the actual 1
         officialCells: grid.officialCells,
         estimatedCells: grid.estimatedCells,
         unknownCells: grid.unknownCells,
-        officialPercent: +((100 * grid.officialCells) / (GRID * GRID)).toFixed(
-          2,
-        ),
+        officialPercent: +((100 * grid.officialCells) / (GRID * GRID)).toFixed(2),
         elapsedMs,
         cacheMs,
         sources: grid.sources,
@@ -112,9 +108,9 @@ test("official archives → API → map decoder → fire engine, at the actual 1
         }),
       );
     }
-    await mkdir("data/fuels", { recursive: true });
+    await mkdir('data/fuels', { recursive: true });
     await writeFile(
-      "data/fuels/verification.json",
+      'data/fuels/verification.json',
       JSON.stringify({ checkedAt: new Date().toISOString(), records }, null, 2),
     );
   } finally {

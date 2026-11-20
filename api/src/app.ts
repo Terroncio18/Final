@@ -4,6 +4,7 @@ import {
   CACHE_TTL_MS,
   DEFAULT_DAYS,
   FIRMS_MAP_KEY,
+  MAX_HOTSPOT_CACHE_ENTRIES,
   MAX_RANGE_DAYS,
 } from './config.js';
 import {
@@ -15,37 +16,16 @@ import {
   isDay,
   today,
   type Day,
-  type HotspotCollection,
 } from './firms.js';
+import { HotspotCache } from './hotspot-cache.js';
 import { nearestObservation } from './weather.js';
 import { registerFuelRoutes } from './fuel-routes.js';
 
 export const app = Fastify({ logger: { transport: undefined } });
 registerFuelRoutes(app);
 
-interface CacheEntry {
-  readonly body: HotspotCollection;
-  readonly sources: readonly string[];
-  readonly fetchedAt: number;
-}
+const cache = new HotspotCache(MAX_HOTSPOT_CACHE_ENTRIES);
 
-/**
- * One entry per range asked for, keyed `from:to`. In memory on purpose: the
- * data is public, cheap to rebuild and worthless after a few minutes, so
- * persisting it would only add a moving part.
- *
- * A historical range never changes, and it is still only kept for the same ten
- * minutes as today's. Holding every month anybody ever asked for would be a
- * leak with a nice name; a month is four seconds to rebuild.
- */
-const cache = new Map<string, CacheEntry>();
-
-/**
- * Serves the cached answer while it is fresh, and —this is the point— serves a
- * stale one when FIRMS fails. An outage upstream should leave the map showing
- * detections from an hour ago with their age on display, not an empty map that
- * reads as «nothing is burning».
- */
 async function hotspots(from: Day, to: Day) {
   const key = `${from}:${to}`;
   const hit = cache.get(key);
@@ -64,27 +44,28 @@ async function hotspots(from: Day, to: Day) {
   }
 }
 
-/**
- * What the query asked for, as two dates, or what is wrong with it.
- *
- * Three ways to ask, and they all end as a range: nothing at all is today;
- * `days=N` is the last N days, which is what the presets send; `from` and `to`
- * are the two dates themselves. The server never answers in the shape it was
- * asked —the answer always carries the resolved range— so a link and a preset
- * cannot drift apart.
- */
-function rangeOf(query: { from?: string; to?: string; days?: string }): { from: Day; to: Day } | string {
+type QueryRange = { readonly from: Day; readonly to: Day };
+type RangeResult =
+  | { readonly ok: true; readonly range: QueryRange }
+  | { readonly ok: false; readonly error: string };
+
+function rangeOf(query: { from?: string; to?: string; days?: string }): RangeResult {
   const now = today();
 
   if (query.from !== undefined || query.to !== undefined) {
     const from = query.from ?? query.to;
     const to = query.to ?? query.from;
-    if (!isDay(from) || !isDay(to)) return 'Les dates han de ser YYYY-MM-DD';
-    if (from > to) return 'La data inicial és posterior a la final';
-    if (to > now) return 'No es poden demanar dates futures';
+    if (!isDay(from) || !isDay(to)) return { ok: false, error: 'Les dates han de ser YYYY-MM-DD' };
+    if (from > to) return { ok: false, error: 'La data inicial és posterior a la final' };
+    if (to > now) return { ok: false, error: 'No es poden demanar dates futures' };
     const span = daysBetween(from, to) + 1;
-    if (span > MAX_RANGE_DAYS) return `El rang màxim és de ${MAX_RANGE_DAYS} dies i se n'han demanat ${span}`;
-    return { from, to };
+    if (span > MAX_RANGE_DAYS) {
+      return {
+        ok: false,
+        error: `El rang màxim és de ${MAX_RANGE_DAYS} dies i se n'han demanat ${span}`,
+      };
+    }
+    return { ok: true, range: { from, to } };
   }
 
   const asked = Number(query.days ?? DEFAULT_DAYS);
@@ -92,38 +73,33 @@ function rangeOf(query: { from?: string; to?: string; days?: string }): { from: 
     ? Math.min(Math.max(Math.trunc(asked), 1), MAX_RANGE_DAYS)
     : DEFAULT_DAYS;
 
-  return { from: addDays(now, 1 - days), to: now };
+  return { ok: true, range: { from: addDays(now, 1 - days), to: now } };
 }
 
 app.get<{ Querystring: { from?: string; to?: string; days?: string } }>(
   '/api/hotspots',
   async (request, reply) => {
     const range = rangeOf(request.query);
-    if (typeof range === 'string') return reply.status(400).send({ error: range });
+    if (!range.ok) return reply.status(400).send({ error: range.error });
 
     try {
-      const { body, sources, fetchedAt, stale } = await hotspots(range.from, range.to);
+      const { from, to } = range.range;
+      const { body, sources, fetchedAt, stale } = await hotspots(from, to);
 
-      // The range travels back resolved, because the client may have asked in
-      // days and has to be able to say which dates it is showing.
-      reply.header('x-from', range.from);
-      reply.header('x-to', range.to);
+      // Return the resolved dates even when the client requested a number of days.
+      reply.header('x-from', from);
+      reply.header('x-to', to);
       reply.header('x-sources', sources.join(','));
-      // What the date fields may offer: see earliest().
       const first = await earliest();
       if (first) reply.header('x-earliest', first);
-      // The age travels in the headers so the interface can say how old the data
-      // is, which with NRT detections —hours behind the overpass— it must.
+      // NRT detections arrive hours after overpass; the interface displays their age.
       reply.header('x-fetched-at', new Date(fetchedAt).toISOString());
       reply.header('x-stale', String(stale));
       reply.header('cache-control', 'public, max-age=300');
       return body;
     } catch (error) {
       request.log.error(error);
-      // Distinguished from a plain outage: a missing key never comes back on
-      // its own, however long the client waits or how often it retries, so
-      // the two cannot share one message (§11.6x). /api/health already tells
-      // the same thing; this is the same check, asked at the moment it bites.
+      // A missing key needs a distinct response because retries cannot fix it.
       if (!FIRMS_MAP_KEY) {
         return reply
           .status(503)
@@ -134,14 +110,6 @@ app.get<{ Querystring: { from?: string; to?: string; days?: string } }>(
   },
 );
 
-/**
- * The weather at a place, as its nearest station last measured it.
- *
- * The country is asked for and not worked out from the coordinates: the
- * client already knows it —a NUTS code starts with it— and a point-in-polygon
- * test here would need the borders the server does not hold. It decides who is
- * asked: AEMET for Spain, IPMA for Portugal.
- */
 app.get<{ Querystring: { country?: string; lon?: string; lat?: string } }>(
   '/api/weather',
   async (request, reply) => {
@@ -151,7 +119,12 @@ app.get<{ Querystring: { country?: string; lon?: string; lat?: string } }>(
     if (country !== 'ES' && country !== 'PT') {
       return reply.status(400).send({ error: 'El país ha de ser ES o PT' });
     }
-    if (!request.query.lon || !request.query.lat || !Number.isFinite(lon) || !Number.isFinite(lat)) {
+    if (
+      !request.query.lon ||
+      !request.query.lat ||
+      !Number.isFinite(lon) ||
+      !Number.isFinite(lat)
+    ) {
       return reply.status(400).send({ error: 'Calen lon i lat' });
     }
     if (Math.abs(lon) > 180 || Math.abs(lat) > 90) {
@@ -174,7 +147,6 @@ app.get<{ Querystring: { country?: string; lon?: string; lat?: string } }>(
   },
 );
 
-/** Enough to tell «the server is down» from «the key is missing». */
 app.get('/api/health', async () => ({
   ok: true,
   firmsKey: FIRMS_MAP_KEY ? 'present' : 'missing',

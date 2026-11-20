@@ -2,10 +2,6 @@ import { afterEach, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import Fastify from 'fastify';
 
-// What the grid is made of is the business of `fuels.ts`, and it reads
-// hundreds of megabytes of GeoTIFF to say it. Here it is replaced, because
-// what is being tested is the route: what it answers, with which headers, and
-// what it does when the thing underneath says no.
 const fuelGrid = vi.hoisted(() => vi.fn());
 vi.mock('../src/fuels.js', () => ({ fuelGrid }));
 
@@ -40,7 +36,12 @@ test('a grid with holes or warnings is not cached at all', async () => {
   fuelGrid.mockResolvedValue({ runs: [], warnings: [], unknownCells: 12, size: 1024 });
   assert.equal((await ask()).headers['cache-control'], 'no-store');
 
-  fuelGrid.mockResolvedValue({ runs: [], warnings: ['IDEIB did not answer'], unknownCells: 0, size: 1024 });
+  fuelGrid.mockResolvedValue({
+    runs: [],
+    warnings: ['IDEIB did not answer'],
+    unknownCells: 0,
+    size: 1024,
+  });
   assert.equal((await ask()).headers['cache-control'], 'no-store');
 });
 

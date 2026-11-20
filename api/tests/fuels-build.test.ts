@@ -5,10 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TILE_SIZE, UNKNOWN } from '../src/fuel-grid.js';
 
-// What is replaced here is the 10 m raster of the whole world —ESA's, read by
-// HTTP ranges— and nothing else: the datasets, the tiles, the cache and the
-// counting are ours and are read and written for real, in a directory of the
-// system's own temporary one.
+/* Mock only WorldCover HTTP reads; use real datasets, tiles and cache under a temporary directory. */
+
 const fromUrl = vi.hoisted(() => vi.fn());
 vi.mock('geotiff', () => ({ fromUrl }));
 
@@ -19,7 +17,6 @@ const CELLS = SIZE * SIZE;
 
 let dir: string;
 
-/** An image of one cover class, with the geometry of a WorldCover tile. */
 function worldCover(cover: number) {
   return {
     getImage: async () => ({
@@ -36,7 +33,6 @@ function worldCover(cover: number) {
   };
 }
 
-/** An official dataset of one tile, every pixel the same model. */
 async function dataset(id: string, model: number, priority = 1) {
   const home = join(dir, 'datasets', id);
   await mkdir(home, { recursive: true });
@@ -81,11 +77,10 @@ test('with no official map, every cell is estimated from the land cover', async 
   assert.equal(grid.officialCells, 0);
   assert.equal(grid.unknownCells, 0);
   assert.equal(grid.nonBurnableCells, 0);
-  // Tree cover is the model 8 of the table in §11.21.
+
   assert.deepEqual(grid.models, [{ id: 8, cells: CELLS }]);
   assert.deepEqual(grid.runs, [8, 2, CELLS], 'one run: model 8, estimated, sixteen cells');
-  // No datasets directory at all: the client is told there is no official
-  // map anywhere, not only that this box happens to miss one.
+
   assert.equal(grid.warnings.length, 1);
   assert.match(grid.warnings[0]!, /[Cc]ap conjunt.*oficial/);
   assert.equal(grid.sources.length, 1);
@@ -105,7 +100,7 @@ test('an official map wins over the estimate, and both are named', async () => {
   assert.deepEqual(grid.models, [{ id: 4, cells: CELLS }]);
   assert.deepEqual(grid.runs, [4, 1, CELLS], 'model 4, official');
   assert.equal(fromUrl.mock.calls.length, 0, 'full official coverage never asks WorldCover');
-  // Only the official one: with nothing estimated left, WorldCover is not cited.
+
   assert.deepEqual(
     grid.sources.map((source) => source.label),
     ['balears · IV Inventari'],
@@ -113,8 +108,8 @@ test('an official map wins over the estimate, and both are named', async () => {
 });
 
 test('an official map with holes leaves the estimate underneath', async () => {
-  // The tile is unknown except for its northern half, which is where the two
-  // upper rows of the box fall.
+  /* Only the northern half has known fuel, covering the box’s top two rows. */
+
   const tile = Buffer.alloc(TILE_SIZE * TILE_SIZE, UNKNOWN);
   tile.fill(2, 0, TILE_SIZE * (TILE_SIZE / 2));
   const home = join(dir, 'datasets', 'parcial');
@@ -149,11 +144,10 @@ test('a land cover that cannot be read leaves the cells unknown, and says so', a
 
   assert.equal(grid.unknownCells, CELLS);
   assert.equal(grid.estimatedCells, 0);
-  // Both named: there is no official map at all, and on top of that the
-  // fallback itself could not be read.
+
   assert.equal(grid.warnings.length, 2);
   assert.match(grid.warnings[1]!, /WorldCover N39E000/);
-  // And nothing of this is kept: a failure upstream has to be retryable.
+
   assert.deepEqual(await readdir(dir), [], 'no cache is written');
 });
 
@@ -163,9 +157,8 @@ test('a missing dataset directory is said once, and does not block caching on it
   const grid = await fuelGrid([...BOUNDS], SIZE);
   assert.equal(grid.warnings.length, 1);
   assert.match(grid.warnings[0]!, /[Cc]ap conjunt.*oficial/);
-  // Stable, not transient: unlike a raster that failed to load, the absence
-  // of a datasets directory is a fact about the deployment and is already
-  // part of the cache key through `maps`, so the answer is still cached.
+  /* An absent static dataset is a stable deployment fact already included in the cache key. */
+
   const cached = await readdir(join(dir, 'cache'));
   assert.equal(cached.length, 1);
 });
@@ -186,7 +179,6 @@ test('an answer with everything known is kept, and the second question does not 
 });
 
 test('the same box asked twice at once is one job, and a third box is busy', async () => {
-  // Three different boxes, so three different jobs, with the raster held up.
   let release!: () => void;
   const held = new Promise<void>((resolve) => (release = resolve));
   fromUrl.mockImplementation(async () => {
@@ -200,8 +192,8 @@ test('the same box asked twice at once is one job, and a third box is busy', asy
   const other = fuelGrid([2.7, 39.55, 2.75, 39.6], SIZE);
 
   try {
-    // Wait until both slots are occupied so filesystem scheduling cannot
-    // affect the assertion about the request limit.
+    /* Occupy both slots before asserting the limit, independently of filesystem scheduling. */
+
     await vi.waitFor(() => assert.equal(fromUrl.mock.calls.length, 2));
     await assert.rejects(
       () => fuelGrid([2.75, 39.55, 2.8, 39.6], SIZE),
@@ -215,7 +207,6 @@ test('the same box asked twice at once is one job, and a third box is busy', asy
   assert.equal(a!.generatedAt, b!.generatedAt, 'the repeated question waited for the first');
   assert.equal(fromUrl.mock.calls.length, 2, 'one read per box, not per question');
 
-  // And once they are done, there is room again.
   const after = await fuelGrid([2.75, 39.55, 2.8, 39.6], SIZE);
   assert.equal(after.estimatedCells, CELLS);
 });
