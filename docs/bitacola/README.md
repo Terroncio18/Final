@@ -138,6 +138,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.65** El codi mort es retira amb prudència
 - **11.66** Fora el punt de càrrega antic i els pintors que no es feien servir
 - **11.67** Les dades de municipis es publiquen amb precisió útil
+- **11.69** El benchmark de `spreadRun` i el split de `simulator-view`
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):
