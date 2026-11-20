@@ -17,11 +17,6 @@
   text-decoration: none;
 }
 
-/* A flame, and not a rounded square with a gradient: the mark should say what
-   the application is about before the name is read. Taken from a published
-   icon set rather than drawn here, so it can be cited like any other
-   dependency. Flat accent and no gradient: the colour is ours, the shape is
-   theirs, and the two should not be confused. */
 .brand-mark {
   width: 22px;
   height: 22px;
@@ -57,8 +52,6 @@
   font-weight: 600;
 }
 
-/* Pushed to the far edge: it is the other way into the application, not one
-   more scope. */
 .create {
   margin-left: auto;
   padding: 7px 14px;

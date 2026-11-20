@@ -26,8 +26,8 @@ import type { Hotspot } from './map/hotspot';
 import type { Terrain } from './simulation/terrain';
 import type { Point } from './simulation/point';
 import { GRID } from './simulation/domain';
+import { inputEvent } from '../testing/events';
 
-const inputEvent = (value: string) => ({ target: { value } }) as unknown as Event;
 const bounds = [0, 0, 4, 4] as const;
 const region = { id: 'ES53', name: 'Balears', country: 'ES', scope: 'peninsula' as const, bounds };
 const province = { id: 'ES531', name: 'Mallorca', region: 'ES53', bounds };
@@ -243,16 +243,24 @@ describe('form, navigation and overview components', () => {
     c['type'](inputEvent('so'));
     c['enter']();
     expect(c['current']()).toBe('search-result-0');
-    c['key'](new KeyboardEvent('keydown', { key: 'ArrowUp' }));
+    await fixture.whenStable();
+    const field = fixture.nativeElement.querySelector('input') as HTMLInputElement;
+    field.focus();
+    const option = fixture.nativeElement.querySelector('.result') as HTMLElement;
+    const press = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    option.dispatchEvent(press);
+    expect(press.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(field);
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
     expect(c['highlighted']()).toBe(1);
     c['key'](new KeyboardEvent('keydown', { key: 'ArrowDown' }));
     expect(c['highlighted']()).toBe(0);
     c['key'](new KeyboardEvent('keydown', { key: 'a' }));
-    c['key'](new KeyboardEvent('keydown', { key: 'Enter' }));
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(navigate).toHaveBeenCalledWith(['/simulacio', 'ES53', 'ES531', 'one']);
     expect(c['query']()).toBe('');
     c['type'](inputEvent('so'));
-    c['key'](new KeyboardEvent('keydown', { key: 'Escape' }));
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(c['open']()).toBe(false);
     expect(c['query']()).toBe('');
   });
@@ -309,7 +317,9 @@ describe('form, navigation and overview components', () => {
     expect(c['open']()).toBe(true);
     c['key'](new KeyboardEvent('keydown', { key: 'Tab' }));
     expect(c['open']()).toBe(true);
-    c['key'](new KeyboardEvent('keydown', { key: 'Escape' }));
+    await fixture.whenStable();
+    const date = fixture.nativeElement.querySelector('input[type="date"]') as HTMLInputElement;
+    date.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(c['open']()).toBe(false);
     c['toggle']();
     c['leave'](new FocusEvent('focusout', { relatedTarget: document.body }));
@@ -379,19 +389,20 @@ describe('form, navigation and overview components', () => {
     expect(c['power']()).toBe('4,5');
     fixture.componentRef.setInput('hotspot', {
       ...hotspot,
-      satellite: 'unknown',
-      confidence: '?',
+      satellite: '?',
+      confidence: '',
       daynight: 'N',
       frp: 5,
     });
     await fixture.whenStable();
-    expect(c['platform']()).toBe('unknown');
-    expect(c['confidence']()).toBe('?');
+    expect(c['platform']()).toBe('?');
+    expect(c['confidence']()).toBe('desconeguda');
     expect(c['moment']()).toBe('nit');
     expect(c['band']()).toBe('moderada');
-    fixture.componentRef.setInput('hotspot', { ...hotspot, frp: 50 });
+    fixture.componentRef.setInput('hotspot', { ...hotspot, frp: 50, daynight: '' });
     await fixture.whenStable();
     expect(c['band']()).toBe('alta');
+    expect(c['moment']()).toBe('desconegut');
   });
 
   it('shows unavailable locations and ignores a location that arrives for a deselected detection', async () => {
@@ -491,8 +502,8 @@ describe('form, navigation and overview components', () => {
       fixture.componentRef.setInput(key, value);
     await fixture.whenStable();
 
-    // The click fell outside every municipality loaded for Spain's province,
-    // but it is not the sea: the located address is Portugal's, not Spain's.
+    /* The local Spanish province misses this point, but the global lookup locates it in Portugal. */
+
     municipalities.at.mockReturnValue(null);
     locator.locate.mockResolvedValueOnce({
       region: 'PT11',
@@ -506,9 +517,8 @@ describe('form, navigation and overview components', () => {
       { replaceUrl: true },
     );
 
-    // A point that answers to nothing at all —the sea— keeps the address it
-    // came with, same as before PointLocator was asked. The route inputs
-    // themselves never changed here: `navigate` is a spy, not a real router.
+    /* For sea points keep the old address. Router navigation is a spy here, so route inputs remain unchanged. */
+
     locator.locate.mockResolvedValueOnce(null);
     maps.picked.set([1, 1]);
     await fixture.whenStable();
@@ -519,13 +529,16 @@ describe('form, navigation and overview components', () => {
   });
 
   it('renders terrain statistics and the relief preview, tolerating a missing canvas context', async () => {
-    const createImageData = vi.fn((w: number, h: number) => ({
-      data: new Uint8ClampedArray(w * h * 4),
-    }));
+    const createImageData = vi.fn((size: number | ImageData, height?: number): ImageData => {
+      const w = typeof size === 'number' ? size : size.width;
+      const h = typeof size === 'number' ? height! : size.height;
+      return { data: new Uint8ClampedArray(w * h * 4), width: w, height: h, colorSpace: 'srgb' };
+    });
     const putImageData = vi.fn();
+    const context: Partial<CanvasRenderingContext2D> = { createImageData, putImageData };
     const getContext = vi
       .spyOn(HTMLCanvasElement.prototype, 'getContext')
-      .mockReturnValue({ createImageData, putImageData } as unknown as CanvasRenderingContext2D);
+      .mockReturnValue(context as CanvasRenderingContext2D);
     const fixture = TestBed.createComponent(IgnitionStep),
       c = fixture.componentInstance;
     for (const [key, value] of Object.entries({

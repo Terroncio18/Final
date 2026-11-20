@@ -10,8 +10,6 @@ import { RangePicker } from './range-picker';
   styleUrl: './top-bar.css',
 })
 export class TopBar {
-  /** The three scopes, in the order map.config declares them. */
-
   protected readonly scopes = (Object.keys(VIEWS) as ViewId[]).map((id) => ({
     id,
     label: VIEWS[id].label,

@@ -1,18 +1,6 @@
-/* You can add global styles to this file, and also import other style files */
 @import 'maplibre-gl/dist/maplibre-gl.css';
 
-/* DM Sans and Manrope, the two families the simulation screen is drawn with
-   (§11.7). Self-hosted and not asked of Google Fonts: the only remote font
-   dependency left is the map's glyphs, and this one would have put the
-   application's own letters behind a third party's uptime.
-
-   Variable files, so one per family and subset covers every weight used —
-   400 to 700 for the text and 500 to 800 for the headings and the figures.
-   95 kB in all, and `latin-ext` is a separate file the browser only fetches
-   when a page needs a letter that is in it.
-
-   Both are SIL Open Font License 1.1; the licence travels beside the files in
-   `src/fonts/`, which is what it asks for (§6). */
+/* Self-hosted variable fonts, with latin-ext loaded only when needed. SIL OFL 1.1 licences live beside the font files. */
 @font-face {
   font-family: 'DM Sans';
   font-style: normal;
@@ -90,30 +78,18 @@ body {
   overflow: hidden;
 }
 
-/* MapLibre sets `font: 12px/20px Helvetica Neue, Arial…` on the map container,
-   so everything it draws over the canvas —the scale, the credits, a popup—
-   speaks in a different typeface from the application around it. The family
-   alone is overridden, which leaves each control's own size where it was. */
+/* Override only the family inherited by MapLibre controls, preserving their individual sizes. */
 .maplibregl-map {
   font-family: inherit;
 }
 
-/* MapLibre's controls ship a light theme; match the application chrome. */
 .maplibregl-ctrl-scale {
   background: rgb(12 17 22 / 0.8);
   border-color: var(--line);
   color: var(--text);
 }
 
-/* The credits are a licence condition and not decoration (§6), so they are
-   held to being readable.
-
-   They were black on the dark bar, which is why almost nothing could be made
-   out: `.maplibregl-ctrl-attrib.maplibregl-compact` carries `color:#000` and
-   two classes, so the one-class rule here never applied and only the links —
-   which MapLibre styles with one class too— took the colour they were given.
-   Matched class for class rather than answered with `!important`, which is
-   what the background had resorted to. */
+/* Match the compact attribution selector’s specificity so its default black text does not override this colour. */
 .maplibregl-ctrl-attrib,
 .maplibregl-ctrl-attrib.maplibregl-compact {
   background-color: rgb(12 17 22 / 0.94);
@@ -122,26 +98,17 @@ body {
   line-height: 1.5;
 }
 
-/* Lighter than the sentence around them, which is what says they are links:
-   the colour is the only cue MapLibre gives them before the hover. */
 .maplibregl-ctrl-attrib a {
   color: var(--text);
 }
 
-/* The button that unfolds them keeps a light backing on purpose: its «i» is a
-   black path in a background image, so a dark button is an empty circle. */
+/* The attribution icon is a black path in a background image and needs a light backing. */
 .maplibregl-ctrl-attrib-button,
 .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-button {
   background-color: rgb(230 234 238 / 0.9);
 }
 
-/* ───────────── Location marks (see app/map/spawn-marker.ts) ─────────────
-
-   Global and not a component's: MapLibre puts a marker's element inside its
-   own container, outside any component's template, so a scoped rule would
-   never reach it. Every animation is on a child, because MapLibre owns the
-   `transform` of each marker's root. Never clickable: a marker sits over the
-   canvas and would swallow the click that places the next one. */
+/* MapLibre inserts markers outside Angular templates, so these rules are global. Animate children because MapLibre owns the root transform; ignore pointer events so markers do not intercept placement clicks. */
 .spawn-ring,
 .spawn-pin {
   pointer-events: none;
@@ -152,7 +119,6 @@ body {
   height: 64px;
 }
 
-/* The ring itself: what stays lit between two pulses. */
 .spawn-ring::before {
   content: '';
   position: absolute;
@@ -189,8 +155,6 @@ body {
   }
 }
 
-/* The gap under the needle is what makes it float: the point of the stem
-   hangs above the ground the ring marks, and comes down to it at each bounce. */
 .spawn-pin {
   padding-bottom: 4px;
 }
@@ -247,7 +211,6 @@ body {
   box-shadow: 0 2px 8px #0008;
 }
 
-/* The centre shares the ignition's needle and halo, but its needle is fixed. */
 .spawn-centre .spawn-float {
   animation: none;
 }
@@ -294,7 +257,7 @@ body {
     animation: none;
   }
 
-  /* Still two rings, so the mark keeps its shape without the movement. */
+  /* Keep the outer ring visible when reduced motion stops its pulse. */
   .spawn-pulse {
     transform: scale(1.7);
     opacity: 0.45;
