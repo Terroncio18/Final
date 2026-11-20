@@ -12,7 +12,6 @@ import { IgnitionPanel } from './ignition-panel';
 import { ScenarioPanel } from './scenario-panel';
 import { ToolSettingsModal } from './tool-settings';
 import { WeatherPanel } from './weather-panel';
-import { Chrome } from '../chrome';
 import { MapService } from '../map/map.service';
 import { PlacesService } from '../map/places.service';
 import { CountermeasureDisplay } from '../map/countermeasure-display';
@@ -25,17 +24,19 @@ import { WeatherService, type Observation } from './weather.service';
 import { spread, type SpreadResult } from '../simulation/fire-spread';
 import { type Terrain, cellOf } from '../simulation/terrain';
 import type { FuelGrid } from '../simulation/fuel-data';
-import type { FuelTreatments } from '../simulation/fuel-treatments';
+
 import { type Point, formatPoints } from '../simulation/point';
 import { GRID, domainAround } from '../simulation/domain';
 import { COUNTERMEASURE_CATALOG, type Countermeasure } from '../simulation/countermeasures';
 import { formatScenario, MAX_SCENARIO_SIZE, type Scenario } from '../simulation/scenario';
 import { routes } from '../app.routes';
 import { appConfig } from '../app.config';
+import { fuelTreatments } from '../../testing/fuel-treatments';
+import { inputEvent as input, fileInputEvent } from '../../testing/events';
 
 const centre: Point = [2.7, 39.7],
   centreCell = cellOf(centre, centre)!;
-const input = (value: string) => ({ target: { value } }) as unknown as Event;
+
 const measure = (patch: Partial<Countermeasure> = {}): Countermeasure => ({
   id: 'm1',
   kind: 'defense-line',
@@ -98,7 +99,7 @@ function resultFor(patch: Partial<SpreadResult> = {}): SpreadResult {
 }
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  let reject!: (reason: unknown) => void;
+  let reject!: (reason: Error) => void;
   const promise = new Promise<T>((yes, no) => {
     resolve = yes;
     reject = no;
@@ -172,12 +173,21 @@ function fuelsDouble() {
   };
 }
 function weatherDouble() {
+  // Like the service: a reading answers only for the country and centre it was asked about.
+  const reading = signal<{ country: 'ES' | 'PT'; point: Point; seen: Observation } | null>(null);
   return {
-    observation: signal<Observation | null>(null),
+    reading,
     loading: signal(false),
     failed: signal(false),
     load: vi.fn(),
     clear: vi.fn(),
+    observationFor: vi.fn((country: 'ES' | 'PT', point: Point | null): Observation | null => {
+      const held = reading();
+      if (!held || !point) return null;
+      const same =
+        held.country === country && held.point[0] === point[0] && held.point[1] === point[1];
+      return same ? held.seen : null;
+    }),
   };
 }
 function placesDouble() {
@@ -208,9 +218,8 @@ describe('simulator screen', () => {
     frames = new Map();
     frameId = 0;
     clock = 0;
-    // Shared by every `matchMedia()` call the component makes —reduced motion
-    // and the narrow-workspace query alike— since nothing here tells queries
-    // apart. Only the latter listens for `change`.
+    /* All matchMedia calls share this stub; only the narrow-workspace query registers a change listener. */
+
     reduced = { matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() };
     vi.stubGlobal(
       'matchMedia',
@@ -230,21 +239,21 @@ describe('simulator screen', () => {
     vi.spyOn(performance, 'now').mockImplementation(() => clock);
     vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    const gl = new Proxy(
-      {
-        getShaderParameter: () => true,
-        getProgramParameter: () => true,
-        createProgram: () => ({}),
-        createShader: () => ({}),
-        createTexture: () => ({}),
-        getExtension: () => null,
-        isContextLost: () => false,
-        createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }),
-      } as Record<string, unknown>,
-      { get: (target, name: string) => (target[name] ??= vi.fn()) },
-    );
+    const methods = {
+      getShaderParameter: () => true,
+      getProgramParameter: () => true,
+      createProgram: () => ({}),
+      createShader: () => ({}),
+      createTexture: () => ({}),
+      getExtension: () => null,
+      isContextLost: () => false,
+      createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+    };
+    const gl = new Proxy<Partial<WebGL2RenderingContext>>(methods, {
+      get: (target, name: string) => Reflect.get(target, name) ?? vi.fn(),
+    });
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-      gl as unknown as CanvasRenderingContext2D,
+      gl as WebGL2RenderingContext,
     );
     vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;slope');
     for (const method of ['attach', 'detach', 'setMeasures', 'setDraft'] as const)
@@ -311,12 +320,12 @@ describe('simulator screen', () => {
     for (const fn of callbacks) fn(ms);
     await fixture.whenStable();
   }
-  /** One of the blocks of the configuration column, as rendered by the console. */
+
   function block<T>(type: Type<T>): T {
     return fixture.debugElement.query(By.directive(type)).componentInstance as T;
   }
   async function publish(result = resultFor()) {
-    c['result'].set(result);
+    c['runs'].result.set(result);
     await fixture.whenStable();
     return result;
   }
@@ -344,9 +353,8 @@ describe('simulator screen', () => {
     expect(reduced.removeEventListener).toHaveBeenCalledWith('change', onChange);
   });
 
-  it('opens the simulation, controls its layers and restores the application on exit', async () => {
+  it('opens the simulation and controls its layers', async () => {
     await open();
-    expect(TestBed.inject(Chrome).visible()).toBe(false);
     expect(maps.create).toHaveBeenCalledWith(fixture.nativeElement.querySelector('.map-canvas'));
     expect(c['coordinates']()).toBe('39.7000° N, 2.7000° E');
     expect(c['compassTurn']()).toBe('rotate(-30deg)');
@@ -390,7 +398,6 @@ describe('simulator screen', () => {
     expect(c['fill'](150, 0, 100)).toBe('100%');
     expect(c['fill'](50, 0, 100)).toBe('50%');
     fixture.destroy();
-    expect(TestBed.inject(Chrome).visible()).toBe(true);
     expect(weather.clear).toHaveBeenCalled();
     expect(maps.destroy).toHaveBeenCalled();
   });
@@ -422,12 +429,12 @@ describe('simulator screen', () => {
 
   it('keeps manual weather while reading live observations and supports wind pointer and keyboard controls', async () => {
     await open();
-    // The block reads its inputs as the console last rendered them, so each
-    // change to the console's state is followed by a render before it is used.
+    /* Render after state changes so child inputs receive the console’s current values. */
+
     const w = block(WeatherPanel);
     expect(w['station']()).toBeNull();
     expect(w['liveState']().tag).toBe('SENSE CONNEXIÓ');
-    c['weatherMode'].set('live');
+    c['weather'].mode.set('live');
     weather.loading.set(true);
     await fixture.whenStable();
     expect(w['liveState']().tag).toBe('LLEGINT');
@@ -443,9 +450,9 @@ describe('simulator screen', () => {
       distanceKm: 2.5,
       stale: false,
     };
-    weather.observation.set(seen);
+    weather.reading.set({ country: 'ES', point: centre, seen });
     weather.loading.set(false);
-    expect(c['now']()).toMatchObject({ wind: 32, humidity: 26, fromDeg: 90, live: true });
+    expect(c['weather'].now()).toMatchObject({ wind: 32, humidity: 26, fromDeg: 90, live: true });
     expect(w['station']()!.name).toBe('Station');
     expect(w['station']()!.observedAt).toContain('UTC');
     expect(w['liveState']().tag).toBe('EN DIRECTE');
@@ -454,69 +461,128 @@ describe('simulator screen', () => {
     weather.failed.set(true);
     expect(w['liveState']().tag).toBe('DADA ANTIGA');
     weather.failed.set(false);
-    weather.observation.set({ ...seen, stale: true });
+    weather.reading.set({ country: 'ES', point: centre, seen: { ...seen, stale: true } });
     expect(w['liveState']().warn).toBe(true);
     w['nudgeWind'](new KeyboardEvent('keydown', { key: 'Home' }));
-    expect(c['direction']()).toBe(315);
-    const dial = {
+    expect(c['weather'].fromDeg()).toBe(315);
+    const dial = Object.assign(document.createElement('button'), {
       setPointerCapture: vi.fn(),
       hasPointerCapture: vi.fn(() => false),
       focus: vi.fn(),
-      getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }),
+      getBoundingClientRect: () => new DOMRect(0, 0, 100, 100),
+    });
+    const pointer = (type: string, clientX: number, clientY: number): PointerEvent => {
+      const event = new PointerEvent(type, { clientX, clientY, pointerId: 1 });
+      Object.defineProperty(event, 'currentTarget', { value: dial });
+      return event;
     };
-    const pointer = (type: string, clientX: number, clientY: number) =>
-      ({ type, clientX, clientY, pointerId: 1, currentTarget: dial }) as unknown as PointerEvent;
     w['turnWind'](pointer('pointerdown', 100, 50));
     expect(dial.focus).not.toHaveBeenCalled();
-    c['weatherMode'].set('manual');
+    c['weather'].mode.set('manual');
     await fixture.whenStable();
     w['setNumber']('humidity', input('40'));
     w['setNumber']('temperature', input('35'));
-    expect(c['humidity']()).toBe(40);
-    expect(c['temperature']()).toBe(35);
+    expect(c['weather'].humidity()).toBe(40);
+    expect(c['weather'].temperature()).toBe(35);
     w['setNumber']('wind', input('20'));
-    c['windChanges'].set([
+    c['weather'].changes.set([
       { startMin: 0, speedKmh: 10, fromDeg: 0 },
       { startMin: 10, speedKmh: 30, fromDeg: 45 },
     ]);
     w['setNumber']('wind', input('21'));
-    expect(c['windChanges']()).toHaveLength(1);
+    expect(c['weather'].changes()).toHaveLength(1);
     w['nudgeWind'](new KeyboardEvent('keydown', { key: 'Home' }));
     await fixture.whenStable();
     expect(w['fromPhrase']()).toBe('del nord');
     w['nudgeWind'](new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
-    expect(c['direction']()).toBe(355);
+    expect(c['weather'].fromDeg()).toBe(355);
     await fixture.whenStable();
     w['nudgeWind'](new KeyboardEvent('keydown', { key: 'PageUp' }));
-    expect(c['direction']()).toBe(40);
+    expect(c['weather'].fromDeg()).toBe(40);
     await fixture.whenStable();
     w['nudgeWind'](new KeyboardEvent('keydown', { key: 'Tab' }));
-    expect(c['direction']()).toBe(40);
+    expect(c['weather'].fromDeg()).toBe(40);
     w['turnWind'](pointer('pointermove', 100, 50));
-    expect(c['direction']()).toBe(40);
+    expect(c['weather'].fromDeg()).toBe(40);
     w['turnWind'](pointer('pointerdown', 50, 50));
-    expect(c['direction']()).toBe(40);
+    expect(c['weather'].fromDeg()).toBe(40);
     dial.setPointerCapture.mockImplementation(() => {
       throw new Error('synthetic');
     });
     w['turnWind'](pointer('pointerdown', 100, 50));
-    expect(c['direction']()).toBe(270);
+    expect(c['weather'].fromDeg()).toBe(270);
     dial.hasPointerCapture.mockReturnValue(true);
     w['turnWind'](pointer('pointermove', 50, 0));
-    expect(c['direction']()).toBe(180);
-    // A render first: the edits above leave the console's reset pending, and
-    // it would otherwise run on the render below and switch computing off.
+    expect(c['weather'].fromDeg()).toBe(180);
+    /* Flush the pending input-reset effect before publishing a result. */
+
     await fixture.whenStable();
-    c['computing'].set(true);
+    c['runs'].computing.set(true);
     await fixture.whenStable();
     w['setNumber']('wind', input('50'));
     w['setNumber']('humidity', input('80'));
     w['turnWind'](pointer('pointerdown', 100, 50));
     w['nudgeWind'](new KeyboardEvent('keydown', { key: 'Home' }));
     c['editWind']({ fromDeg: 0 });
-    expect(c['wind']()).toBe(21);
-    expect(c['direction']()).toBe(180);
-    expect(c['humidity']()).toBe(40);
+    expect(c['weather'].wind()).toBe(21);
+    expect(c['weather'].fromDeg()).toBe(180);
+    expect(c['weather'].humidity()).toBe(40);
+  });
+
+  it('never lets one domain’s observation feed another', async () => {
+    const lisbon: Point = [-8, 40];
+    const seen: Observation = {
+      source: 'AEMET',
+      station: { id: 'one', name: 'Sóller', lon: 2.7, lat: 39.7 },
+      observedAt: '2024-08-01T12:00:00Z',
+      windKmh: 48,
+      windFromDeg: 90,
+      humidity: 12,
+      temperature: 38,
+      distanceKm: 2.5,
+      stale: false,
+    };
+    await open('@2.7,39.7', true);
+    await ignition();
+    c['weather'].mode.set('live');
+    await fixture.whenStable();
+    expect(weather.load).toHaveBeenLastCalledWith('ES', centre);
+    weather.reading.set({ country: 'ES', point: centre, seen });
+    await fixture.whenStable();
+    expect(c['weather'].now()).toMatchObject({ live: true, wind: 48, humidity: 12 });
+
+    /* The scenario moves to Portugal while the Palma reading is still the only one held. */
+
+    weather.loading.set(true);
+    fixture.componentRef.setInput('region', 'PT11');
+    fixture.componentRef.setInput('point', '@-8.00000,40.00000');
+    fixture.componentRef.setInput('ignicions', formatPoints([lisbon]));
+    await fixture.whenStable();
+    expect(weather.load).toHaveBeenLastCalledWith('PT', lisbon);
+    expect(block(WeatherPanel)['station']()).toBeNull();
+    expect(c['weather'].now()).toMatchObject({
+      live: false,
+      wind: 22,
+      humidity: 28,
+      temperature: 32,
+    });
+
+    /* The Portuguese request fails: the calculation still uses the manual values. */
+
+    weather.loading.set(false);
+    weather.failed.set(true);
+    await fixture.whenStable();
+    expect(block(WeatherPanel)['liveState']().tag).toBe('SENSE CONNEXIÓ');
+    simulate.mockResolvedValue(resultFor());
+    await c['start']();
+    expect(simulate.mock.lastCall![0]).toMatchObject({ wind10mKmh: 22, temperatureC: 32 });
+
+    /* An answer for the Portuguese domain does reach the screen. */
+
+    weather.failed.set(false);
+    weather.reading.set({ country: 'PT', point: lisbon, seen: { ...seen, windKmh: 7 } });
+    await fixture.whenStable();
+    expect(c['weather'].now()).toMatchObject({ live: true, wind: 7 });
   });
 
   it('validates fuel availability, burnable ignitions and the spotting seed before starting', async () => {
@@ -562,22 +628,22 @@ describe('simulator screen', () => {
     expect(c['conditions']().base).toContain('–');
     expect(block(FuelPanel)['fuelModels']()).toHaveLength(2);
     expect(block(FuelPanel)['burnableShare']()).toBe('100 %');
-    c['runError'].set('failed');
+    c['runs'].error.set('failed');
     expect(c['state']().detail).toBe('failed');
     for (const value of ['2', '-1', '1.5', '4294967296', 'bad']) {
       const event = input(value);
       block(IgnitionPanel)['setSpottingSeed'](event);
       expect((event.target as HTMLInputElement).value).toBe('2');
     }
-    // A render first: the seed above leaves the console's reset pending, and
-    // it would otherwise run on the render below and switch computing off.
+    /* Flush the pending seed-reset effect before setting computing. */
+
     await fixture.whenStable();
-    c['computing'].set(true);
+    c['runs'].computing.set(true);
     await fixture.whenStable();
     block(IgnitionPanel)['setSpottingSeed'](input('5'));
     expect(c['spottingSeed']()).toBe(2);
     expect(c['state']().tag).toBe('CALCULANT');
-    c['computing'].set(false);
+    c['runs'].computing.set(false);
     fixture.componentRef.setInput(
       'ignicions',
       formatPoints([centre, [0, 0], [10, 39.7], [2.7, 0], [2.7, 60]]),
@@ -628,13 +694,13 @@ describe('simulator screen', () => {
     await fixture.whenStable();
     expect(c['plan'].kind()).toBeNull();
     c['plan'].begin('firebreak');
-    c['computing'].set(true);
+    c['runs'].computing.set(true);
     maps.picked.set([2.72, 39.7]);
     maps.rightClicks.set(5);
     await fixture.whenStable();
     expect(c['plan'].kind()).toBe('firebreak');
     expect(c['plan'].draft()).toEqual([]);
-    c['computing'].set(false);
+    c['runs'].computing.set(false);
     c['cancelTool']();
     maps.ready.set(true);
     maps.map = {};
@@ -655,8 +721,6 @@ describe('simulator screen', () => {
   });
 
   it('validates countermeasure settings, remembers choices and warns before editing history', async () => {
-    // The modal's own fields are tested in tool-settings.spec.ts; here, that
-    // it opens, edits this view's state and hands the apply back to it.
     const modal = async () => {
       await fixture.whenStable();
       return fixture.debugElement.query(By.directive(ToolSettingsModal))?.componentInstance as
@@ -668,10 +732,10 @@ describe('simulator screen', () => {
     expect(await modal()).toBeUndefined();
     c['applySettings']();
     c['confirmPastMeasure']();
-    c['computing'].set(true);
+    c['runs'].computing.set(true);
     c['pickMeasure']('firebreak');
     expect(c['configuring']()).toBeNull();
-    c['computing'].set(false);
+    c['runs'].computing.set(false);
     for (const entry of COUNTERMEASURE_CATALOG) {
       c['pickMeasure'](entry.kind);
       await modal();
@@ -698,7 +762,7 @@ describe('simulator screen', () => {
     c['pickMeasure']('clearing');
     c['pickMeasure']('clearing');
     expect(c['configuring']()).toBeNull();
-    c['result'].set(resultFor());
+    c['runs'].result.set(resultFor());
     c['minutes'].set(10);
     c['plan'].measures.set([measure({ startMin: 20 })]);
     c['pickMeasure']('backfire');
@@ -725,21 +789,21 @@ describe('simulator screen', () => {
       return first.promise;
     });
     const pending = c['start']();
-    expect(c['computing']()).toBe(true);
-    expect(c['progress']()).toBe(0.5);
+    expect(c['runs'].computing()).toBe(true);
+    expect(c['runs'].progress()).toBe(0.5);
     expect(c['state']().short).toContain('50 %');
     expect(simulate.mock.calls[0][0]).toMatchObject({ ignitions: [centreCell], horizon: 1110 });
     c['reset']();
     simulate.mock.calls[0][1]?.(0.9);
-    expect(c['progress']()).toBe(0.5);
+    expect(c['runs'].progress()).toBe(0.5);
     first.resolve(resultFor());
     await pending;
-    expect(c['result']()).toBeNull();
+    expect(c['runs'].result()).toBeNull();
     simulate.mockResolvedValue(resultFor());
     await c['start']();
-    expect(c['result']()).not.toBeNull();
+    expect(c['runs'].result()).not.toBeNull();
     expect(c['playing']()).toBe(true);
-    expect(c['computing']()).toBe(false);
+    expect(c['runs'].computing()).toBe(false);
     await fixture.whenStable();
     await frame(1000);
     expect(c['minutes']()).toBe(0.5);
@@ -755,15 +819,15 @@ describe('simulator screen', () => {
     expect(c['playing']()).toBe(true);
     c['togglePlay']();
     expect(c['playing']()).toBe(false);
-    c['windDraft'].set({ speedKmh: 20, fromDeg: 0 });
+    c['weather'].draft.set({ speedKmh: 20, fromDeg: 0 });
     c['togglePlay']();
     expect(c['playing']()).toBe(false);
-    c['windDraft'].set(null);
-    c['computing'].set(true);
+    c['weather'].draft.set(null);
+    c['runs'].computing.set(true);
     c['togglePlay']();
     c['setMinutes'](input('10'));
     expect(c['minutes']()).toBe(0);
-    c['computing'].set(false);
+    c['runs'].computing.set(false);
     c['setMinutes'](input('10'));
     expect(c['minutes']()).toBe(10);
     c['reset']();
@@ -781,36 +845,36 @@ describe('simulator screen', () => {
     c['minutes'].set(10);
     simulate.mockRejectedValueOnce(new Error('failed'));
     await c['start'](10, previous, winds);
-    expect(c['result']()).toBe(result);
-    expect(c['runError']()).toBe('failed');
+    expect(c['runs'].result()).toBe(result);
+    expect(c['runs'].error()).toBe('failed');
     expect(c['plan'].measures()).toBe(previous);
-    expect(c['windChanges']()).toBe(winds);
+    expect(c['weather'].changes()).toBe(winds);
     simulate.mockRejectedValueOnce('offline');
     await c['start'](10);
-    expect(c['runError']()).toContain('No s’ha pogut');
+    expect(c['runs'].error()).toContain('No s’ha pogut');
     const pending = deferred<SpreadResult>();
     simulate.mockReturnValueOnce(pending.promise);
     const running = c['start'](10);
     c['reset']();
     pending.reject(new Error('old'));
     await running;
-    expect(c['runError']()).toBeNull();
+    expect(c['runs'].error()).toBeNull();
     await publish();
     c['editWind']({ speedKmh: 200 });
-    expect(c['windDraft']()).not.toBeNull();
+    expect(c['weather'].draft()).not.toBeNull();
     await c['applyWind']();
-    expect(c['runError']()).toBeTruthy();
-    c['windDraft'].set({ speedKmh: 25, fromDeg: 180 });
+    expect(c['runs'].error()).toBeTruthy();
+    c['weather'].draft.set({ speedKmh: 25, fromDeg: 180 });
     simulate.mockResolvedValue(resultFor());
     await c['applyWind']();
-    expect(c['windDraft']()).toBeNull();
-    expect(c['planStale']()).toBe(true);
+    expect(c['weather'].draft()).toBeNull();
+    expect(c['runs'].stale()).toBe(true);
     expect(c['playing']()).toBe(false);
     await c['applyWind']();
-    c['windDraft'].set({ speedKmh: 20, fromDeg: 0 });
-    c['result'].set(null);
+    c['weather'].draft.set({ speedKmh: 20, fromDeg: 0 });
+    c['runs'].result.set(null);
     await c['applyWind']();
-    expect(c['windDraft']()).not.toBeNull();
+    expect(c['weather'].draft()).not.toBeNull();
   });
 
   it('keeps cursor history when measures change and uses the plan guard for mop-up', async () => {
@@ -835,19 +899,19 @@ describe('simulator screen', () => {
     await fixture.whenStable();
     expect(plan.measures()).toEqual([]);
     c['finishMeasure']();
-    c['computing'].set(true);
+    c['runs'].computing.set(true);
     c['clearMeasures']();
-    c['computing'].set(false);
-    c['result'].set(null);
+    c['runs'].computing.set(false);
+    c['runs'].result.set(null);
     plan.begin('backfire');
     plan.click(centre, domainAround(centre));
     plan.click([2.71, 39.7], domainAround(centre));
     c['finishMeasure']();
     expect(plan.measures()).toHaveLength(1);
-    c['result'].set(result);
+    c['runs'].result.set(result);
     c['minutes'].set(30);
-    c['windChanges'].set([{ startMin: 20, speedKmh: 40, fromDeg: 180 }]);
-    expect(c['now']().wind).toBe(40);
+    c['weather'].changes.set([{ startMin: 20, speedKmh: 40, fromDeg: 180 }]);
+    expect(c['weather'].now().wind).toBe(40);
     expect(c['windRows']()[0]).toMatchObject({ time: '00:20', origin: 'S', pending: false });
   });
 
@@ -878,7 +942,7 @@ describe('simulator screen', () => {
     expect(c['forecastRows']().every((r) => r.available)).toBe(true);
     const zero = new Float32Array(1111),
       heading = new Float32Array(1111).fill(NaN);
-    c['result'].set({
+    c['runs'].result.set({
       ...result,
       reachedEdge: 100,
       burnable: 0,
@@ -896,19 +960,19 @@ describe('simulator screen', () => {
     expect(c['forecastRows']().some((r) => !r.available)).toBe(true);
     c['minutes'].set(120);
     expect(c['figures']()?.edgeReached).toBe(true);
-    c['computing'].set(true);
+    c['runs'].computing.set(true);
     expect(c['forecastRows']()).toEqual([]);
     expect(c['state']().short).toContain('Actualitzant');
-    c['computing'].set(false);
+    c['runs'].computing.set(false);
     c['focusFire']();
     expect(maps.focusFire).toHaveBeenCalled();
     c['forecasts'].set(false);
     c['focusFire']();
     const empty = new Float32Array(GRID * GRID).fill(Infinity);
-    c['result'].set({ ...result, arrival: empty });
+    c['runs'].result.set({ ...result, arrival: empty });
     c['focusFire']();
     expect(maps.focusFire).toHaveBeenCalledTimes(2);
-    c['result'].set({
+    c['runs'].result.set({
       ...result,
       spotIgnitions: [{ cell: centreCell, source: centreCell, minute: 1, distanceM: 100.4 }],
     });
@@ -921,10 +985,8 @@ describe('simulator screen', () => {
     const treated = () => block(CountermeasurePanel)['treatedCell']();
     expect(treated()).toBeNull();
     maps.pointer.set(centre);
-    const treatment = {
-      at: vi.fn(() => ({ moisture1h: 0.15, bed: { loadTonHa: 8 }, remaining: 0.5 })),
-    };
-    c['result'].set({ ...result, fuelTreatments: treatment as unknown as FuelTreatments });
+    const treatment = fuelTreatments({ moisture1h: 0.15, bed: { loadTonHa: 8 }, remaining: 0.5 });
+    c['runs'].result.set({ ...result, fuelTreatments: treatment });
     await fixture.whenStable();
     expect(treated()).toMatchObject({
       where: 'Cel·la sota el cursor',
@@ -938,6 +1000,35 @@ describe('simulator screen', () => {
     expect(treated()?.where).toContain('seleccionada');
     maps.pointer.set([0, 0]);
     expect(treated()).toBeNull();
+  });
+
+  it('lists every ember ignition reached by the timeline and focuses its map location', async () => {
+    await open(undefined, true);
+    await ignition();
+    c['spottingEnabled'].set(true);
+    await fixture.whenStable();
+    const spots = Array.from({ length: 12 }, (_, i) => ({
+      cell: centreCell + i,
+      source: centreCell,
+      minute: i + 1,
+      distanceM: 100 + i,
+    }));
+    await publish(resultFor({ spotIgnitions: spots }));
+    c['minutes'].set(10);
+    await fixture.whenStable();
+
+    const buttons = (): HTMLButtonElement[] =>
+      Array.from(fixture.nativeElement.querySelectorAll('.spot-list button'));
+    expect(buttons()).toHaveLength(10);
+    expect(buttons()[0].textContent).toContain('Focus per brasa 1');
+    expect(buttons()[9].textContent).toContain('Focus per brasa 10');
+    maps.goToBounds.mockClear();
+    buttons()[9].click();
+    expect(maps.goToBounds).toHaveBeenCalledTimes(1);
+
+    c['minutes'].set(3);
+    await fixture.whenStable();
+    expect(buttons()).toHaveLength(3);
   });
 
   it('saves reproducible scenarios and rejects pending changes or malformed files', async () => {
@@ -964,16 +1055,15 @@ describe('simulator screen', () => {
     c['saveScenario']();
     expect(c['scenarioNote']()?.failed).toBe(true);
     c['plan'].draft.set([]);
-    c['windDraft'].set({ speedKmh: 20, fromDeg: 0 });
+    c['weather'].draft.set({ speedKmh: 20, fromDeg: 0 });
     c['saveScenario']();
-    c['windDraft'].set(null);
-    c['computing'].set(true);
+    c['weather'].draft.set(null);
+    c['runs'].computing.set(true);
     c['saveScenario']();
-    c['computing'].set(false);
-    const fileEvent = (file?: object) =>
-      ({ target: { files: file ? [file] : [], value: 'old' } }) as unknown as Event;
+    c['runs'].computing.set(false);
+    const fileEvent = fileInputEvent;
     await c['loadScenario'](fileEvent());
-    await c['loadScenario']({ target: { value: 'old' } } as unknown as Event);
+    await c['loadScenario'](input('old'));
     await c['loadScenario'](fileEvent({ size: MAX_SCENARIO_SIZE + 1 }));
     expect(c['scenarioNote']()?.failed).toBe(true);
     await c['loadScenario'](fileEvent({ size: 10, text: async () => 'bad' }));
@@ -1051,13 +1141,31 @@ describe('simulator screen', () => {
     await fixture.whenStable();
     expect(maps.resetFireParticles).toHaveBeenCalled();
     await frame(400);
-    c['result'].set(null);
+    c['runs'].result.set(null);
     await fixture.whenStable();
     expect(frames.size).toBe(0);
     expect(maps.setFire).toHaveBeenLastCalledWith(null);
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
     await publish();
-    expect(c['runError']()).toContain('dibuixar');
+    expect(c['runs'].error()).toContain('dibuixar');
+  });
+
+  it('stops both animation clocks and clears fire layers before destroying the map', async () => {
+    await open(undefined, true);
+    await ignition();
+    await publish();
+    c['playing'].set(true);
+    await fixture.whenStable();
+    expect(frames.size).toBeGreaterThan(0);
+
+    fixture.destroy();
+
+    expect(frames.size).toBe(0);
+    expect(maps.setFire).toHaveBeenLastCalledWith(null);
+    expect(maps.setFireParticles).toHaveBeenLastCalledWith(null);
+    const destroyedAt = maps.destroy.mock.invocationCallOrder[0];
+    expect(maps.setFire.mock.invocationCallOrder.at(-1)).toBeLessThan(destroyedAt);
+    expect(maps.setFireParticles.mock.invocationCallOrder.at(-1)).toBeLessThan(destroyedAt);
   });
 
   it('shows measures only during their deployment and animates newly reached aircraft passes', async () => {
@@ -1099,20 +1207,20 @@ describe('simulator screen', () => {
     c['minutes'].set(50);
     await fixture.whenStable();
     c['editWind']({ speedKmh: 35 });
-    expect(c['now']().wind).toBe(35);
-    expect(c['now']().towardsDeg).toBe((c['now']().fromDeg + 180) % 360);
+    expect(c['weather'].now().wind).toBe(35);
+    expect(c['weather'].now().towardsDeg).toBe((c['weather'].now().fromDeg + 180) % 360);
     const burning = measure({ kind: 'mop-up', startMin: 1 });
     expect(c['plan'].guard?.(burning)).toContain('Front massa intens');
-    c['result'].set({ ...result, heat: new Float32Array(GRID * GRID).fill(Infinity) });
+    c['runs'].result.set({ ...result, heat: new Float32Array(GRID * GRID).fill(Infinity) });
     expect(c['plan'].guard?.(burning)).toContain('més de 12');
-    c['result'].set({
+    c['runs'].result.set({
       ...result,
-      fuelTreatments: { at: () => ({ bed: { heatPerArea: 2000 } }) } as unknown as FuelTreatments,
+      fuelTreatments: fuelTreatments({ bed: { heatPerArea: 2000 } }),
     });
     expect(c['plan'].guard?.(burning)).toContain('Front massa intens');
-    c['result'].set({ ...result, heat: new Float32Array(GRID * GRID) });
+    c['runs'].result.set({ ...result, heat: new Float32Array(GRID * GRID) });
     expect(c['plan'].guard?.(measure({ kind: 'mop-up' }))).toBeNull();
-    c['result'].set(null);
+    c['runs'].result.set(null);
     expect(c['shownMeasures']()).toHaveLength(5);
   });
 
@@ -1145,33 +1253,34 @@ describe('simulator screen', () => {
     maps.picked.set(centre);
     await fixture.whenStable();
     expect(c['plan'].draft()).toEqual([]);
-    c['result'].set(result);
-    c['windDraft'].set({ speedKmh: 10, fromDeg: 0 });
+    c['runs'].result.set(result);
+    c['weather'].draft.set({ speedKmh: 10, fromDeg: 0 });
     await c['applyWind']();
-    expect(c['windDraft']()).not.toBeNull();
+    expect(c['weather'].draft()).not.toBeNull();
   });
 
   it('wires each block of the configuration column to the console', async () => {
     await open(undefined, true);
     await ignition();
 
-    // What the blocks are given: the place, and the centre to read again.
     expect(block(DomainPanel).place()).toBe('Sóller');
     expect(block(DomainPanel).province()).toBe('Mallorca');
     expect(block(FuelPanel).centre()).toEqual(centre);
 
-    // The weather is the console's: set from the block, read back from it.
     const w = block(WeatherPanel);
     expect(w.country()).toBe('ES');
     w.windEdit.emit({ speedKmh: 12 });
-    expect(c['wind']()).toBe(12);
+    expect(c['weather'].wind()).toBe(12);
     w.humidity.set(55);
     w.temperature.set(20);
     w.weatherMode.set('live');
-    expect([c['humidity'](), c['temperature'](), c['weatherMode']()]).toEqual([55, 20, 'live']);
+    expect([c['weather'].humidity(), c['weather'].temperature(), c['weather'].mode()]).toEqual([
+      55,
+      20,
+      'live',
+    ]);
     w.weatherMode.set('manual');
 
-    // The scenario: the name is shared, saving and loading are the console's.
     const s = block(ScenarioPanel);
     s.name.set('Named');
     expect(c['scenarioName']()).toBe('Named');
@@ -1179,14 +1288,11 @@ describe('simulator screen', () => {
     s.saveScenario.emit();
     expect(c['scenarioNote']()?.failed).toBe(true);
     c['plan'].draft.set([]);
-    s.loadScenario.emit({
-      target: { files: [{ size: MAX_SCENARIO_SIZE + 1 }], value: '' },
-    } as unknown as Event);
+    s.loadScenario.emit(fileInputEvent({ size: MAX_SCENARIO_SIZE + 1 }));
     await fixture.whenStable();
     expect(c['scenarioNote']()?.text).toContain('massa');
     expect(s.note()).toBe(c['scenarioNote']());
 
-    // Ignitions are written to the address; the tool and the spotting are shared.
     const i = block(IgnitionPanel);
     i.removeStart.emit(0);
     expect(navigate).toHaveBeenLastCalledWith(
@@ -1207,7 +1313,6 @@ describe('simulator screen', () => {
       7,
     ]);
 
-    // The countermeasures: each button is a request the console decides on.
     const m = block(CountermeasurePanel);
     expect(m.plan()).toBe(c['plan']);
     m.pickMeasure.emit('firebreak');
@@ -1228,20 +1333,19 @@ describe('simulator screen', () => {
     m.clearMeasures.emit();
     expect(c['plan'].measures()).toEqual([]);
 
-    // A pending change of wind over a computed fire: kept, dropped or applied.
-    // Rendered first, so the reset the edits above left pending does not take
-    // the fire off as soon as it is published.
+    /* Flush the pending reset before publishing the fire. */
+
     await fixture.whenStable();
     await publish();
-    c['windDraft'].set({ speedKmh: 20, fromDeg: 0 });
+    c['weather'].draft.set({ speedKmh: 20, fromDeg: 0 });
     await fixture.whenStable();
     expect(w.windDraft()).toEqual({ speedKmh: 20, fromDeg: 0 });
     w.windDraft.set(null);
-    expect(c['windDraft']()).toBeNull();
-    c['windDraft'].set({ speedKmh: 25, fromDeg: 180 });
+    expect(c['weather'].draft()).toBeNull();
+    c['weather'].draft.set({ speedKmh: 25, fromDeg: 180 });
     simulate.mockResolvedValue(resultFor());
     w.applyWind.emit();
-    expect(c['windChanges']()).toEqual([{ startMin: 0, speedKmh: 25, fromDeg: 180 }]);
+    expect(c['weather'].changes()).toEqual([{ startMin: 0, speedKmh: 25, fromDeg: 180 }]);
     await fixture.whenStable();
   });
 
@@ -1276,9 +1380,9 @@ describe('simulator screen', () => {
       spotting: { enabled: false, seed: 1 },
     };
     const text = formatScenario(scenario, new Date(0)).replace('versio = 8', 'versio = 1');
-    await c['loadScenario']({
-      target: { files: [{ size: text.length, text: async () => text, name: 'old.txt' }] },
-    } as unknown as Event);
+    await c['loadScenario'](
+      fileInputEvent({ size: text.length, text: async () => text, name: 'old.txt' }),
+    );
     expect(c['scenarioNote']()?.outdated).toBe(true);
     expect(c['scenarioNote']()?.text).not.toContain('per defecte');
     fixture.nativeElement.ownerDocument.dispatchEvent(

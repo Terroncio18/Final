@@ -17,10 +17,6 @@ import {
 } from './countermeasure-plan';
 import { Icon } from './icon';
 
-/**
- * The tool being set up in the modal, before it is used (§11.39): its values
- * as typed, and why they were refused if they were.
- */
 export interface ToolConfig {
   kind: CountermeasureKind;
   discard: boolean;
@@ -28,10 +24,7 @@ export interface ToolConfig {
   error: string | null;
 }
 
-/**
- * Where a crew's default production comes from (12.19), for the modal: the
- * published source as a link, or nothing where the value is a placeholder.
- */
+// A missing production source means the rate is an editable placeholder.
 const CREW_CITATIONS: Partial<Record<CrewKind, { cite: string; url: string }>> = {
   'defense-line': {
     cite: 'Ortega et al. 2023',
@@ -55,13 +48,6 @@ function crewView(kind: CrewKind) {
   };
 }
 
-/**
- * The modal a countermeasure is set up in before it is used (§11.39).
- *
- * It edits the parent's `configuring` in place, through the two-way `config`,
- * and closes it by setting it to null. Applying is the parent's: putting the
- * tool in the hand is the plan's business, and so is remembering the values.
- */
 @Component({
   selector: 'app-tool-settings',
   imports: [Icon],
@@ -74,7 +60,6 @@ export class ToolSettingsModal {
 
   protected readonly widthLimits = WIDTH_LIMITS;
 
-  /** What the modal shows for the tool being set up. */
   protected readonly configView = computed(() => {
     const config = this.config();
     if (!config) return null;
@@ -94,7 +79,7 @@ export class ToolSettingsModal {
     };
   });
 
-  /** A field of the modal. A percentage is kept as the fraction it stands for. */
+  // Percentage fields store fractions rather than the displayed percent.
   protected setSetting(field: keyof ToolSettings, event: Event): void {
     const input = event.target as HTMLInputElement;
     const typed = input.value.trim() === '' ? Number.NaN : Number(input.value.replace(',', '.'));
@@ -104,7 +89,6 @@ export class ToolSettingsModal {
     );
   }
 
-  /** What a field shows: nothing for an empty one, the percentage for a fraction. */
   protected shown(value: number | undefined, percent = false): number | '' {
     if (value === undefined || Number.isNaN(value)) return '';
     return percent ? Math.round(value * 100) : value;

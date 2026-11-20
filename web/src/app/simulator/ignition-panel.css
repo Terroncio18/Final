@@ -1,8 +1,3 @@
-/* The ignition and spotting blocks: their own rules, moved here from
- * simulator-view.css in the order they had there. What they share with the
- * other blocks of the column is in config-section.css, listed before this.
- */
-
 .start-dot {
   flex-shrink: 0;
   width: 7px;
@@ -21,4 +16,27 @@
   border: 1px solid #35414e;
   border-radius: 4px;
   cursor: pointer;
+}
+
+.spot-list {
+  flex-direction: column;
+  max-height: 14rem;
+  overflow-y: auto;
+  margin: 8px 0 0;
+  padding: 0 4px 0 0;
+  list-style: none;
+}
+
+.spot-list li {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.spot-list button {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
 }

@@ -1,13 +1,15 @@
 import { signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
-import { vi } from 'vitest';
+
 import { MapService } from '../map/map.service';
 import { COUNTERMEASURE_CATALOG, type Countermeasure } from '../simulation/countermeasures';
-import type { SpreadResult } from '../simulation/fire-spread';
-import type { FuelTreatments } from '../simulation/fuel-treatments';
+
 import type { Point } from '../simulation/point';
 import { CountermeasurePanel } from './countermeasure-panel';
 import { CountermeasurePlan } from './countermeasure-plan';
+import { fuelTreatments } from '../../testing/fuel-treatments';
+import { spreadResult } from '../../testing/spread-result';
+import type { ComponentInputs } from '../../testing/component-inputs';
 
 const centre: Point = [2.7, 39.7];
 const line = (patch: Partial<Countermeasure> = {}): Countermeasure => ({
@@ -29,7 +31,7 @@ describe('CountermeasurePanel', () => {
   let plan: CountermeasurePlan;
   const pointer = signal<Point | null>(null);
   const element = () => fixture.nativeElement as HTMLElement;
-  const set = async (inputs: Record<string, unknown>) => {
+  const set = async (inputs: ComponentInputs<CountermeasurePanel>) => {
     for (const [key, value] of Object.entries(inputs)) fixture.componentRef.setInput(key, value);
     await fixture.whenStable();
   };
@@ -117,8 +119,9 @@ describe('CountermeasurePanel', () => {
 
   it('reads the treated fuel of the cell under the pointer or of the measure selected', async () => {
     const treated = () => p['treatedCell']();
-    const at = vi.fn(() => ({ moisture1h: 0.15, bed: { loadTonHa: 8 }, remaining: 0.5 }));
-    const result = { fuelTreatments: { at } as unknown as FuelTreatments } as SpreadResult;
+    const treatment = fuelTreatments({ moisture1h: 0.15, bed: { loadTonHa: 8 }, remaining: 0.5 });
+    const at = treatment.at;
+    const result = spreadResult({ fuelTreatments: treatment });
     expect(treated()).toBeNull();
     pointer.set(centre);
     await set({ result, minutes: 30 });

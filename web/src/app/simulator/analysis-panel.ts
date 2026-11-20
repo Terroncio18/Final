@@ -5,14 +5,6 @@ import { FuelService } from '../simulation/fuel.service';
 import { FUEL_MODELS } from '../simulation/rothermel';
 import { Icon } from './icon';
 
-/**
- * What the analysis column can show, and whether it does on a first visit.
- *
- * The column is the reader's to arrange: someone looking at how a front
- * behaves wants intensity and flame length, someone looking at how much
- * burns wants the areas, and both at once is a column to scroll. What is
- * switched off is kept in the browser, under ANALYSIS_KEY.
- */
 const ANALYSIS_ITEMS = [
   { id: 'area', label: 'Superfície', on: true },
   { id: 'perimeter', label: 'Perímetre', on: true },
@@ -33,14 +25,12 @@ const ANALYSIS_ITEMS = [
 
 const ANALYSIS_KEY = 'ignislab.analysis.hidden';
 
-/** Where the simulation stands, as the column's heading and its empty state say it. */
 export interface AnalysisState {
   tag: string;
   title: string;
   detail: string;
 }
 
-/** The figures of the fire at the minute the timeline is on, already written out. */
 export interface AnalysisFigures {
   area: string;
   growth: string;
@@ -59,11 +49,10 @@ export interface AnalysisFigures {
   edge: string;
   edgeNote: string;
   edgeReached: boolean;
-  /** Where the minute falls on the charts' 300-wide viewBox. */
+  // Chart cursor position uses the 300-unit SVG viewBox.
   cursor: number;
 }
 
-/** What Rothermel is given for the weather in force, and what it answers. */
 export interface AnalysisConditions {
   dead: string;
   live: number;
@@ -72,7 +61,6 @@ export interface AnalysisConditions {
   head: string;
 }
 
-/** One of the forecast bands, as the column lists it. */
 export interface ForecastRow {
   offset: number;
   label: string;
@@ -82,16 +70,8 @@ export interface ForecastRow {
   growth: string;
 }
 
-/**
- * A line and the area under it, as two SVG paths.
- *
- * Drawn here and not with a charting library: two paths over a fixed viewBox
- * is what these charts are, and a dependency for that would be heavier than
- * the thing it draws. `preserveAspectRatio="none"` lets the viewBox stretch to
- * whatever width the column has.
- */
 function chartPaths(values: readonly number[], width = 300, height = 100) {
-  // A fire that has not moved is a flat line at the bottom, not a division by zero.
+  // A stationary fire needs a zero-height curve, avoiding division by zero.
   const top = Math.max(...values) || 1;
   const step = width / (values.length - 1);
   const points = values.map(
@@ -103,15 +83,6 @@ function chartPaths(values: readonly number[], width = 300, height = 100) {
   return { line, area: `${line} L${width} ${height} L0 ${height} Z` };
 }
 
-/**
- * The right-hand column of the console: what comes out of the computation.
- *
- * The figures, the conditions and the forecast are the screen's, worked out
- * with the clock and the compass it also uses elsewhere, and come in already
- * written. What is the column's own is what it draws from the run —the two
- * curves and the fuels burned— and which of its blocks the reader keeps on.
- * It is its own landmark: the console gives it the place of a sidebar.
- */
 @Component({
   selector: 'app-analysis-panel',
   imports: [Icon],
@@ -132,15 +103,12 @@ export class AnalysisPanel {
 
   private readonly fuels = inject(FuelService);
 
-  // ---- What the column shows. ----
   protected readonly analysisItems = ANALYSIS_ITEMS;
   protected readonly editing = signal(false);
   private readonly hidden = signal<ReadonlySet<string>>(this.storedHidden());
 
-  /** How many fuel models the domain has, which is what the conditions are worked out for. */
   protected readonly fuelCount = computed(() => this.fuels.grid()?.counts.length ?? 0);
 
-  /** The two curves of the column, sampled every five minutes. */
   protected readonly charts = computed(() => {
     const result = this.result();
     if (!result) return { area: chartPaths([0, 0]), rate: chartPaths([0, 0], 300, 64) };
@@ -157,12 +125,8 @@ export class AnalysisPanel {
     return { area: chartPaths(areas), rate: chartPaths(rates, 300, 64) };
   });
 
-  /**
-   * What has burned so far, by fuel model: which fuels the fire is living on.
-   *
-   * A pass over the grid, so it is only made while the block is on screen,
-   * and once per minute of the timeline rather than per frame of it.
-   */
+  // Scan burned fuel only while visible and once per simulation minute, rather than once per
+  // animation frame.
   protected readonly burnedFuels = computed(() => {
     const result = this.result();
     const fuels = this.fuels.grid();
@@ -197,7 +161,7 @@ export class AnalysisPanel {
     try {
       localStorage.setItem(ANALYSIS_KEY, JSON.stringify([...hidden]));
     } catch {
-      // Not kept for the next visit; it still holds for this one.
+      // Storage may be unavailable; keep the choice for this visit.
     }
   }
 
@@ -206,7 +170,7 @@ export class AnalysisPanel {
       const stored = localStorage.getItem(ANALYSIS_KEY);
       if (stored !== null) return new Set(JSON.parse(stored) as string[]);
     } catch {
-      // No storage, or something else's value under the key: the defaults.
+      // Use defaults when storage is unavailable or contains an incompatible value.
     }
     return new Set(ANALYSIS_ITEMS.filter((item) => !item.on).map((item) => item.id));
   }

@@ -11,8 +11,6 @@
   </button>
 </div>
 
-<!-- The column is the reader's to arrange: what is ticked is what is
-     shown, and the choice is kept in the browser. -->
 @if (editing()) {
   <fieldset class="analysis-options">
     <legend>Dades visibles</legend>
@@ -232,8 +230,6 @@
   </div>
 }
 
-<!-- What went into the computation, whether or not it has run: these
-     are worked out from the weather in force, not from the fire. -->
 @if (shows('conditions')) {
   <details class="fold chart-section" [open]="!result()">
     <summary>

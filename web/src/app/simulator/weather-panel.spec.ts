@@ -5,8 +5,21 @@ import type { SpreadResult } from '../simulation/fire-spread';
 import type { Point } from '../simulation/point';
 import { compass, trackFill, WeatherPanel, type WeatherNow, type WindEdit } from './weather-panel';
 import { WeatherService, type Observation } from './weather.service';
+import type { ComponentInputs } from '../../testing/component-inputs';
+import { inputEvent } from '../../testing/events';
 
 const centre: Point = [2.7, 39.7];
+const observation: Observation = {
+  source: 'AEMET',
+  station: { id: 'B013X', name: 'Sóller', lon: 2.7, lat: 39.76 },
+  observedAt: '2024-08-01T12:00:00Z',
+  windKmh: 18,
+  windFromDeg: 90,
+  humidity: 40,
+  temperature: 29,
+  distanceKm: 3.2,
+  stale: false,
+};
 const now: WeatherNow = {
   wind: 20,
   fromDeg: 315,
@@ -20,20 +33,25 @@ describe('WeatherPanel', () => {
   let fixture: ComponentFixture<WeatherPanel>;
   let p: WeatherPanel;
   let edits: WindEdit[];
+  // The real service answers only for the domain it was asked about; this double does the same.
+  const reading = signal<Observation | null>(null);
   const weather = {
-    observation: signal<Observation | null>(null),
     loading: signal(false),
     failed: signal(false),
     load: vi.fn(),
+    observationFor: vi.fn((country: 'ES' | 'PT', point: Point | null) =>
+      country === 'ES' && point?.[0] === centre[0] ? reading() : null,
+    ),
   };
   const element = () => fixture.nativeElement as HTMLElement;
-  const set = async (inputs: Record<string, unknown>) => {
+  const set = async (inputs: ComponentInputs<WeatherPanel>) => {
     for (const [key, value] of Object.entries(inputs)) fixture.componentRef.setInput(key, value);
     await fixture.whenStable();
   };
 
   beforeEach(async () => {
     weather.load.mockClear();
+    reading.set(null);
     TestBed.configureTestingModule({ providers: [{ provide: WeatherService, useValue: weather }] });
     fixture = TestBed.createComponent(WeatherPanel);
     p = fixture.componentInstance;
@@ -93,6 +111,28 @@ describe('WeatherPanel', () => {
     expect(element().querySelector('.source-card')).toBeNull();
   });
 
+  it('shows the station only while it belongs to the domain on screen', async () => {
+    reading.set(observation);
+    await set({ weatherMode: 'live' });
+    expect(weather.observationFor).toHaveBeenCalledWith('ES', centre);
+    expect(p['station']()).toMatchObject({ name: 'Sóller', distance: '3,2 km' });
+    expect(p['liveState']().tag).toBe('EN DIRECTE');
+    await set({ country: 'PT' });
+    expect(p['station']()).toBeNull();
+    expect(p['liveState']().tag).toBe('SENSE CONNEXIÓ');
+    expect(p['liveState']().note).toContain("l'IPMA");
+    await set({ country: 'ES', centre: null });
+    expect(p['station']()).toBeNull();
+    expect(weather.observationFor).toHaveBeenCalledWith('ES', null);
+    weather.loading.set(true);
+    expect(p['liveState']().tag).toBe('LLEGINT');
+    weather.loading.set(false);
+    await set({ centre });
+    weather.failed.set(true);
+    expect(p['liveState']().tag).toBe('DADA ANTIGA');
+    weather.failed.set(false);
+  });
+
   it('sends the wind out and keeps the humidity and the temperature', async () => {
     const slide = (id: string, value: string) => {
       const range = element().querySelector<HTMLInputElement>(`#${id}`)!;
@@ -105,7 +145,7 @@ describe('WeatherPanel', () => {
     expect(edits).toEqual([{ speedKmh: 35 }]);
     expect([p.humidity(), p.temperature()]).toEqual([55, 33]);
     await set({ computing: true });
-    p['setNumber']('humidity', { target: { value: '70' } } as unknown as Event);
+    p['setNumber']('humidity', inputEvent('70'));
     expect(p.humidity()).toBe(55);
   });
 

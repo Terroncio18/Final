@@ -3,8 +3,8 @@ import { vi } from 'vitest';
 import { COUNTERMEASURE_CATALOG, type CountermeasureKind } from '../simulation/countermeasures';
 import { defaultSettings } from './countermeasure-plan';
 import { ToolSettingsModal, type ToolConfig } from './tool-settings';
+import { inputEvent as input } from '../../testing/events';
 
-const input = (value: string) => ({ target: { value } }) as unknown as Event;
 const configFor = (kind: CountermeasureKind, patch: Partial<ToolConfig> = {}): ToolConfig => ({
   kind,
   discard: false,

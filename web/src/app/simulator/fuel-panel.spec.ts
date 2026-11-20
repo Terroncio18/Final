@@ -8,13 +8,14 @@ import type { Point } from '../simulation/point';
 import type { Terrain } from '../simulation/terrain';
 import { TerrainService } from '../simulation/terrain.service';
 import { FuelPanel } from './fuel-panel';
+import { fuelGrid } from '../../testing/fuel-grid';
 
 const centre: Point = [2.7, 39.7];
 
 function gridWith(patch: Partial<FuelGrid>): FuelGrid {
   const models = new Uint8Array(GRID * GRID).fill(1);
   models[0] = 0;
-  return {
+  return fuelGrid({
     models,
     officialCells: GRID * GRID,
     estimatedCells: 0,
@@ -26,7 +27,7 @@ function gridWith(patch: Partial<FuelGrid>): FuelGrid {
     ],
     warnings: ['Avís'],
     ...patch,
-  } as unknown as FuelGrid;
+  });
 }
 
 describe('FuelPanel', () => {

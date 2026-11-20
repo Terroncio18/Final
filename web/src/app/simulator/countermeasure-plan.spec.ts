@@ -94,24 +94,20 @@ describe('the countermeasure plan', () => {
     plan.click(c, bounds);
     const [first, second] = plan.measures();
 
-    // Back at minute 50: two measures are later than the cursor.
     plan.minute.set(50);
     expect(plan.later().map((m) => m.startMin)).toEqual([100, 200]);
 
-    // Without agreeing, a new measure leaves them alone.
     plan.begin(line.kind);
     plan.begin(point.kind);
     plan.click(a, bounds);
     expect(plan.measures()).toHaveLength(4);
     plan.remove(plan.measures()[3].id);
 
-    // Agreed and then put down: nothing is dropped.
     plan.cancel();
     plan.begin(point.kind, true);
     plan.cancel();
     expect(plan.discarding()).toBe(false);
 
-    // Agreed: the next measure takes them off, says so, and disarms.
     plan.begin(point.kind, true);
     plan.click(b, bounds);
     expect(plan.measures().map((m) => m.startMin)).toEqual([undefined, 50]);
@@ -132,7 +128,7 @@ describe('the countermeasure plan', () => {
     expect(plan.tool()?.widthM).toBe(120);
     plan.click(a, bounds);
     expect(plan.measures()[0]).toMatchObject({ widthM: 120, litresPerPass: 900, passes: 3 });
-    // Without values chosen, the catalogue's.
+
     plan.begin('clearing');
     plan.click(a, bounds);
     plan.click(b, bounds);
@@ -153,7 +149,7 @@ describe('the countermeasure plan', () => {
     plan.minute.set(81);
     expect(plan.finishedRows().map((row) => row.id)).toEqual([drop.id]);
     expect(plan.openRows()).toEqual([]);
-    // A line on the ground is never «done» in that sense.
+
     expect(lastPass({ ...drop, kind: 'firebreak', litresPerPass: undefined })).toBeNull();
   });
 
@@ -235,7 +231,7 @@ describe('the countermeasure plan', () => {
       strength: line.strength,
       durationMin: line.durationMin,
     });
-    // The line is closed and the tool put away: one measure per tool taken.
+
     expect(plan.draft()).toEqual([]);
     expect(plan.kind()).toBeNull();
     expect(plan.note()?.failed).toBe(false);
@@ -282,7 +278,7 @@ describe('the countermeasure plan', () => {
     plan.click(a, bounds);
     expect(plan.measures().map((measure) => measure.points)).toEqual([[a]]);
     expect(plan.draft()).toEqual([]);
-    // Placed, and the tool is put away: a second click places nothing.
+
     expect(plan.kind()).toBeNull();
     plan.click(b, bounds);
     expect(plan.measures()).toHaveLength(1);

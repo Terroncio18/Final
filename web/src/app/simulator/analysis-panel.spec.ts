@@ -6,6 +6,7 @@ import type { SpreadResult } from '../simulation/fire-spread';
 import type { FuelGrid } from '../simulation/fuel-data';
 import { FuelService } from '../simulation/fuel.service';
 import { AnalysisPanel, type AnalysisFigures } from './analysis-panel';
+import { fuelGrid } from '../../testing/fuel-grid';
 
 const centreCell = (GRID / 2) * GRID + GRID / 2;
 
@@ -35,7 +36,7 @@ function resultFor(): SpreadResult {
 }
 
 function gridOf(models: Uint8Array): FuelGrid {
-  return { models, counts: [{ id: 1, cells: GRID * GRID }] } as unknown as FuelGrid;
+  return fuelGrid({ models, counts: [{ id: 1, cells: GRID * GRID }] });
 }
 
 const figures: AnalysisFigures = {

@@ -3,9 +3,6 @@
     <h3>METEOROLOGIA <app-icon name="wind" /></h3>
   </summary>
 
-  <!-- Two ways of saying what the weather is, and only one of them is
-       wired: the live one shows where the data will come from and
-       nothing it has not read. -->
   <div class="mode-switch" role="group" aria-label="Origen de la meteorologia">
     <button
       type="button"
@@ -59,12 +56,6 @@
 
   <div class="weather-values" [class.locked]="weatherMode() === 'live'">
     <div class="wind-summary">
-      <!-- A compass to turn: drag the needle, or use the arrow keys. It is
-           a slider to assistive technology, over the bearing the wind
-           comes from. Locked while an observation is in force. The dial
-           takes the pointer and not the needle (`pointer-events: none`),
-           and `touch-action: none` keeps a finger from scrolling the
-           column instead of turning it. -->
       <div
         class="wind-rose"
         role="slider"
@@ -85,8 +76,6 @@
         <span class="south">S</span>
         <span class="west">O</span>
         <div class="rose-rings"></div>
-        <!-- The needle points where the wind goes, which is where it
-             takes the fire: the origin plus 180°, and not the origin. -->
         <svg
           class="wind-needle"
           viewBox="-50 -50 100 100"
@@ -99,7 +88,6 @@
           aria-hidden="true"
           [style.transform]="'rotate(' + now().towardsDeg + 'deg)'"
         >
-          <!-- The blunt end: where the wind comes from. -->
           <circle cx="0" cy="27" r="2" />
           <line x1="0" y1="27" x2="0" y2="-18" />
           <path d="M0 -34 L8 -17 L0 -21 L-8 -17 Z" />

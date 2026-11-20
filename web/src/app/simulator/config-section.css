@@ -1,14 +1,4 @@
-/* What every section of the configuration column wears.
- *
- * The column is split into a component per block —domain, weather, fuel,
- * scenarios, ignitions, countermeasures—, and each of them wears the same
- * folding section, list of facts, row of buttons and focus ring. Moved here
- * from simulator-view.css once, and listed first in each of those components'
- * `styleUrls`, rather than copied five times over. Everything is in the order
- * it had there; each component's own sheet comes after this one, as its rules
- * came after these, so the cascade comes out the same. The colours are the
- * console's custom properties, which reach in from its host.
- */
+/* Shared rules load before each component’s own sheet so local overrides retain precedence. */
 
 /* The host adds no box: each section is still an item of the column's flex. */
 :host {
@@ -49,7 +39,6 @@
   --icon-size: 14px;
 }
 
-/* A section that folds: a <details> with its title. */
 .fold > summary {
   list-style: none;
   cursor: pointer;
@@ -68,7 +57,6 @@
   margin: 0;
 }
 
-/* The arrow and the title to the left, the icon or the tag to the right. */
 .control-section h3 > :last-child {
   margin-left: auto;
 }

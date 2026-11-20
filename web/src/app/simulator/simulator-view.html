@@ -6,15 +6,8 @@
     </p>
   }
 
-  <!-- The bar carries what IgnisLab actually has here: the mark, which
-       simulation this is, and the way back. No tabs that lead nowhere. -->
   <header class="topbar">
     <a class="brand" [routerLink]="back()">
-      <!--
-      Material Symbols Outlined «mode_heat», eixos FILL 0, wght 400, GRAD 0,
-      opsz 24. Google, llicència Apache 2.0. El mateix traçat que la portada:
-      la marca és la marca.
-      -->
       <span class="brand-icon">
         <svg viewBox="0 -960 960 960" aria-hidden="true">
           <path
@@ -46,8 +39,6 @@
       <h1>Predicció de propagació d'incendis</h1>
     </div>
     <div class="heading-right">
-      <!-- What the screen is, said where it cannot be missed: a drill on
-           assumed fuel, not a forecast. -->
       <span class="mock-badge">
         <span></span>
         Simulacre · combustible cartografiat i estimat
@@ -56,7 +47,6 @@
   </div>
 
   <main class="workspace">
-    <!-- ───────────────────────── esquerra: entrades ───────────────────────── -->
     <aside class="sidebar left-panel" aria-label="Configuració de la simulació">
       <div class="panel-heading">
         <h2><app-icon name="sliders" /> Configuració</h2>
@@ -66,14 +56,14 @@
       <app-domain-panel [place]="chosen()?.name ?? null" [province]="provinceName()" />
 
       <app-weather-panel
-        [(weatherMode)]="weatherMode"
-        [(humidity)]="humidity"
-        [(temperature)]="temperature"
-        [(windDraft)]="windDraft"
-        [now]="now()"
+        [(weatherMode)]="weather.mode"
+        [(humidity)]="weather.humidity"
+        [(temperature)]="weather.temperature"
+        [(windDraft)]="weather.draft"
+        [now]="weather.now()"
         [windRows]="windRows()"
-        [result]="result()"
-        [computing]="computing()"
+        [result]="runs.result()"
+        [computing]="runs.computing()"
         [canStart]="canStart()"
         [elapsed]="elapsed()"
         [country]="country()"
@@ -98,8 +88,8 @@
         [(spottingSeed)]="spottingSeed"
         [plan]="plan"
         [startRows]="startRows()"
-        [result]="result()"
-        [computing]="computing()"
+        [result]="runs.result()"
+        [computing]="runs.computing()"
         [spotCount]="visibleSpots().length"
         [spotRows]="spotRows()"
         [elapsed]="elapsed()"
@@ -110,10 +100,10 @@
 
       <app-countermeasure-panel
         [plan]="plan"
-        [computing]="computing()"
+        [computing]="runs.computing()"
         [pastWarning]="pastWarning()"
-        [planStale]="planStale()"
-        [result]="result()"
+        [planStale]="runs.stale()"
+        [result]="runs.result()"
         [minutes]="minutes()"
         [centre]="ignition()"
         (pickMeasure)="pickMeasure($event)"
@@ -131,29 +121,29 @@
           </p>
         }
         <div class="simulation-state">
-          <span class="live-dot" [class.waiting]="!result()"></span>
+          <span class="live-dot" [class.waiting]="!runs.result()"></span>
           <span>{{ state().short }}</span>
           <span class="elapsed">T + {{ elapsed() }} h</span>
         </div>
-        @if (computing()) {
-          <div class="run-progress"><span [style.width.%]="progress() * 100"></span></div>
+        @if (runs.computing()) {
+          <div class="run-progress"><span [style.width.%]="runs.progress() * 100"></span></div>
         }
-        @if (runError(); as error) {
+        @if (runs.error(); as error) {
           <p class="terrain-note measure-note failed" role="alert">{{ error }}</p>
         }
         <div class="play-controls">
           <button
             type="button"
             class="button primary"
-            [disabled]="!canStart() || !!windDraft()"
+            [disabled]="!canStart() || !!weather.draft()"
             (click)="start()"
           >
-            <app-icon name="play" /> {{ result() ? 'Tornar a calcular' : 'Iniciar simulació' }}
+            <app-icon name="play" /> {{ runs.result() ? 'Tornar a calcular' : 'Iniciar simulació' }}
           </button>
           <button
             type="button"
             class="button reset-button"
-            [disabled]="!result() && !computing()"
+            [disabled]="!runs.result() && !runs.computing()"
             aria-label="Reiniciar"
             title="Treure la simulació"
             (click)="reset()"
@@ -164,7 +154,6 @@
       </div>
     </aside>
 
-    <!-- ────────────────────────── centre: el terreny ────────────────────────── -->
     <section class="map-panel" aria-label="Terreny de la simulació">
       <div class="map-topbar">
         <div class="map-place">
@@ -173,8 +162,6 @@
           <span>/</span>
           <span>{{ provinceName() }}</span>
         </div>
-        <!-- The cell under the pointer while there is one, and the centre of
-             the domain otherwise. Each says which it is. -->
         @if (under(); as cell) {
           <span class="map-coordinates">
             Cursor · {{ cell.coordinates }} · <strong>{{ cell.elevation }} m</strong> ·
@@ -209,9 +196,6 @@
           <span class="time-chip-tag">{{ state().tag }}</span>
         </div>
 
-        <!-- Only the controls that do something here. The zoom has buttons
-             since the sandbox has a zoom (§11.10): the wheel alone leaves out
-             whoever has no wheel, and the keyboard handler stays off (§11.3). -->
         <div class="map-toolbar">
           <button type="button" title="Acostar" aria-label="Acostar" (click)="zoom(1)">
             <app-icon name="plus" />
@@ -256,7 +240,7 @@
           >
             <app-icon name="layers" />
           </button>
-          @if (result()) {
+          @if (runs.result()) {
             <button
               type="button"
               title="Veure el foc i la previsió"
@@ -283,14 +267,14 @@
             <span><i class="legend-domain"></i>Domini</span>
             <span><i class="legend-fire"></i>Centre del domini</span>
           </div>
-          @if (result()) {
+          @if (runs.result()) {
             <div class="map-legend slope-legend">
               <span>Foc</span>
               <span><i class="fire-front"></i>Front</span>
               <span><i class="fire-flames"></i>Flames</span>
               <span><i class="fire-char"></i>Cremat</span>
             </div>
-            @if (forecasts() && !computing()) {
+            @if (forecasts() && !runs.computing()) {
               <div class="map-legend forecast-legend">
                 <span>Previsió</span>
                 @for (row of forecastRows(); track row.offset) {
@@ -314,7 +298,6 @@
           }
         </div>
 
-        <!-- A line is closed here, under the drawing (§11.39). -->
         @if (plan.tool(); as active) {
           @if (active.geometry === 'line') {
             <div class="map-apply" [style.--measure]="active.color">
@@ -324,7 +307,7 @@
               >
               <button
                 type="button"
-                [disabled]="!plan.canFinish() || computing()"
+                [disabled]="!plan.canFinish() || runs.computing()"
                 (click)="finishMeasure()"
               >
                 Aplicar
@@ -333,8 +316,6 @@
           }
         }
 
-        <!-- Which way the view faces (§11.37). It only says so: turning the
-             view is done on the map itself. -->
         <div class="map-compass" role="img" aria-label="Orientació de la vista">
           <svg viewBox="0 0 40 40" [style.transform]="compassTurn()">
             <polygon class="compass-north" points="20,7 24.5,20 15.5,20" />
@@ -354,7 +335,7 @@
           <div class="timeline-actions">
             <button
               type="button"
-              [disabled]="!result() || computing() || !!windDraft()"
+              [disabled]="!runs.result() || runs.computing() || !!weather.draft()"
               [attr.aria-label]="playing() ? 'Aturar' : 'Reproduir'"
               (click)="togglePlay()"
             >
@@ -363,7 +344,7 @@
             <select
               aria-label="Velocitat"
               [value]="speed()"
-              [disabled]="!result() || computing()"
+              [disabled]="!runs.result() || runs.computing()"
               (change)="setSpeed($event)"
             >
               <option value="1">1×</option>
@@ -385,7 +366,7 @@
             [value]="minutes()"
             [style.--fill]="fill(minutes(), 0, horizon.minutes)"
             (input)="setMinutes($event)"
-            [disabled]="!result() || computing()"
+            [disabled]="!runs.result() || runs.computing()"
           />
           <div class="timeline-ticks">
             @for (tick of horizon.ticks; track tick) {
@@ -396,12 +377,11 @@
       </div>
     </section>
 
-    <!-- ───────────────────── dreta: el que surt del càlcul ───────────────────── -->
     <app-analysis-panel
       class="sidebar right-panel"
-      [result]="result()"
+      [result]="runs.result()"
       [minutes]="minutes()"
-      [computing]="computing()"
+      [computing]="runs.computing()"
       [horizon]="horizon"
       [state]="state()"
       [elapsed]="elapsed()"
@@ -413,7 +393,7 @@
 
   <footer class="statusbar">
     <div>
-      <span class="live-dot" [class.waiting]="!result()"></span>
+      <span class="live-dot" [class.waiting]="!runs.result()"></span>
       {{ state().short }} · Rothermel · combustible per cel·la
       <span class="status-divider">|</span>
       <span>Escenari: <strong>sense desar</strong></span>
@@ -426,8 +406,6 @@
       <strong>IgnisLab <span>TFG UOC</span></strong>
     </div>
   </footer>
-  <!-- A countermeasure is set up before it is used, here and not in the list
-       (§11.39). -->
   @if (configuring()) {
     <app-tool-settings [(config)]="configuring" (apply)="applySettings()" />
   }

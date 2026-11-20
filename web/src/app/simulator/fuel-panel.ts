@@ -5,21 +5,12 @@ import type { Point } from '../simulation/point';
 import { FUEL_MODELS } from '../simulation/rothermel';
 import { TerrainService } from '../simulation/terrain.service';
 
-/**
- * The «Combustible» block of the configuration column: what the fuel map of
- * the square says, and where it comes from.
- *
- * Read from the fuel grid and the elevation the whole screen shares
- * (FuelService, TerrainService); whether that fuel lets the simulation start
- * is the console's to say, and it says it under the start button.
- */
 @Component({
   selector: 'app-fuel-panel',
   templateUrl: './fuel-panel.html',
   styleUrls: ['./config-section.css', './fuel-panel.css'],
 })
 export class FuelPanel {
-  /** The centre of the domain, to ask for its fuels again; nothing when the address has none. */
   public readonly centre = input.required<Point | null>();
 
   protected readonly fuels = inject(FuelService);
@@ -33,7 +24,6 @@ export class FuelPanel {
     })),
   );
 
-  /** How much of the square is ground, which is how much of it can burn. */
   protected readonly burnableShare = computed(() => {
     const terrain = this.terrain.terrain();
     const fuels = this.fuels.grid();

@@ -1,11 +1,3 @@
-/* The simulation console.
- *
- * Ported from the FireCast prototype (§11.7): same geometry —a 75 px bar, a
- * 255 / 1fr / 304 grid and a 34 px status bar— and its palette, which turns
- * out to be a point or two from the one the rest of the application already
- * uses. The values are kept here and not merged into the global tokens
- * because they describe this screen, and nothing on the portada asked to move.
- */
 :host {
   --panel: #161d25;
   --line: #29313b;
@@ -26,8 +18,6 @@
   flex-direction: column;
   height: 100%;
 }
-
-/* ───────────────────────────── the bar ───────────────────────────── */
 
 .topbar {
   height: 75px;
@@ -92,7 +82,6 @@
   margin-left: auto;
 }
 
-/* Which simulation this is, which is what the prototype's tabs occupied. */
 .where {
   display: flex;
   align-items: center;
@@ -158,8 +147,6 @@
   letter-spacing: -0.3px;
 }
 
-/* Said in the heading, said under the numbers and said in the status bar:
-   three times, because a screenshot of this screen only carries one of them. */
 .mock-badge {
   display: flex;
   align-items: center;
@@ -179,8 +166,6 @@
   background: #e8ab80;
   border-radius: 50%;
 }
-
-/* ──────────────────────────── the grid ──────────────────────────── */
 
 .workspace {
   flex: 1;
@@ -248,12 +233,6 @@
   border-color: #5c4330;
 }
 
-/* ───────────────────────── left: the inputs ───────────────────────── */
-
-/* The blocks of the column are components of their own, each with its sheet
- * and config-section.css for what they share. What stays here is the column's
- * foot —the note and the start button— and what the timeline also wears. */
-
 .terrain-note {
   margin: 9px 0 0;
   font-size: 10px;
@@ -316,7 +295,6 @@ input[type='range']::-webkit-slider-thumb {
   border-radius: 50%;
 }
 
-/* Amber and not green: nothing is running, and nothing is going to. */
 .live-dot.waiting {
   background: #c99a62;
 }
@@ -354,8 +332,6 @@ input[type='range']::-webkit-slider-thumb {
 .play-controls button:disabled:hover {
   filter: saturate(0.35) brightness(0.8);
 }
-
-/* ───────────────────────── centre: the map ───────────────────────── */
 
 .map-panel {
   position: relative;
@@ -595,11 +571,8 @@ input[type='range']::-webkit-slider-thumb {
   background: #425260;
 }
 
-/* Under the time chip and not in the bottom corner. That corner is MapLibre's:
-   the credits are a licence condition, they wrap to as many lines as the card
-   is narrow, and a legend placed a fixed distance above them ends up on top of
-   them. Up here nothing else changes size. */
-/* The compass: the toolbar's look, in a disc at the bottom right. */
+/* Keep the legend away from attribution, which can wrap to several lines in a narrow card. */
+
 .map-compass {
   position: absolute;
   z-index: 3;
@@ -670,7 +643,6 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 .map-legend i,
-/* Squares and not dots: these are areas of ground, not marks on it. */
 .slope-legend {
   margin-top: 6px;
 }
@@ -769,8 +741,6 @@ input[type='range']::-webkit-slider-thumb {
   color: #80909c;
 }
 
-/* ──────────────────────── the status bar ──────────────────────── */
-
 .statusbar {
   flex-shrink: 0;
   display: flex;
@@ -816,9 +786,6 @@ select:focus-visible {
   outline-offset: 3px;
 }
 
-/* Said once, plainly, when the window is the reason the columns moved —see
-   the `@media` rule further down, and NARROW_WORKSPACE_QUERY in the
-   component, which has to name the same width. */
 .narrow-warning {
   flex-shrink: 0;
   margin: 0;
@@ -829,7 +796,6 @@ select:focus-visible {
   border-bottom: 1px solid #6a4731;
 }
 
-/* A laptop screen: the three columns stay, everything gives a little. */
 @media (max-width: 1250px) {
   .workspace {
     grid-template-columns: 225px minmax(0, 1fr) 270px;
@@ -848,14 +814,7 @@ select:focus-visible {
   }
 }
 
-/* A tablet turned narrow, or a window pulled in past what the laptop rule
- * above can absorb: 225px and 270px of fixed sidebar no longer leave the
- * centre column anywhere to shrink to, and the grid would spill past the
- * edge instead of fitting (§11.6x). Below here the three columns stack
- * instead, full width and in reading order, and the console scrolls rather
- * than clipping them — :host's own overflow stays hidden on the cross axis
- * only. NARROW_WORKSPACE_QUERY in the component has to name this same width.
- */
+/* Stack columns below this breakpoint to avoid overflow. Keep NARROW_WORKSPACE_QUERY in sync. */
 @media (max-width: 860px) {
   :host {
     height: auto;
@@ -888,8 +847,6 @@ select:focus-visible {
   }
 }
 
-/* ───────────────────────── the simulation ───────────────────────── */
-
 .run-progress {
   height: 3px;
   margin-bottom: 8px;
@@ -904,8 +861,6 @@ select:focus-visible {
   background: var(--orange);
 }
 
-/* The three ages the fire is painted in (fire-spread.ts), as squares: they
-   are areas of ground, like the bands of the slope. */
 .fire-front {
   background: #ffe278;
 }

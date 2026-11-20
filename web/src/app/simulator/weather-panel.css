@@ -1,11 +1,3 @@
-/* The «Meteorologia» block: its own rules, moved here from
- * simulator-view.css in the order they had there, and a copy of the console's
- * range, which simulator-view.css keeps for the timeline. What it shares with
- * the other blocks of the column is in config-section.css, listed before this.
- */
-
-/* ---- The block's own ---- */
-
 .wind-summary {
   display: flex;
   align-items: center;
@@ -118,8 +110,6 @@
   color: #e0e5e9;
 }
 
-/* ---- Copied from simulator-view.css ---- */
-
 input[type='range'] {
   --fill: 50%;
   display: block;
@@ -143,8 +133,6 @@ input[type='range']::-webkit-slider-thumb {
   box-shadow: 0 0 0 3px #fa884414;
 }
 
-/* ---- The block's own ---- */
-
 .blue-range {
   --orange: #79a5c9;
 }
@@ -161,7 +149,6 @@ input[type='range']::-webkit-slider-thumb {
   color: #657585;
 }
 
-/* The two origins of the weather, as one control with two positions. */
 .mode-switch {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -232,8 +219,6 @@ input[type='range']::-webkit-slider-thumb {
   --icon-size: 13px;
 }
 
-/* Read and not set: with the weather coming from a station, the sliders show
-   a value and take none. */
 .weather-values.locked {
   opacity: 0.55;
 }

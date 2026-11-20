@@ -1,16 +1,7 @@
 import { Component, computed, input } from '@angular/core';
 
-/**
- * The line icons the simulation screen is drawn with.
- *
- * Twenty-four paths on a 24×24 grid, stroked and not filled, taken from the
- * FireCast prototype this screen is modelled on —they are drawn by hand there,
- * in its own `app.js`, and not a third party's set, so there is no licence to
- * carry and no package to install for twenty-four line drawings.
- *
- * A dictionary and not one component per icon: they are data, they are used
- * once each, and a file per icon would be more ceremony than drawing.
- */
+// Line paths adapted from the project’s FireCast prototype; additional icons use the same 24×24
+// grid.
 const ICONS = {
   flame: 'M12 3c2 5-5 7-2 11 1-2 3-3 4-6 6 6 4 13-3 13S2 15 6 10c0 3 2 4 3 2-1-4 3-5 3-9Z',
   sliders: 'M4 5h7 M15 5h5 M4 12h2 M10 12h10 M4 19h10 M18 19h2 M11 2v6 M6 9v6 M14 16v6',
@@ -31,8 +22,7 @@ const ICONS = {
   activity: 'M2 12h5l3-8 4 16 3-8h5',
   info: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0 M12 11v6 M12 7v1',
   back: 'm11 5-7 7 7 7 M4 12h16',
-  // The six below are not the prototype's: drawn here, in the same manner,
-  // when the configuration column needed them.
+
   antenna: 'M5 13a7 7 0 0 1 14 0 M8.5 13a3.5 3.5 0 0 1 7 0 M12 13v8 M9 21h6',
   save: 'M5 3h11l3 3v15H5Z M8 3v6h7V3 M8 21v-7h8v7',
   folder: 'M3 6h6l2 2h10v11H3Z',
@@ -43,18 +33,10 @@ const ICONS = {
 
 type IconName = keyof typeof ICONS;
 
-/** A name that came as data —the countermeasure catalogue's— or a fallback. */
 export function iconOr(name: string, fallback: IconName): IconName {
   return Object.hasOwn(ICONS, name) ? (name as IconName) : fallback;
 }
 
-/**
- * One icon, inline.
- *
- * Inline rather than a sprite or a font: the stroke takes `currentColor`, so
- * an icon beside a label is the same colour as the label without anything
- * having to say so, and there is no second request for a file.
- */
 @Component({
   selector: 'app-icon',
   template: `<svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="path()" /></svg>`,

@@ -76,12 +76,15 @@
     <p class="terrain-note" role="status">
       {{ spotCount() }} focus per brases fins a T + {{ elapsed() }} h.
     </p>
-    <div class="tools-row">
+    <ul class="tools-row spot-list" aria-label="Focus secundaris per brases">
       @for (spot of spotRows(); track spot.cell) {
-        <button type="button" (click)="focusSpot.emit(spot.cell)">
-          {{ spot.label }} · {{ spot.time }} h · {{ spot.distance }} m
-        </button>
+        <li>
+          <button type="button" (click)="focusSpot.emit(spot.cell)">
+            <strong>{{ spot.label }}</strong>
+            <span>{{ spot.time }} h · {{ spot.distance }} m</span>
+          </button>
+        </li>
       }
-    </div>
+    </ul>
   }
 </details>

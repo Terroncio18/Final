@@ -1,6 +1,10 @@
 @if (configView(); as config) {
-  <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -- Escape closes it from anywhere: the simulator view listens on the document. -->
-  <div class="modal-backdrop" (click)="cancelSettings()"></div>
+  <button
+    type="button"
+    class="modal-backdrop"
+    aria-label="Tancar els ajustos"
+    (click)="cancelSettings()"
+  ></button>
   <div
     class="tool-modal"
     role="dialog"

@@ -16,24 +16,16 @@ import {
 } from '../simulation/countermeasures';
 import type { Point } from '../simulation/point';
 
-/** `[west, south, east, north]`, as domainAround() gives it. */
+// Bounds order: west, south, east, north.
 export type Bounds = readonly [number, number, number, number];
 
-/** What the plan last had to say: a confirmation, or why something was refused. */
 interface PlanNote {
   readonly text: string;
   readonly failed: boolean;
 }
 
-/**
- * What the inputs of the list accept.
- *
- * The same bounds the model's own validation holds (parseCountermeasures), so
- * that a plan a scenario file may carry is one these inputs can show and
- * edit. The lower width is the cell: a strip narrower than thirty metres is
- * one the grid cannot resolve. These constants come from the model;
- * commit() validates the complete plan before accepting any edit.
- */
+// Tool limits match model validation. A strip narrower than one cell cannot be resolved by the
+// grid.
 export { WIDTH_LIMITS, DURATION_LIMITS, MAX_VERTICES } from '../simulation/countermeasures';
 
 const BARRIERS: ReadonlySet<CountermeasureKind> = new Set(['defense-line', 'firebreak']);
@@ -42,23 +34,18 @@ export function catalogEntry(kind: CountermeasureKind) {
   return COUNTERMEASURE_CATALOG.find((entry) => entry.kind === kind)!;
 }
 
-/**
- * What is chosen for a tool before it is used (§11.39): the size, and for a
- * discharge or a clearing what it puts down or leaves.
- */
 export interface ToolSettings {
   readonly widthM: number;
   readonly litresPerPass?: number;
   readonly passes?: number;
   readonly passIntervalMin?: number;
   readonly fuelRemaining?: number;
-  /** The crew of a ground measure (12.19): arrival, people and production each. */
+
   readonly arrivalMin?: number;
   readonly crewSize?: number;
   readonly ratePerPerson?: number;
 }
 
-/** A tool's starting values: the catalogue's size, a full load, one pass, the default crew. */
 export function defaultSettings(kind: CountermeasureKind): ToolSettings {
   return {
     widthM: catalogEntry(kind).widthM,
@@ -80,23 +67,18 @@ export function defaultSettings(kind: CountermeasureKind): ToolSettings {
   };
 }
 
-/** When the crew of a measure starts working on site, or null if it has none. */
 export function workStart(measure: Countermeasure): number | null {
   if (measure.crewSize === undefined) return null;
   return (measure.startMin ?? 0) + (measure.arrivalMin ?? 0);
 }
 
-/**
- * When an aerial discharge has made its last pass, or null for a measure that
- * is not one. Past it the measure has done all it will do, and the screen
- * puts it away (§11.40); its water stays in the model until it dries.
- */
+// After the last aircraft pass the visual agent disappears; its water remains effective until it
+// dries.
 export function lastPass(measure: Countermeasure): number | null {
   if (measure.litresPerPass === undefined) return null;
   return (measure.startMin ?? 0) + ((measure.passes ?? 1) - 1) * (measure.passIntervalMin ?? 0);
 }
 
-/** The measure a tool with these settings would leave, wherever it is put. */
 function measureFrom(
   kind: CountermeasureKind,
   settings: ToolSettings,
@@ -132,10 +114,6 @@ function measureFrom(
   };
 }
 
-/**
- * Why these settings cannot make a measure, or null. The model's own
- * validation, on a measure of the right shape put anywhere.
- */
 export function checkSettings(kind: CountermeasureKind, settings: ToolSettings): string | null {
   const points: Point[] =
     catalogEntry(kind).geometry === 'point'
@@ -152,7 +130,7 @@ function inside(point: Point, [west, south, east, north]: Bounds): boolean {
   return point[0] >= west && point[0] <= east && point[1] >= south && point[1] <= north;
 }
 
-/** Metres along a polyline. Flat-earth, which thirty kilometres can afford. */
+// Polyline length in metres, using flat-earth distances over a roughly 30 km domain.
 export function lengthM(points: readonly Point[]): number {
   let total = 0;
   for (let i = 1; i < points.length; i += 1) {
@@ -165,7 +143,6 @@ export function lengthM(points: readonly Point[]): number {
   return total;
 }
 
-/** The litres a discharge carries, defaulted the way the model itself does. */
 function liquidTotals(measure: Countermeasure): {
   litresPerPass: number;
   passes: number;
@@ -182,7 +159,6 @@ function liquidTotals(measure: Countermeasure): {
   };
 }
 
-/** `T + HH:MM:SS` for a start given in minutes, with whatever seconds it carries. */
 function formatDeployment(start: number): string {
   return `T + ${Math.floor(start / 60)
     .toString()
@@ -193,7 +169,6 @@ function formatDeployment(start: number): string {
     .padStart(2, '0')}`;
 }
 
-/** What the crew of a ground measure is doing, or null for a measure with none (12.19). */
 function crewStatusLabel(
   stopped: number | undefined,
   minute: number,
@@ -206,11 +181,6 @@ function crewStatusLabel(
   return head.done ? 'Feta' : `En construcció · ${built} %`;
 }
 
-/**
- * How far a ground crew has got, and what the status column says of it
- * (12.19): built fraction and its label, or no progress for a measure that
- * has none.
- */
 function crewProgress(
   measure: Countermeasure,
   minute: number,
@@ -225,7 +195,6 @@ function crewProgress(
   return { built, crewStatus: crewStatusLabel(stopped, minute, working, head, built) };
 }
 
-/** The status column: scheduled, the crew's own word, a pass count, or whether it has lapsed. */
 function statusLabel(
   start: number,
   minute: number,
@@ -241,7 +210,6 @@ function statusLabel(
   return expired ? 'Caducada' : 'Desplegada';
 }
 
-/** The shape column: a point, or a length in metres or kilometres. */
 function shapeLabel(
   geometry: 'line' | 'point',
   metres: number,
@@ -252,7 +220,6 @@ function shapeLabel(
   return metres >= 1000 ? `${one.format(metres / 1000)} km` : `${whole.format(metres)} m`;
 }
 
-/** The crew line: effectives, rate and arrival, or empty for a measure with none. */
 function crewTextLabel(
   measure: Countermeasure,
   whole: Intl.NumberFormat,
@@ -264,7 +231,6 @@ function crewTextLabel(
   return `${whole.format(measure.crewSize!)} efectius × ${one.format(measure.ratePerPerson!)} ${unit} · arribada ${whole.format(measure.arrivalMin!)} min`;
 }
 
-/** The effect column: what a discharge leaves, a clearing's residue, or a line's own terms. */
 function effectLabel(
   measure: Countermeasure,
   whole: Intl.NumberFormat,
@@ -284,65 +250,32 @@ function effectLabel(
     : `−${percent} % de propagació, permanent`;
 }
 
-/**
- * The countermeasure plan and the drawing in progress, away from the map and
- * from the template.
- *
- * A plain class of signals, not a service: the plan belongs to one simulation
- * screen and dies with it, and being plain is what lets the rules of drawing
- * —what a click means, what Escape undoes, what is refused— be tested without
- * a map or a DOM.
- *
- * New measures are timestamped at the paused playback cursor. Measures that
- * have already affected its past cannot be edited or deleted retroactively.
- *
- * The plan is not in the address, unlike the ignitions: a few polylines are
- * more than a link should carry. It travels in the scenario file.
- */
+// New measures use the paused playback cursor. Measures that have already affected the past cannot
+// be edited retroactively.
 export class CountermeasurePlan {
-  /** What will be handed to the model. Only ever replaced whole. */
   public readonly measures = signal<readonly Countermeasure[]>([]);
-  /** The tool in the hand, if any. */
+
   public readonly kind = signal<CountermeasureKind | null>(null);
-  /** The vertices clicked so far of a line not yet finished. */
+
   public readonly draft = signal<readonly Point[]>([]);
   public readonly selected = signal<string | null>(null);
   public readonly note = signal<PlanNote | null>(null);
   public readonly minute = signal(0);
-  /**
-   * The minute each crew stopped for safety (12.19), by measure id: the
-   * model's answer, set by whoever holds the result.
-   */
+  // Stop time in simulation minutes, keyed by measure id and supplied by the model.
   public readonly crewStops = signal<ReadonlyMap<string, number>>(new Map());
-  /**
-   * The measures deployed after the cursor. A decision taken now, in the past,
-   * leaves them behind: they were decided on a fire that will no longer be
-   * the one computed (§11.38).
-   */
-  public readonly later = computed(() =>
-    this.measures().filter((measure) => (measure.startMin ?? 0) > this.minute()),
-  );
-  /** Set when the user accepted that the next measure added drops `later`. */
-  public readonly discarding = signal(false);
-  /**
-   * A last say on a measure about to be added, from whoever knows the fire:
-   * why it cannot go there, or null. Mop-up is refused on an intense front
-   * and where nothing has burned (§11.40).
-   */
-  public guard: ((measure: Countermeasure) => string | null) | null = null;
-  public readonly hasEditable = computed(() =>
-    this.measures().some((m) => (m.startMin ?? 0) >= this.minute()),
-  );
 
-  public isLocked(id: string): boolean {
-    const measure = this.measures().find((m) => m.id === id);
-    return !!measure && (measure.startMin ?? 0) < this.minute();
-  }
+  public readonly discarding = signal(false);
+  public guard: ((measure: Countermeasure) => string | null) | null = null;
 
   private nextId = 1;
 
-  /** The values the tool in the hand was set to; the defaults if none. */
   public readonly settings = signal<ToolSettings | null>(null);
+  public readonly later = computed(() =>
+    this.measures().filter((measure) => (measure.startMin ?? 0) > this.minute()),
+  );
+  public readonly hasEditable = computed(() =>
+    this.measures().some((m) => (m.startMin ?? 0) >= this.minute()),
+  );
 
   public readonly tool = computed(() => {
     const kind = this.kind();
@@ -351,14 +284,11 @@ export class CountermeasurePlan {
     return { ...catalogEntry(kind), widthM: settings.widthM };
   });
 
-  /** The measures still at work, and the discharges that are done (§11.40). */
   public readonly openRows = computed(() => this.rows().filter((row) => !row.finished));
   public readonly finishedRows = computed(() => this.rows().filter((row) => row.finished));
 
-  /** A line needs two points to be one. */
   public readonly canFinish = computed(() => this.draft().length >= 2);
 
-  /** Each measure in the words the list uses. */
   public readonly rows = computed(() => {
     const counts = new Map<CountermeasureKind, number>();
     const whole = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 0 });
@@ -366,7 +296,175 @@ export class CountermeasurePlan {
     return this.measures().map((measure) => this.describeMeasure(measure, whole, one, counts));
   });
 
-  /** One measure, in the words the list uses; `counts` keeps the ordinal per kind across calls. */
+  public isLocked(id: string): boolean {
+    const measure = this.measures().find((m) => m.id === id);
+    return !!measure && (measure.startMin ?? 0) < this.minute();
+  }
+
+  public begin(kind: CountermeasureKind, discard = false, settings?: ToolSettings): void {
+    const same = this.kind() === kind && !settings;
+    this.draft.set([]);
+    this.kind.set(same ? null : kind);
+    this.settings.set(same ? null : (settings ?? null));
+    this.discarding.set(!same && discard);
+    this.note.set(null);
+  }
+
+  public cancel(): void {
+    this.draft.set([]);
+    this.kind.set(null);
+    this.settings.set(null);
+    this.discarding.set(false);
+  }
+
+  public click(point: Point, bounds: Bounds): void {
+    const tool = this.tool();
+    if (!tool) return;
+    if (!inside(point, bounds)) {
+      this.note.set({ text: 'Fora del domini: fes clic dins del quadrat simulat.', failed: true });
+      return;
+    }
+    const here: Point = [point[0], point[1]];
+
+    if (tool.geometry === 'point') {
+      if (this.add(tool.kind, [here])) this.cancel();
+      return;
+    }
+    const last = this.draft().at(-1);
+    if (last && last[0] === here[0] && last[1] === here[1]) return;
+    if (this.draft().length >= MAX_VERTICES) {
+      this.note.set({
+        text: `Una línia admet fins a ${MAX_VERTICES} vèrtexs: finalitza-la i continua amb una altra.`,
+        failed: true,
+      });
+      return;
+    }
+    this.draft.update((points) => [...points, here]);
+    this.note.set(null);
+  }
+
+  public undo(): void {
+    if (this.draft().length <= 1) {
+      this.cancel();
+      return;
+    }
+    this.draft.update((points) => points.slice(0, -1));
+  }
+
+  public finish(): void {
+    const kind = this.kind();
+    if (!kind) return;
+    if (!this.canFinish()) {
+      this.note.set({ text: 'Una línia necessita almenys dos punts.', failed: true });
+      return;
+    }
+    if (this.add(kind, this.draft())) this.cancel();
+  }
+
+  public remove(id: string): void {
+    if (this.isLocked(id)) {
+      this.historyNote();
+      return;
+    }
+    this.commit(
+      this.measures().filter((measure) => measure.id !== id),
+      null,
+    );
+    if (this.selected() === id) this.selected.set(null);
+  }
+
+  public clear(): void {
+    this.cancel();
+    const retained = this.measures().filter((m) => this.isLocked(m.id));
+    if (retained.length === this.measures().length && retained.length) {
+      this.historyNote();
+      return;
+    }
+    this.commit(retained, retained.length ? 'Es conserven les mesures ja desplegades.' : null);
+    this.selected.set(null);
+  }
+
+  public select(id: string | null): void {
+    this.selected.set(id && this.measures().some((measure) => measure.id === id) ? id : null);
+  }
+
+  public setWidth(id: string, value: number): boolean {
+    if (!Number.isFinite(value) || value < WIDTH_LIMITS.min || value > WIDTH_LIMITS.max) {
+      this.note.set({
+        text: `L’amplada ha d’anar de ${WIDTH_LIMITS.min} a ${WIDTH_LIMITS.max} m: la graella és de 30 m i no resol franges més estretes.`,
+        failed: true,
+      });
+      return false;
+    }
+    return this.patch(id, { widthM: Math.round(value) });
+  }
+
+  public setDuration(id: string, value: number): boolean {
+    if (!Number.isFinite(value) || value < DURATION_LIMITS.min || value > DURATION_LIMITS.max) {
+      this.note.set({
+        text: `La durada ha d’anar de ${DURATION_LIMITS.min} a ${DURATION_LIMITS.max} minuts.`,
+        failed: true,
+      });
+      return false;
+    }
+    return this.patch(id, { durationMin: Math.round(value) });
+  }
+
+  public setStrength(id: string, percent: number): boolean {
+    if (!Number.isFinite(percent) || percent < 0 || percent > 95) {
+      this.note.set({ text: 'La reducció experimental ha d’anar de 0 a 95 %.', failed: true });
+      return false;
+    }
+    return this.patch(id, { strength: percent / 100 });
+  }
+
+  public replace(measures: readonly Countermeasure[], bounds: Bounds | null): void {
+    const renumbered = measures.map((measure, i) => ({ ...measure, id: `m${i + 1}` }));
+    const checked = parseCountermeasures(renumbered);
+    if (typeof checked === 'string') {
+      this.note.set({ text: checked, failed: true });
+      return;
+    }
+    this.cancel();
+    this.selected.set(null);
+    // Regenerate ids because separate scenario files may both contain m1.
+    this.nextId = checked.length + 1;
+    this.measures.set(checked);
+    this.note.set(null);
+    this.confine(bounds);
+  }
+
+  public confine(bounds: Bounds | null): void {
+    this.draft.set([]);
+    const plan = this.measures();
+    if (!plan.length) return;
+    const kept = bounds
+      ? plan.filter((measure) => measure.points.every((point) => inside(point, bounds)))
+      : [];
+    const lost = plan.length - kept.length;
+    if (!lost) return;
+    this.measures.set(kept);
+    if (!kept.some((measure) => measure.id === this.selected())) this.selected.set(null);
+    this.note.set({
+      text:
+        lost === 1
+          ? 'S’ha tret 1 contramesura que quedava fora del domini.'
+          : `S’han tret ${lost} contramesures que quedaven fora del domini.`,
+      failed: true,
+    });
+  }
+
+  public setLiquid(
+    id: string,
+    field: 'litresPerPass' | 'passes' | 'passIntervalMin',
+    value: number,
+  ): boolean {
+    return this.patch(id, { [field]: value });
+  }
+  public setRemaining(id: string, percent: number): boolean {
+    return this.patch(id, { fuelRemaining: percent / 100 });
+  }
+
   private describeMeasure(
     measure: Countermeasure,
     whole: Intl.NumberFormat,
@@ -431,190 +529,6 @@ export class CountermeasurePlan {
     };
   }
 
-  /**
-   * Takes a tool, or puts it down if it was the one in the hand. With
-   * `discard`, the next measure added takes the later ones off the plan.
-   */
-  public begin(kind: CountermeasureKind, discard = false, settings?: ToolSettings): void {
-    const same = this.kind() === kind && !settings;
-    this.draft.set([]);
-    this.kind.set(same ? null : kind);
-    this.settings.set(same ? null : (settings ?? null));
-    this.discarding.set(!same && discard);
-    this.note.set(null);
-  }
-
-  /** Escape: the line being drawn is thrown away and the tool put down. */
-  public cancel(): void {
-    this.draft.set([]);
-    this.kind.set(null);
-    this.settings.set(null);
-    this.discarding.set(false);
-  }
-
-  /**
-   * A click on the ground with a tool in the hand.
-   *
-   * A point tool is done in one click; a line tool gains a vertex. Outside the
-   * domain it is refused aloud, not dropped: a click that does nothing looks
-   * like a broken tool.
-   */
-  public click(point: Point, bounds: Bounds): void {
-    const tool = this.tool();
-    if (!tool) return;
-    if (!inside(point, bounds)) {
-      this.note.set({ text: 'Fora del domini: fes clic dins del quadrat simulat.', failed: true });
-      return;
-    }
-    const here: Point = [point[0], point[1]];
-    // One measure per tool taken: once it is down, the tool is put away.
-    if (tool.geometry === 'point') {
-      if (this.add(tool.kind, [here])) this.cancel();
-      return;
-    }
-    const last = this.draft().at(-1);
-    // A second click on the same spot would be a segment of no length.
-    if (last && last[0] === here[0] && last[1] === here[1]) return;
-    if (this.draft().length >= MAX_VERTICES) {
-      this.note.set({
-        text: `Una línia admet fins a ${MAX_VERTICES} vèrtexs: finalitza-la i continua amb una altra.`,
-        failed: true,
-      });
-      return;
-    }
-    this.draft.update((points) => [...points, here]);
-    this.note.set(null);
-  }
-
-  /**
-   * Takes the last vertex back; with none left, the measure is given up and
-   * the tool put down. It is what the right button does (§11.39).
-   */
-  public undo(): void {
-    if (this.draft().length <= 1) {
-      this.cancel();
-      return;
-    }
-    this.draft.update((points) => points.slice(0, -1));
-  }
-
-  /** Turns the line drawn into a measure. The tool stays, for the next one. */
-  public finish(): void {
-    const kind = this.kind();
-    if (!kind) return;
-    if (!this.canFinish()) {
-      this.note.set({ text: 'Una línia necessita almenys dos punts.', failed: true });
-      return;
-    }
-    if (this.add(kind, this.draft())) this.cancel();
-  }
-
-  public remove(id: string): void {
-    if (this.isLocked(id)) {
-      this.historyNote();
-      return;
-    }
-    this.commit(
-      this.measures().filter((measure) => measure.id !== id),
-      null,
-    );
-    if (this.selected() === id) this.selected.set(null);
-  }
-
-  public clear(): void {
-    this.cancel();
-    const retained = this.measures().filter((m) => this.isLocked(m.id));
-    if (retained.length === this.measures().length && retained.length) {
-      this.historyNote();
-      return;
-    }
-    this.commit(retained, retained.length ? 'Es conserven les mesures ja desplegades.' : null);
-    this.selected.set(null);
-  }
-
-  public select(id: string | null): void {
-    this.selected.set(id && this.measures().some((measure) => measure.id === id) ? id : null);
-  }
-
-  /** False, and a note saying why, if the value is not one the grid can hold. */
-  public setWidth(id: string, value: number): boolean {
-    if (!Number.isFinite(value) || value < WIDTH_LIMITS.min || value > WIDTH_LIMITS.max) {
-      this.note.set({
-        text: `L’amplada ha d’anar de ${WIDTH_LIMITS.min} a ${WIDTH_LIMITS.max} m: la graella és de 30 m i no resol franges més estretes.`,
-        failed: true,
-      });
-      return false;
-    }
-    return this.patch(id, { widthM: Math.round(value) });
-  }
-
-  public setDuration(id: string, value: number): boolean {
-    if (!Number.isFinite(value) || value < DURATION_LIMITS.min || value > DURATION_LIMITS.max) {
-      this.note.set({
-        text: `La durada ha d’anar de ${DURATION_LIMITS.min} a ${DURATION_LIMITS.max} minuts.`,
-        failed: true,
-      });
-      return false;
-    }
-    return this.patch(id, { durationMin: Math.round(value) });
-  }
-
-  public setStrength(id: string, percent: number): boolean {
-    if (!Number.isFinite(percent) || percent < 0 || percent > 95) {
-      this.note.set({ text: 'La reducció experimental ha d’anar de 0 a 95 %.', failed: true });
-      return false;
-    }
-    return this.patch(id, { strength: percent / 100 });
-  }
-
-  /**
-   * Puts a whole plan in place: the one a scenario file carried.
-   *
-   * What falls outside the domain is left out and counted aloud, the same as
-   * when the domain moves under a plan.
-   */
-  public replace(measures: readonly Countermeasure[], bounds: Bounds | null): void {
-    const renumbered = measures.map((measure, i) => ({ ...measure, id: `m${i + 1}` }));
-    const checked = parseCountermeasures(renumbered);
-    if (typeof checked === 'string') {
-      this.note.set({ text: checked, failed: true });
-      return;
-    }
-    this.cancel();
-    this.selected.set(null);
-    // Fresh ids: two files may both have an «m1», and the list tracks by id.
-    this.nextId = checked.length + 1;
-    this.measures.set(checked);
-    this.note.set(null);
-    this.confine(bounds);
-  }
-
-  /**
-   * The domain is another one: what no longer fits is taken off, and said.
-   *
-   * A measure half outside would be a strip the model clips where the reader
-   * cannot see why, so it goes whole; and it never goes silently.
-   */
-  public confine(bounds: Bounds | null): void {
-    this.draft.set([]);
-    const plan = this.measures();
-    if (!plan.length) return;
-    const kept = bounds
-      ? plan.filter((measure) => measure.points.every((point) => inside(point, bounds)))
-      : [];
-    const lost = plan.length - kept.length;
-    if (!lost) return;
-    this.measures.set(kept);
-    if (!kept.some((measure) => measure.id === this.selected())) this.selected.set(null);
-    this.note.set({
-      text:
-        lost === 1
-          ? 'S’ha tret 1 contramesura que quedava fora del domini.'
-          : `S’han tret ${lost} contramesures que quedaven fora del domini.`,
-      failed: true,
-    });
-  }
-
   private add(kind: CountermeasureKind, points: readonly Point[]): boolean {
     const entry = catalogEntry(kind);
     const measure = measureFrom(
@@ -646,17 +560,6 @@ export class CountermeasurePlan {
     return done;
   }
 
-  public setLiquid(
-    id: string,
-    field: 'litresPerPass' | 'passes' | 'passIntervalMin',
-    value: number,
-  ): boolean {
-    return this.patch(id, { [field]: value });
-  }
-  public setRemaining(id: string, percent: number): boolean {
-    return this.patch(id, { fuelRemaining: percent / 100 });
-  }
-
   private patch(id: string, change: Partial<Countermeasure>): boolean {
     if (this.isLocked(id)) {
       this.historyNote();
@@ -675,18 +578,12 @@ export class CountermeasurePlan {
     });
   }
 
-  /**
-   * The one door into `measures`: nothing gets in that the model's own
-   * validation would refuse, so what the list shows is what can be computed.
-   */
   private commit(next: readonly Countermeasure[], said: string | null): boolean {
     const checked = parseCountermeasures(next);
     if (typeof checked === 'string') {
       this.note.set({ text: checked, failed: true });
       return false;
     }
-    // What the validation returns, not what it was given: its copy is the
-    // one the scenario file and the model will see.
     this.measures.set(checked);
     this.note.set(said ? { text: said, failed: false } : null);
     return true;

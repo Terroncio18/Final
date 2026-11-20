@@ -1,8 +1,3 @@
-/* The «Combustible» block: its own rule, moved here from simulator-view.css.
- * What it shares with the other blocks of the column is in
- * config-section.css, listed before this.
- */
-
 .section-lead {
   margin: 0 0 9px;
   font-size: 10px;

@@ -2,13 +2,15 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import type { SpreadResult } from '../simulation/fire-spread';
 import { CountermeasurePlan } from './countermeasure-plan';
 import { IgnitionPanel } from './ignition-panel';
+import type { ComponentInputs } from '../../testing/component-inputs';
+import { inputEvent } from '../../testing/events';
 
 describe('IgnitionPanel', () => {
   let fixture: ComponentFixture<IgnitionPanel>;
   let p: IgnitionPanel;
   let plan: CountermeasurePlan;
   const element = () => fixture.nativeElement as HTMLElement;
-  const set = async (inputs: Record<string, unknown>) => {
+  const set = async (inputs: ComponentInputs<IgnitionPanel>) => {
     for (const [key, value] of Object.entries(inputs)) fixture.componentRef.setInput(key, value);
     await fixture.whenStable();
   };
@@ -70,7 +72,7 @@ describe('IgnitionPanel', () => {
     box.click();
     expect(p.spottingEnabled()).toBe(true);
     const seed = (value: string) => {
-      const event = { target: { value } } as unknown as Event;
+      const event = inputEvent(value);
       p['setSpottingSeed'](event);
       return (event.target as HTMLInputElement).value;
     };
@@ -95,7 +97,8 @@ describe('IgnitionPanel', () => {
       '3 focus per brases fins a T + 02:00 h',
     );
     const spot = [...element().querySelectorAll<HTMLButtonElement>('.tools-row button')].at(-1)!;
-    expect(spot.textContent).toContain('Focus per brasa 3 · 01:10 h · 240 m');
+    expect(spot.querySelector('strong')?.textContent).toBe('Focus per brasa 3');
+    expect(spot.querySelector('span')?.textContent).toContain('01:10 h · 240 m');
     spot.click();
     expect(focused).toEqual([42]);
   });

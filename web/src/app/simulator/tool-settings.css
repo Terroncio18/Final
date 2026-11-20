@@ -1,19 +1,6 @@
-/* The tool's modal (§11.39).
- *
- * Its own rules, moved here from countermeasures.css, and a copy of the
- * console's that it also wears —the row of buttons, the note, the field— from
- * simulator-view.css and countermeasures.css, which keep theirs for the rest
- * of the screen. The copies are in the order they had there, so the cascade
- * comes out the same. The colours are the console's custom properties, which
- * reach in from its host.
- */
-
-/* The host adds no box: the backdrop and the modal are fixed to the window. */
 :host {
   display: contents;
 }
-
-/* ---- Copied from simulator-view.css ---- */
 
 .terrain-note {
   margin: 9px 0 0;
@@ -58,8 +45,6 @@ input:focus-visible {
   outline-offset: 3px;
 }
 
-/* ---- Copied from countermeasures.css ---- */
-
 .measure-fields input:focus-visible {
   outline: 2px solid var(--orange);
   outline-offset: 1px;
@@ -102,13 +87,16 @@ input:focus-visible {
   border-radius: 3px;
 }
 
-/* ---- The modal's own ---- */
-
 .modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 40;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   background: #05090dad;
+  cursor: pointer;
 }
 
 .tool-modal {
