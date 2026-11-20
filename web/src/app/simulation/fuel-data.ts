@@ -20,22 +20,54 @@ export interface FuelGrid {
   warnings: string[];
 }
 
-/** Strict decoding prevents a truncated/misaligned response from becoming fuel. */
-// eslint-disable-next-line complexity -- pending (docs/estil.md §4): a validator, one check per field of the response.
-export function decodeFuels(raw: unknown, bounds: readonly number[], size: number): FuelGrid {
-  const data = raw as Record<string, unknown> | null;
-  const fail = (): never => {
-    throw new Error('Resposta de combustibles invàlida.');
-  };
+/** True when the header fields (version, size, bounds) match what was requested. */
+function hasValidHeader(
+  data: Record<string, unknown> | null,
+  bounds: readonly number[],
+  size: number,
+): data is Record<string, unknown> {
   if (!data || data['version'] !== 'anderson13-worldcover2021-v2' || data['size'] !== size)
-    return fail();
+    return false;
   const received = data['bounds'];
-  if (!Array.isArray(received) || received.length !== 4 || received.some((n, i) => n !== bounds[i]))
-    return fail();
-  const runs = data['runs'];
-  if (!Array.isArray(runs) || runs.length % 3) return fail();
-  const models = new Uint8Array(size * size),
-    quality = new Uint8Array(size * size);
+  return (
+    Array.isArray(received) && received.length === 4 && !received.some((n, i) => n !== bounds[i])
+  );
+}
+
+/** True when `runs` has the [model, source, length] triplet shape the loop below expects. */
+function hasValidRunsShape(runs: unknown): runs is unknown[] {
+  return Array.isArray(runs) && runs.length % 3 === 0;
+}
+
+/** True when a single [model, source, length] triplet fits within the grid. */
+function isValidRun(
+  model: number,
+  source: number,
+  length: number,
+  offset: number,
+  totalLength: number,
+): boolean {
+  return (
+    Number.isInteger(model) &&
+    ((model >= 0 && model <= 13) || model === 255) &&
+    [0, 1, 2].includes(source) &&
+    (model === 255) === (source === 0) &&
+    Number.isInteger(length) &&
+    length >= 1 &&
+    offset + length <= totalLength
+  );
+}
+
+interface RunsResult {
+  officialCells: number;
+  estimatedCells: number;
+  unknownCells: number;
+  nonBurnableCells: number;
+  counts: Map<number, number>;
+}
+
+/** Fills `models`/`quality` from the run-length encoding, or `null` if any triplet is invalid. */
+function applyRuns(runs: unknown[], models: Uint8Array, quality: Uint8Array): RunsResult | null {
   let offset = 0,
     officialCells = 0,
     estimatedCells = 0,
@@ -44,16 +76,7 @@ export function decodeFuels(raw: unknown, bounds: readonly number[], size: numbe
   const counts = new Map<number, number>();
   for (let i = 0; i < runs.length; i += 3) {
     const [model, source, length] = runs.slice(i, i + 3) as number[];
-    if (
-      !Number.isInteger(model) ||
-      !((model >= 0 && model <= 13) || model === 255) ||
-      ![0, 1, 2].includes(source) ||
-      (model === 255) !== (source === 0) ||
-      !Number.isInteger(length) ||
-      length < 1 ||
-      offset + length > models.length
-    )
-      return fail();
+    if (!isValidRun(model, source, length, offset, models.length)) return null;
     models.fill(model, offset, offset + length);
     quality.fill(source, offset, offset + length);
     offset += length;
@@ -63,25 +86,49 @@ export function decodeFuels(raw: unknown, bounds: readonly number[], size: numbe
     if (model === 0) nonBurnableCells += length;
     else if (model !== 255) counts.set(model, (counts.get(model) ?? 0) + length);
   }
-  if (offset !== models.length) return fail();
-  const sources = data['sources'],
-    warnings = data['warnings'];
-  if (
-    !Array.isArray(sources) ||
-    !sources.every(
+  if (offset !== models.length) return null;
+  return { officialCells, estimatedCells, unknownCells, nonBurnableCells, counts };
+}
+
+/** True when every source entry has the expected string fields and an https URL. */
+function hasValidSources(sources: unknown): sources is FuelSource[] {
+  return (
+    Array.isArray(sources) &&
+    sources.every(
       (s) =>
         s &&
         ['label', 'sourceUrl', 'sourceDate', 'attribution'].every(
           (k) => typeof s[k] === 'string',
         ) &&
         /^https:\/\//.test(s.sourceUrl),
-    ) ||
-    !Array.isArray(warnings) ||
-    !warnings.every((s) => typeof s === 'string')
-  )
-    return fail();
+    )
+  );
+}
+
+/** True when `warnings` is an array of strings. */
+function hasValidWarnings(warnings: unknown): warnings is string[] {
+  return Array.isArray(warnings) && warnings.every((s) => typeof s === 'string');
+}
+
+/** Strict decoding prevents a truncated/misaligned response from becoming fuel. */
+export function decodeFuels(raw: unknown, bounds: readonly number[], size: number): FuelGrid {
+  const data = raw as Record<string, unknown> | null;
+  const fail = (): never => {
+    throw new Error('Resposta de combustibles invàlida.');
+  };
+  if (!hasValidHeader(data, bounds, size)) return fail();
+  const runs = data['runs'];
+  if (!hasValidRunsShape(runs)) return fail();
+  const models = new Uint8Array(size * size),
+    quality = new Uint8Array(size * size);
+  const runsResult = applyRuns(runs, models, quality);
+  if (!runsResult) return fail();
+  const { officialCells, estimatedCells, unknownCells, nonBurnableCells, counts } = runsResult;
+  const sources = data['sources'],
+    warnings = data['warnings'];
+  if (!hasValidSources(sources) || !hasValidWarnings(warnings)) return fail();
   return {
-    version: data['version'],
+    version: 'anderson13-worldcover2021-v2',
     bounds,
     size,
     models,
@@ -91,7 +138,7 @@ export function decodeFuels(raw: unknown, bounds: readonly number[], size: numbe
     unknownCells,
     nonBurnableCells,
     counts: [...counts].map(([id, cells]) => ({ id, cells })).sort((a, b) => b.cells - a.cells),
-    sources: sources as FuelSource[],
+    sources,
     warnings,
   };
 }
