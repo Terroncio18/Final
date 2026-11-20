@@ -143,10 +143,14 @@ no es donen per integrades només perquè una de les dues parts estigui verda.
   sense conversions ni excepcions afegides. Passen 147 proves del model i
   112 API i 154 de components amb les regles estrictes activades: 413 en
   total. Tipus de fonts/proves/integració, ESLint i compilacions en verd.
-- Integració global: pendent de CL1–CL3 i de repetir la verificació final
-  després de rebre el resultat de Claude.
-- Commits: autoritzats per Pere després del pla complet, agrupats per
-  mòduls. Encara no se n'ha fet cap.
+- Integració global: feta. Compilacions, ESLint, Prettier i 420 proves en
+  verd a les dues meitats; queden la prova manual global i Sonar, de la
+  fase 7.
+- Commits: fets. Vuit per mòduls, seguint l'agrupació de sota, més la
+  bitàcola. Recullen també la feina de les fases 0 a 5 que era al diff.
+  Res empès al remot. L'estat final és el verificat; dels commits
+  intermedis s'ha comprovat que cap no deixa un import ni una plantilla
+  inexistents, però no s'han compilat per separat.
 
 ### Segona revisió — troballes de Claude (20/11/2026)
 
