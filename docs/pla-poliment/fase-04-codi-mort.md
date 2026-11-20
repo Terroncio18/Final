@@ -4,8 +4,13 @@
 que s'ha de treure. **Acaba quan**: no queda res de la llista de la fase 1 i
 les proves segueixen verdes.
 
-- [ ] Treure el que digui la llista de la fase 1.
-- [ ] Escriure a la bitàcola el que es tregui. A la memòria hi ha d'anar **el
+- [ ] Treure el que digui la llista de la fase 1. Fets: dependència
+      `@angular/forms` eliminada; `fflate`, `proj4` i `shapefile` passen a
+      `devDependencies`; exports només interns retirats; comentari de `fire`
+      actualitzat. La prova d'avui depenia d'una data que ja havia passat; la
+      disponibilitat de FIRMS de la seva fixture ara s'ancora al dia actual.
+      Pendents de decisió: els pintors de 12.15 i `parseScenario`.
+- [x] Escriure a la bitàcola el que es tregui. A la memòria hi ha d'anar **el
       que es va provar i no es va quedar**, que és la part que explica les
       decisions.
 

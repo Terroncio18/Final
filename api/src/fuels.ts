@@ -21,8 +21,8 @@ import {
   type Bounds,
 } from "./fuel-grid.js";
 
-export const FUEL_DATA_DIR = resolve(process.env.FUEL_DATA_DIR ?? "data/fuels");
-export const FUEL_VERSION = "anderson13-worldcover2021-v2";
+const FUEL_DATA_DIR = resolve(process.env.FUEL_DATA_DIR ?? "data/fuels");
+const FUEL_VERSION = "anderson13-worldcover2021-v2";
 export interface FuelDataset {
   id: string;
   label: string;

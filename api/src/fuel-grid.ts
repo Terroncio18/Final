@@ -1,7 +1,7 @@
 /** Shared by the offline importer and API. Categorical values never interpolate. */
 export type Bounds = readonly [number, number, number, number];
 export const UNKNOWN = 255;
-export const TILE_DEGREES = 0.125;
+const TILE_DEGREES = 0.125;
 export const TILE_SIZE = 512;
 export type Ring = readonly (readonly number[])[];
 export type Polygon = readonly Ring[];

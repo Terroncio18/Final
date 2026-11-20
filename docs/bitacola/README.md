@@ -135,6 +135,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.62** La interfície també es prova, i la porta es posa verda
 - **11.63** El linter entra, i el que no deixa passar
 - **11.64** El combustible oficial surt de Balears
+- **11.65** El codi mort es retira amb prudència
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):

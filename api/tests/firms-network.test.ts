@@ -5,13 +5,14 @@ import assert from 'node:assert/strict';
 // thing replaced. The module keeps the availability table in a variable of its
 // own, so every test loads the module again to start without one.
 
+const AVAILABLE_THROUGH = new Date().toISOString().slice(0, 10);
 const AVAILABILITY = [
   'data_id,min_date,max_date',
   'VIIRS_SNPP_SP,2012-01-20,2026-09-30',
-  'VIIRS_SNPP_NRT,2026-08-01,2026-11-19',
+  `VIIRS_SNPP_NRT,2026-08-01,${AVAILABLE_THROUGH}`,
   'VIIRS_NOAA20_SP,2018-01-05,2026-09-30',
-  'VIIRS_NOAA20_NRT,2026-08-01,2026-11-19',
-  'VIIRS_NOAA21_NRT,2026-08-01,2026-11-19',
+  `VIIRS_NOAA20_NRT,2026-08-01,${AVAILABLE_THROUGH}`,
+  `VIIRS_NOAA21_NRT,2026-08-01,${AVAILABLE_THROUGH}`,
   'MODIS_SP,not-a-date,2026-09-30',
 ].join('\n');
 

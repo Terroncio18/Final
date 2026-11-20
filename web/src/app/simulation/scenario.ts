@@ -68,7 +68,7 @@ export const SCENARIO_DEFAULTS: {
  * version it says it is, and the keys that had to be filled with defaults.
  * With either, the screen offers to save it again as a current file.
  */
-export interface ScenarioRead {
+interface ScenarioRead {
   readonly scenario: Scenario;
   readonly version: string;
   readonly filled: readonly string[];

@@ -41,7 +41,7 @@ const ICONS = {
   plane: 'M12 3v17 M3 14l9-4 9 4 M8 21l4-2 4 2',
 } as const;
 
-export type IconName = keyof typeof ICONS;
+type IconName = keyof typeof ICONS;
 
 /** A name that came as data —the countermeasure catalogue's— or a fallback. */
 export function iconOr(name: string, fallback: IconName): IconName {

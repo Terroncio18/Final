@@ -25,7 +25,7 @@ export const WETTING = {
 } as const;
 type Drop = { minute: number; litresM2: number };
 type Removal = { minute: number; remaining: number };
-export interface TreatedFuel {
+interface TreatedFuel {
   readonly bed: FuelBed;
   readonly moisture1h: number;
   readonly remaining: number;

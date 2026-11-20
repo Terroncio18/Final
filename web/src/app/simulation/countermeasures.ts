@@ -47,17 +47,11 @@ export interface Countermeasure {
 }
 
 /** The measures a ground crew builds; the rest stay instantaneous. */
-export const CREW_KINDS = [
-  'defense-line',
-  'firebreak',
-  'clearing',
-  'water-line',
-  'mop-up',
-] as const;
+const CREW_KINDS = ['defense-line', 'firebreak', 'clearing', 'water-line', 'mop-up'] as const;
 export type CrewKind = (typeof CREW_KINDS)[number];
 export const crewKind = (kind: CountermeasureKind): kind is CrewKind =>
   (CREW_KINDS as readonly string[]).includes(kind);
-export const crewMeasure = (m: Countermeasure) => m.crewSize !== undefined;
+const crewMeasure = (m: Countermeasure) => m.crewSize !== undefined;
 
 export interface CrewDefault {
   readonly arrivalMin: number;
@@ -133,7 +127,7 @@ export const CREW_LIMITS = {
 } as const;
 
 /** When each cell of a crew measure is done (contract 12.19). */
-export interface CrewSchedule {
+interface CrewSchedule {
   /** The same cells as countermeasureCells. */
   readonly cells: readonly number[];
   /** Minute each cell is done, aligned with cells. */
@@ -144,7 +138,7 @@ export interface CrewSchedule {
   readonly lengthM: number;
 }
 /** Where the head of the work is at a minute. */
-export interface CrewHead {
+interface CrewHead {
   readonly point: Point;
   readonly builtM: number;
   readonly done: boolean;
@@ -199,7 +193,7 @@ export const AIRCRAFT = {
 export type AircraftKind = keyof typeof AIRCRAFT;
 export const aircraftKind = (kind: CountermeasureKind): kind is AircraftKind => kind in AIRCRAFT;
 /** The longest a load may take, minutes: the old upper bound of an interval. */
-export const MAX_LOAD_MIN = 120;
+const MAX_LOAD_MIN = 120;
 
 /** Flat-earth metres between two points; thirty kilometres can afford it. */
 export function distanceM(a: Point, b: Point): number {
@@ -372,7 +366,7 @@ export const COUNTERMEASURE_CATALOG: readonly MeasureDefinition[] = [
  */
 export const MOP_UP_MAX_FLAME_M = 1.2;
 
-export const MAX_COUNTERMEASURES = 100;
+const MAX_COUNTERMEASURES = 100;
 export const WIDTH_LIMITS = { min: CELL_M, max: 3000 } as const;
 export const DURATION_LIMITS = { min: 1, max: 720 } as const;
 export const MAX_VERTICES = 64;
@@ -718,7 +712,7 @@ export interface TreatmentWindow {
   readonly until: number;
   readonly factor: number;
 }
-export interface CountermeasureField {
+interface CountermeasureField {
   /**
    * Cells whose fire is put out, and from which minute (mop-up, §11.40): no
    * fire leaves them, nor enters them, after it.

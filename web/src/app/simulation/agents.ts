@@ -8,9 +8,8 @@ import type { Point } from './point';
  * computed —the crew's schedule and stop (12.19), the passes of a discharge
  * (§11.31)— and none of it changes the fire.
  */
-export type GroundKind = 'crew' | 'bulldozer' | 'fire-engine';
-export type AircraftFigure = 'helicopter' | 'scooper' | 'tanker';
-export type AgentKind = GroundKind | AircraftFigure;
+type GroundKind = 'crew' | 'bulldozer' | 'fire-engine';
+type AircraftFigure = 'helicopter' | 'scooper' | 'tanker';
 
 export interface GroundAgent {
   readonly id: string;

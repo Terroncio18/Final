@@ -125,7 +125,7 @@ export const GLYPHS = 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf';
 /** The one font stack asked for, and the only one that has to exist. */
 export const LABEL_FONT = 'Open Sans Regular';
 
-export interface NamedView {
+interface NamedView {
   readonly label: string;
   readonly bounds: LngLatBoundsLike;
 }

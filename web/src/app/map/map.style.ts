@@ -50,11 +50,11 @@ export const LAYERS = {
 } as const;
 
 export const DEM_SOURCE = 'terrain-dem';
-export const REGIONS_SOURCE = 'regions';
+const REGIONS_SOURCE = 'regions';
 export const PROVINCES_SOURCE = 'provinces';
 export const MUNICIPALITIES_SOURCE = 'municipalities';
 export const PLACES_SOURCE = 'places';
-export const CONTOURS_SOURCE = 'contours';
+const CONTOURS_SOURCE = 'contours';
 export const DOMAIN_SOURCE = 'domain';
 
 /** Not in the style: an image source needs its image, so it is added on demand. */

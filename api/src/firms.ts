@@ -10,7 +10,7 @@ import {
 } from './config.js';
 
 /** One detection, with only the fields the interface is going to show. */
-export interface HotspotProperties {
+interface HotspotProperties {
   /** Stable enough to key a feature on: no two platforms see the same pixel at the same second. */
   readonly id: string;
   readonly scope: Scope;
@@ -37,7 +37,7 @@ export type HotspotCollection = {
 };
 
 /** What one query answered with, beside the detections themselves. */
-export interface HotspotAnswer {
+interface HotspotAnswer {
   readonly body: HotspotCollection;
   /** The sources that actually covered the range, for the interface to name. */
   readonly sources: readonly string[];

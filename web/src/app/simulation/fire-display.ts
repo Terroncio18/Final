@@ -62,7 +62,7 @@ export function arrivalTexture(arrival: Float32Array, size: number): Float32Arra
   return data;
 }
 
-export interface FrontSegment {
+interface FrontSegment {
   x0: number;
   y0: number;
   x1: number;

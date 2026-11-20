@@ -10,7 +10,7 @@ export interface SpotIgnition {
   readonly minute: number;
   readonly distanceM: number;
 }
-export interface EmberWind {
+interface EmberWind {
   readonly speedKmh: number;
   readonly towardsDeg: number;
   readonly until: number;

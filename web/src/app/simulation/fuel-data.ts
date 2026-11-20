@@ -1,4 +1,4 @@
-export interface FuelSource {
+interface FuelSource {
   label: string;
   sourceUrl: string;
   sourceDate: string;

@@ -20,7 +20,7 @@ import type { Point } from '../simulation/point';
 export type Bounds = readonly [number, number, number, number];
 
 /** What the plan last had to say: a confirmation, or why something was refused. */
-export interface PlanNote {
+interface PlanNote {
   readonly text: string;
   readonly failed: boolean;
 }

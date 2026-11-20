@@ -29,7 +29,7 @@ export interface Observation {
   readonly temperature: number;
 }
 
-export type Country = 'ES' | 'PT';
+type Country = 'ES' | 'PT';
 
 /**
  * How long a set of observations is reused.

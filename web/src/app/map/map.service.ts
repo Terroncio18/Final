@@ -839,9 +839,8 @@ export class MapService {
           id: LAYERS.fire,
           type: 'raster',
           source: FIRE_SOURCE,
-          // Linear, unlike the slopes: the picture is a continuous field
-          // (fire-field.ts) and the filter is what puts the front between
-          // two cells instead of on one of them.
+          // Linear, unlike the slopes: the picture is continuous and the
+          // filter puts the front between two cells instead of on one of them.
           paint: { 'raster-resampling': 'linear', 'raster-fade-duration': 0 },
         },
         LAYERS.contourLines,

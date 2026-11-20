@@ -10,7 +10,7 @@ import { MunicipalitiesService } from './municipalities.service';
  * standing on a municipality and differ in what they ask the user for, not in
  * what the map draws underneath them.
  */
-export type Level = 'region' | 'province' | 'municipality' | 'ignition';
+type Level = 'region' | 'province' | 'municipality' | 'ignition';
 
 /**
  * The codes a level needs, which are its own ancestors.
