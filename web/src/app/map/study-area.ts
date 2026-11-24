@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import type { Feature, Point } from 'geojson';
 import { boundsOf, contains, type AreaGeometry } from '../simulation/bounds';
 import { REGIONS_URL } from './map.config';
+import { readJson } from '../simulation/read-json';
 
 interface Area {
   readonly bounds: readonly [number, number, number, number];
@@ -42,13 +43,7 @@ export class StudyArea {
   private read(): Promise<void> {
     if (this.reading) return this.reading;
 
-    const url = new URL(REGIONS_URL, document.baseURI).href;
-
-    const reading = fetch(url)
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json() as Promise<{ features: readonly RegionFeature[] }>;
-      })
+    const reading = readJson<{ features: readonly RegionFeature[] }>(REGIONS_URL)
       .then((collection) => {
         this.areas = collection.features.map((feature) => ({
           bounds: boundsOf(feature.geometry),

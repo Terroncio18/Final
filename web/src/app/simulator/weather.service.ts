@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import type { Point } from '../simulation/point';
+import { readJson } from '../simulation/read-json';
 
 export interface Observation {
   readonly source: 'AEMET' | 'IPMA';
@@ -68,11 +69,7 @@ export class WeatherService {
     this.failed.set(false);
 
     const url = `/api/weather?country=${country}&lon=${point[0]}&lat=${point[1]}`;
-    fetch(url)
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json() as Promise<Observation>;
-      })
+    readJson<Observation>(url)
       .then((observation) => {
         if (mine !== this.token) return;
         this.reading.set({ domain, observation });

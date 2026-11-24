@@ -2,6 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import type { FeatureCollection, Point } from 'geojson';
 import { MapService } from './map.service';
 import { PLACES_URL } from './map.config';
+import { readJson } from '../simulation/read-json';
 
 // Limit summit labels so they do not crowd out town names.
 const PEAKS_IN_VIEW = 12;
@@ -45,13 +46,7 @@ export class PlacesService {
       return;
     }
 
-    const url = new URL(`${PLACES_URL}/${province}.geojson`, document.baseURI).href;
-
-    fetch(url)
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json() as Promise<FeatureCollection<Point>>;
-      })
+    readJson<FeatureCollection<Point>>(`${PLACES_URL}/${province}.geojson`)
       .then((collection) => {
         this.cache.set(province, collection);
         // Ignore an older request after navigation has moved to another province.

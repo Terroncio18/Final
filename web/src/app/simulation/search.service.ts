@@ -1,5 +1,6 @@
 import { computed, Injectable, signal } from '@angular/core';
 import { MUNICIPALITY_INDEX_URL } from '../map/map.config';
+import { readJson } from './read-json';
 
 const LIMIT = 8;
 
@@ -80,14 +81,7 @@ export class SearchService {
     this.asked = true;
     this.failed.set(false);
 
-    // Resolve against document.baseURI; the active route may have several segments.
-    const url = new URL(MUNICIPALITY_INDEX_URL, document.baseURI).href;
-
-    fetch(url)
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json() as Promise<Index>;
-      })
+    readJson<Index>(MUNICIPALITY_INDEX_URL)
       .then((index) => {
         this.entries.set(
           index.municipalities.map(([name, id, province, provinceName]) => ({

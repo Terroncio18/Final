@@ -5,6 +5,7 @@ import { MapService } from '../map/map.service';
 
 import type { Province } from './province';
 import { boundsOf } from './bounds';
+import { readJson } from './read-json';
 
 type ProvinceFeature = Feature<
   Polygon | MultiPolygon,
@@ -36,16 +37,9 @@ export class ProvincesService {
     this.asked = true;
     this.failed.set(false);
 
-    // Resolve against document.baseURI; nested routes would otherwise request /simulacio/data/.
-    const url = new URL(PROVINCES_URL, document.baseURI).href;
-
-    fetch(url)
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json() as Promise<
-          FeatureCollection<Polygon | MultiPolygon, ProvinceFeature['properties']>
-        >;
-      })
+    readJson<FeatureCollection<Polygon | MultiPolygon, ProvinceFeature['properties']>>(
+      PROVINCES_URL,
+    )
       .then((collection) => {
         const features = collection.features;
         this.provinces.set(features.map(toProvince));

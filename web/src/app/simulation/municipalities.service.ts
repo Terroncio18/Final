@@ -5,6 +5,7 @@ import { MapService } from '../map/map.service';
 import { boundsOf, contains, type AreaGeometry } from './bounds';
 import type { Municipality } from './municipality';
 import type { Point } from './point';
+import { readJson } from './read-json';
 
 type MunicipalityFeature = Feature<
   Polygon | MultiPolygon,
@@ -48,16 +49,9 @@ export class MunicipalitiesService {
 
     this.municipalities.set([]);
 
-    // Resolve against document.baseURI, not the nested route URL.
-    const url = new URL(`${MUNICIPALITIES_URL}/${province}.geojson`, document.baseURI).href;
-
-    fetch(url)
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json() as Promise<
-          FeatureCollection<Polygon | MultiPolygon, MunicipalityFeature['properties']>
-        >;
-      })
+    readJson<FeatureCollection<Polygon | MultiPolygon, MunicipalityFeature['properties']>>(
+      `${MUNICIPALITIES_URL}/${province}.geojson`,
+    )
       .then((collection) => {
         const features = collection.features;
         const list = features.map(toMunicipality);

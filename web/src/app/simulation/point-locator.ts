@@ -3,6 +3,7 @@ import type { Feature, FeatureCollection, MultiPolygon, Polygon } from 'geojson'
 import { MUNICIPALITIES_URL, PROVINCES_URL } from '../map/map.config';
 import { boundsOf, contains, type AreaGeometry } from './bounds';
 import type { Point } from './point';
+import { readJson } from './read-json';
 
 export interface Place {
   readonly region: string;
@@ -56,7 +57,7 @@ export class PointLocator {
 
   private readProvinces(): Promise<Shape[]> {
     if (this.provinces) return this.provinces;
-    const pending: Promise<Shape[]> = read(PROVINCES_URL)
+    const pending: Promise<Shape[]> = readJson<AreaCollection>(PROVINCES_URL)
       .then((collection) => {
         const list = shapes(collection, (feature) => String(feature.id));
         this.regions.clear();
@@ -76,7 +77,9 @@ export class PointLocator {
   private readMunicipalities(province: string): Promise<Shape[]> {
     const held = this.municipalities.get(province);
     if (held) return held;
-    const pending: Promise<Shape[]> = read(`${MUNICIPALITIES_URL}/${province}.geojson`)
+    const pending: Promise<Shape[]> = readJson<AreaCollection>(
+      `${MUNICIPALITIES_URL}/${province}.geojson`,
+    )
       .then((collection) => shapes(collection, (feature) => String(feature.properties?.['id'])))
       .catch((error) => {
         if (this.municipalities.get(province) === pending) this.municipalities.delete(province);
@@ -85,11 +88,4 @@ export class PointLocator {
     this.municipalities.set(province, pending);
     return pending;
   }
-}
-
-async function read(path: string): Promise<AreaCollection> {
-  // Resolve against document.baseURI rather than the active route.
-  const response = await fetch(new URL(path, document.baseURI).href);
-  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-  return (await response.json()) as AreaCollection;
 }

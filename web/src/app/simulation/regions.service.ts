@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { REGIONS_URL } from '../map/map.config';
 import { boundsOf, type AreaGeometry } from './bounds';
 import type { Region } from './region';
+import { readJson } from './read-json';
 
 interface RegionFeature {
   readonly properties: {
@@ -43,14 +44,7 @@ export class RegionsService {
     this.asked = true;
     this.failed.set(false);
 
-    // Resolve against document.baseURI; nested routes would otherwise request /simulacio/data/.
-    const url = new URL(REGIONS_URL, document.baseURI).href;
-
-    fetch(url)
-      .then((response) => {
-        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-        return response.json() as Promise<RegionCollection>;
-      })
+    readJson<RegionCollection>(REGIONS_URL)
       .then((collection) => this.regions.set(collection.features.map(toRegion)))
       .catch((error: Error) => {
         console.error('[regions]', error);
