@@ -3,6 +3,14 @@
 Fet només amb lectura, amb grep i sense graf de crides complet: els falsos positius
 són possibles, sobretot en tipus i en noms curts (marcats com a dubtosos).
 
+> **Al dia, 24/11/2026.** Els punts 2 i 3 estan resolts: `fire-field.ts` i
+> `fire-appearance.ts` es van retirar a la §11.66, amb les seves proves, i
+> amb ells el comentari de `map.service.ts` que nomenava el camp continu. La
+> 12.15 queda tancada. Es conserven escrits perquè l'inventari és el de la
+> fase 1 i diu què s'hi va trobar, no què hi ha avui. El punt 7, la conversió
+> de metres a graus repetida cinc vegades, **continua viu** i és a la llista
+> de la revisió final.
+
 ## Per gravetat
 
 1. **Dependència sense ús**: `web/package.json` `@angular/forms` (dependencies). Zero imports a web/src i cap ngModel, formControl ni formGroup als html. Dubtosa només si hi ha un ús per plantilla que el grep no veu (no n'he trobat).

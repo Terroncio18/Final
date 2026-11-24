@@ -110,11 +110,23 @@ Els informes es llegeixen junts i **Pere decideix** què s'unifica, què
 s'esborra i què es queda com és. Abans d'això no es toca res. És el que diu
 el `CLAUDE.md`: la decisió es proposa abans d'escriure el codi.
 
-## Fase D — El canvi
+## Fase D — El canvi, i la revisió creuada
 
 Repartit per fitxers, amb la llista escrita abans. Cada cosa amb la seva
 regressió i la seva reversió. Les vuit portes en verd a cada volta. Commits
 per mòduls, quan Pere ho autoritzi.
+
+**I en acabar, cadascú revisa el codi de l'altre.** Demanat per Pere el
+24/11/2026: Claude revisa el que ha escrit Codex, Codex revisa el que ha
+escrit Claude, i es contrasten les dues revisions. El motiu és el que la
+fase B ja va demostrar: creuar les auditories de proves va trobar tres coses
+a les proves de Claude que Claude no havia vist, i una als dobles de l'API
+que Codex no havia vist. Qui ha escrit una cosa és qui pitjor la revisa.
+
+La revisió creuada mira el canvi, no el fitxer sencer: què fa de debò, si la
+regressió prova el que diu que prova, i si l'arranjament ha obert res pel
+costat. Les dues revisions van a la bústia i es llegeixen juntes; el que
+una trobi i l'altra no, es diu.
 
 ## Fase E — El full per a la fase 7
 

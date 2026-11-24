@@ -92,6 +92,29 @@ botó**, i els dos s'han afegit avui. Els dos botons tenen classes diferents
 —`retry` i `apply`— perquè el full de `step-panel.css` no en tenia cap i el
 del selector sí.
 
+### 6. Els metres a graus, cinc vegades — i això ja estava escrit
+
+`map/agents-3d.ts:249`, `map/countermeasure-display.ts:50`,
+`simulation/domain.ts:13` i `simulator/countermeasure-plan.ts:139-140`. Dos
+fitxers declaren la seva pròpia constant `M_PER_DEGREE = 111_320`, un la
+porta escrita dins d'una expressió i l'altre dues vegades; i el
+`Math.cos(lat · π / 180)` que converteix longituds hi va al costat cada
+vegada. També a `simulation/countermeasures.ts`.
+
+És la repetició amb més risc de totes les d'aquest informe, perquè no és
+forma: **és aritmètica de coordenades**. Si un dia es canvia el valor o la
+latitud de referència, cal canviar-ho a cinc llocs i res no avisa si se
+n'oblida un.
+
+> **Això ja ho sabia el projecte.** El punt 7 de
+> [`../inventari-web.md`](../inventari-web.md), de la fase 1, ho té escrit
+> amb els cinc llocs. Aquest informe no ho duia: la primera passada de B1 va
+> buscar repetició al codi i **no va llegir l'inventari que la fase 1 ja
+> havia fet**, que és justament el que el `CLAUDE.md` demana abans de
+> proposar res. Hi va arribar de rebot, mirant una referència vella que
+> Codex havia assenyalat. El punt 5 del mateix inventari també llista una
+> dotzena d'`export` sobrers que coincideixen amb el que B2 ha trobat avui.
+
 ## On hauria de viure cada cosa
 
 Sense carpeta `utils/`: Pere ho ha descartat i l'estructura d'aquest projecte
