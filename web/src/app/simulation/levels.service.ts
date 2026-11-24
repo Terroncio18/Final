@@ -4,7 +4,7 @@ import { PlacesService } from '../map/places.service';
 import { MunicipalitiesService } from './municipalities.service';
 
 // The last two form steps share the municipality level and differ only in the question asked.
-type Level = 'region' | 'province' | 'municipality' | 'ignition';
+type Level = 'region' | 'province' | 'municipality' | 'centre';
 
 interface Of {
   readonly region?: string;
@@ -29,21 +29,21 @@ export class LevelsService {
 
     // Clear municipality service state as well as the layer; otherwise its cache may refuse to
     // reload a province when returning.
-    if (level === 'municipality' || level === 'ignition') {
+    if (level === 'municipality' || level === 'centre') {
       if (of.province) this.municipalities.load(of.province);
     } else {
       this.municipalities.release();
     }
 
-    // At the ignition step, the municipality highlight is a selection rather than a hover.
+    // At the centre step, the municipality highlight is a selection rather than a hover.
     this.maps.focusRegion(null);
     this.maps.focusProvince(null);
-    this.maps.focusMunicipality(level === 'ignition' ? (of.municipality ?? null) : null);
+    this.maps.focusMunicipality(level === 'centre' ? (of.municipality ?? null) : null);
 
-    // Clear old ignition/domain state on higher levels; the ignition step sets its own state
+    // Clear old centre/domain state on higher levels; the centre step sets its own state
     // immediately after show().
-    if (level !== 'ignition') {
-      this.maps.setIgnition(null);
+    if (level !== 'centre') {
+      this.maps.setCentre(null);
       this.maps.setDomain(null);
     }
 

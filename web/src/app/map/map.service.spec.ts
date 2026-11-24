@@ -376,8 +376,8 @@ describe('MapService and map overlays', () => {
     });
     service.setDomain(null);
     expect(map.getSource(DOMAIN_SOURCE)!.setData).toHaveBeenLastCalledWith(empty);
-    service.setIgnition([2, 3]);
-    service.setIgnition(null);
+    service.setCentre([2, 3]);
+    service.setCentre(null);
     expect(doubles.markers[0].remove).toHaveBeenCalled();
     service.setFireStarts([{ point: [2, 3], label: '<img src=x>' }]);
     expect(doubles.markers[3].options.element.querySelector('.spawn-label')?.textContent).toBe(
@@ -386,7 +386,7 @@ describe('MapService and map overlays', () => {
     expect(doubles.markers[3].options.element.querySelector('img')).toBeNull();
     service.setFireStarts([]);
     expect(doubles.markers[3].remove).toHaveBeenCalled();
-    service.setIgnition([2, 3]);
+    service.setCentre([2, 3]);
     service.setFireStarts([{ point: [2, 3], label: 'fire' }]);
     service.setSlopes(null);
     service.setSlopes('data:image/png;base64,first');

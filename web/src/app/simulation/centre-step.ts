@@ -19,15 +19,15 @@ import { PointLocator } from './point-locator';
 import { ProvincesService } from './provinces.service';
 import { TerrainService } from './terrain.service';
 
-// Despite legacy ignition names, this step chooses the domain centre. Fire-start points are added
+// This step chooses the domain centre. Fire-start points are placed inside the simulator, with
 // inside the simulator.
 @Component({
-  selector: 'app-ignition-step',
+  selector: 'app-centre-step',
   imports: [RouterLink],
-  templateUrl: './ignition-step.html',
+  templateUrl: './centre-step.html',
   styleUrl: './step-panel.css',
 })
-export class IgnitionStep implements OnInit, OnDestroy {
+export class CentreStep implements OnInit, OnDestroy {
   public readonly region = input.required<string>();
   public readonly province = input.required<string>();
   public readonly municipality = input.required<string>();
@@ -56,16 +56,16 @@ export class IgnitionStep implements OnInit, OnDestroy {
   // An unlocated point keeps the URL municipality but is flagged outside it; this can mean sea or
   // a neighbouring province.
   protected readonly outside = computed(() => {
-    const point = this.ignition();
+    const point = this.centre();
     if (!point || !this.municipalities.municipalities().length) return false;
     return this.municipalities.at(point) === null;
   });
 
-  protected readonly ignition = computed(() => parsePoint(this.point()));
+  protected readonly centre = computed(() => parsePoint(this.point()));
 
   // Display latitude first; URL coordinates are longitude first.
   protected readonly coordinates = computed(() => {
-    const point = this.ignition();
+    const point = this.centre();
     return point ? point[1].toFixed(5) + ', ' + point[0].toFixed(5) : '';
   });
 
@@ -88,7 +88,7 @@ export class IgnitionStep implements OnInit, OnDestroy {
   });
 
   protected readonly simulation = computed(() => {
-    const point = this.ignition();
+    const point = this.centre();
     if (!point) return null;
     return ['/simulador', this.region(), this.province(), this.municipality(), formatPoint(point)];
   });
@@ -104,7 +104,7 @@ export class IgnitionStep implements OnInit, OnDestroy {
       // Direct links may arrive before municipality data; the service reuses an existing load.
       const province = this.provinces.find(this.province());
       if (province) {
-        this.levels.show('ignition', {
+        this.levels.show('centre', {
           province: province.id,
           municipality: this.municipality(),
         });
@@ -113,7 +113,7 @@ export class IgnitionStep implements OnInit, OnDestroy {
       const chosen = this.chosen();
       if (!chosen) return;
 
-      const point = this.ignition();
+      const point = this.centre();
       if (point) {
         this.maps.setDomain(domainRing(point));
         this.maps.goToBounds(domainAround(point), true);
@@ -123,10 +123,10 @@ export class IgnitionStep implements OnInit, OnDestroy {
       }
     });
 
-    effect(() => this.maps.setIgnition(this.ignition()));
+    effect(() => this.maps.setCentre(this.centre()));
 
     effect(() => {
-      const point = this.ignition();
+      const point = this.centre();
       if (point) this.terrain.read(point);
       else this.terrain.clear();
     });
@@ -155,7 +155,7 @@ export class IgnitionStep implements OnInit, OnDestroy {
           else this.goTo(this.region(), this.province(), this.municipality(), picked);
         })
         .catch((error: Error) => {
-          console.error('[ignition]', error);
+          console.error('[centre-step]', error);
           if (this.resolving !== picked) return;
           this.goTo(this.region(), this.province(), this.municipality(), picked);
         });
@@ -174,13 +174,13 @@ export class IgnitionStep implements OnInit, OnDestroy {
 
   // Replace an existing coordinate entry so Back returns to the list instead of replaying nudges.
   protected retryTerrain(): void {
-    const point = this.ignition();
+    const point = this.centre();
     if (point) this.terrain.read(point);
   }
 
   private goTo(region: string, province: string, municipality: string, point: Point): void {
     void this.router.navigate(['/simulacio', region, province, municipality, formatPoint(point)], {
-      replaceUrl: this.ignition() !== null,
+      replaceUrl: this.centre() !== null,
     });
   }
 

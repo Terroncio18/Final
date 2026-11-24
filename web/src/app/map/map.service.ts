@@ -325,7 +325,7 @@ export class MapService {
   }
 
   // This legacy API name sets the simulation centre, not a fire-start point.
-  public setIgnition(point: readonly [number, number] | null): void {
+  public setCentre(point: readonly [number, number] | null): void {
     this.withStyle((map) => {
       this.centreMarker?.remove();
       this.centreMarker = point
@@ -334,7 +334,7 @@ export class MapService {
     });
   }
 
-  // setIgnition sets the domain centre; these markers are the independent fire-start points.
+  // setCentre sets the domain centre; these markers are the independent fire-start points.
   public setFireStarts(
     starts: readonly { readonly point: readonly [number, number]; readonly label: string }[],
   ): void {

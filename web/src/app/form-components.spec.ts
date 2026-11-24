@@ -14,7 +14,7 @@ import { HotspotsService } from './map/hotspots.service';
 import { RegionStep } from './simulation/region-step';
 import { ProvinceStep } from './simulation/province-step';
 import { MunicipalityStep } from './simulation/municipality-step';
-import { IgnitionStep } from './simulation/ignition-step';
+import { CentreStep } from './simulation/centre-step';
 import { SearchBox } from './simulation/search-box';
 import { SimulationFlow } from './simulation/simulation-flow';
 import { MapShell } from './map/map-shell';
@@ -66,7 +66,7 @@ describe('form, navigation and overview components', () => {
       focusMunicipality: vi.fn(),
       goToView: vi.fn(),
       goToBounds: vi.fn(),
-      setIgnition: vi.fn(),
+      setCentre: vi.fn(),
       setDomain: vi.fn(),
       setPicking: vi.fn(),
       setHotspotsVisible: vi.fn(),
@@ -525,7 +525,7 @@ describe('form, navigation and overview components', () => {
 
   it('centres the ignition domain, changes municipality on click and clears picking on exit', async () => {
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    const fixture = TestBed.createComponent(IgnitionStep),
+    const fixture = TestBed.createComponent(CentreStep),
       c = fixture.componentInstance;
     for (const [key, value] of Object.entries({
       region: 'ES53',
@@ -574,7 +574,7 @@ describe('form, navigation and overview components', () => {
 
   it('re-resolves the whole address when a click lands outside the province, in another country', async () => {
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    const fixture = TestBed.createComponent(IgnitionStep);
+    const fixture = TestBed.createComponent(CentreStep);
     for (const [key, value] of Object.entries({
       region: 'ES53',
       province: 'ES531',
@@ -621,7 +621,7 @@ describe('form, navigation and overview components', () => {
     const getContext = vi
       .spyOn(HTMLCanvasElement.prototype, 'getContext')
       .mockReturnValue(context as CanvasRenderingContext2D);
-    const fixture = TestBed.createComponent(IgnitionStep),
+    const fixture = TestBed.createComponent(CentreStep),
       c = fixture.componentInstance;
     for (const [key, value] of Object.entries({
       region: 'ES53',

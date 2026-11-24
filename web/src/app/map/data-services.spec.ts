@@ -93,7 +93,7 @@ describe('geographic and observation services', () => {
     focusRegion: vi.fn(),
     focusProvince: vi.fn(),
     focusMunicipality: vi.fn(),
-    setIgnition: vi.fn(),
+    setCentre: vi.fn(),
     setDomain: vi.fn(),
     setTerrain3D: vi.fn(),
     setOrbit: vi.fn(),
@@ -372,13 +372,13 @@ describe('geographic and observation services', () => {
     levels.show('municipality', { province: 'ES531' });
     expect(load).toHaveBeenLastCalledWith('ES531');
     levels.show('municipality');
-    levels.show('ignition', { province: 'ES531', municipality: 'one' });
+    levels.show('centre', { province: 'ES531', municipality: 'one' });
     expect(maps.focusMunicipality).toHaveBeenLastCalledWith('one');
-    levels.show('ignition');
+    levels.show('centre');
     expect(maps.focusMunicipality).toHaveBeenLastCalledWith(null);
     levels.clear();
     expect(maps.setRegionsVisible).toHaveBeenLastCalledWith(true);
-    expect(maps.setIgnition).toHaveBeenLastCalledWith(null);
+    expect(maps.setCentre).toHaveBeenLastCalledWith(null);
     expect(maps.setDomain).toHaveBeenLastCalledWith(null);
     expect(maps.setTerrain3D).toHaveBeenLastCalledWith(false);
     expect(release).toHaveBeenCalled();

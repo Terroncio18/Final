@@ -118,7 +118,7 @@ const MAP_METHODS = [
   'setRegionsVisible',
   'showProvincesOf',
   'focusMunicipality',
-  'setIgnition',
+  'setCentre',
   'setDomain',
   'setDomainMask',
   'setTerrain3D',

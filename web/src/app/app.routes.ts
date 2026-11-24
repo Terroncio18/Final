@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { MapShell } from './map/map-shell';
 import { MapView } from './map/map-view';
-import { IgnitionStep } from './simulation/ignition-step';
+import { CentreStep } from './simulation/centre-step';
 import { MunicipalityStep } from './simulation/municipality-step';
 import { ProvinceStep } from './simulation/province-step';
 import { RegionStep } from './simulation/region-step';
@@ -25,8 +25,8 @@ export const routes: Routes = [
           { path: '', component: RegionStep },
           { path: ':region', component: ProvinceStep },
           { path: ':region/:province', component: MunicipalityStep },
-          { path: ':region/:province/:municipality', component: IgnitionStep },
-          { path: ':region/:province/:municipality/:point', component: IgnitionStep },
+          { path: ':region/:province/:municipality', component: CentreStep },
+          { path: ':region/:province/:municipality/:point', component: CentreStep },
         ],
       },
       { path: ':scope', component: MapView },

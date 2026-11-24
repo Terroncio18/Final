@@ -67,12 +67,12 @@
         [canStart]="canStart()"
         [elapsed]="elapsed()"
         [country]="country()"
-        [centre]="ignition()"
+        [centre]="centre()"
         (windEdit)="editWind($event)"
         (applyWind)="applyWind()"
       />
 
-      <app-fuel-panel [centre]="ignition()" />
+      <app-fuel-panel [centre]="centre()" />
 
       <app-scenario-panel
         [(name)]="scenarioName"
@@ -105,7 +105,7 @@
         [planStale]="runs.stale()"
         [result]="runs.result()"
         [minutes]="minutes()"
-        [centre]="ignition()"
+        [centre]="centre()"
         (pickMeasure)="pickMeasure($event)"
         (confirmPast)="confirmPastMeasure()"
         (cancelPast)="cancelPastMeasure()"

@@ -184,7 +184,7 @@ export class SimulatorView implements OnDestroy {
   protected readonly runs = new FireRun();
   protected readonly weather = new ScreenWeather(this.observations, {
     country: () => this.country(),
-    centre: () => this.ignition(),
+    centre: () => this.centre(),
     minute: () => this.minutes(),
   });
 
@@ -276,7 +276,7 @@ export class SimulatorView implements OnDestroy {
     })),
   );
   protected readonly starts = computed<readonly Point[]>(() => {
-    const centre = this.ignition();
+    const centre = this.centre();
     if (!centre) return [];
     const [west, south, east, north] = domainAround(centre);
     return parsePoints(this.ignicions()).filter(
@@ -285,7 +285,7 @@ export class SimulatorView implements OnDestroy {
   });
 
   protected readonly startRows = computed(() => {
-    const centre = this.ignition();
+    const centre = this.centre();
     const terrain = this.terrain.terrain();
     const degrees = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
     return this.starts().map((point, index) => {
@@ -325,7 +325,7 @@ export class SimulatorView implements OnDestroy {
   private readonly narrowQuery = matchMedia(NARROW_WORKSPACE_QUERY);
   protected readonly narrowWorkspace = signal(this.narrowQuery.matches);
 
-  protected readonly ignition = computed(() => parsePoint(this.point()));
+  protected readonly centre = computed(() => parsePoint(this.point()));
 
   protected readonly chosen = computed(() => this.municipalities.find(this.municipality()));
 
@@ -334,13 +334,13 @@ export class SimulatorView implements OnDestroy {
   );
 
   protected readonly coordinates = computed(() => {
-    const point = this.ignition();
+    const point = this.centre();
     return point ? readable(point) : '';
   });
 
   // Read elevation and slope from the model grid, not MapLibre’s display mesh.
   protected readonly under = computed(() => {
-    const centre = this.ignition();
+    const centre = this.centre();
     const pointer = this.maps.pointer();
     const terrain = this.terrain.terrain();
     if (!centre || !pointer || !terrain) return null;
@@ -446,7 +446,7 @@ export class SimulatorView implements OnDestroy {
     if (this.fuels.error()) return this.fuels.error();
     const fuels = this.fuels.grid(),
       terrain = this.terrain.terrain(),
-      centre = this.ignition();
+      centre = this.centre();
     if (!fuels) return 'Falta la cartografia de combustibles.';
     if (this.unknownLand())
       return 'Hi ha terreny sense dades de combustible. Torna a carregar la cartografia.';
@@ -581,7 +581,7 @@ export class SimulatorView implements OnDestroy {
       });
       return;
     }
-    const centre = this.ignition();
+    const centre = this.centre();
     if (!centre) return;
     const place = this.chosen()?.name ?? this.municipality();
     const name = this.scenarioName().trim() || `${place} · ${this.scenarioSummary()}`;
@@ -714,7 +714,7 @@ export class SimulatorView implements OnDestroy {
 
   protected focusFire(): void {
     const result = this.runs.result(),
-      centre = this.ignition();
+      centre = this.centre();
     if (!result || !centre) return;
     const until = Math.min(
       this.minutes() + (this.forecasts() ? FORECASTS[FORECASTS.length - 1] : 0),
@@ -750,7 +750,7 @@ export class SimulatorView implements OnDestroy {
     previousWinds?: readonly WindChange[],
   ): Promise<void> {
     const terrain = this.terrain.terrain();
-    const centre = this.ignition();
+    const centre = this.centre();
     const fuels = this.fuels.grid();
     if (!terrain || !centre || !fuels || !this.canStart()) return;
 
@@ -895,14 +895,14 @@ export class SimulatorView implements OnDestroy {
   }
 
   protected focusSpot(cell: number): void {
-    const centre = this.ignition();
+    const centre = this.centre();
     if (!centre) return;
     const [lon, lat] = spotPoint(cell, centre);
     this.maps.goToBounds([lon - 0.005, lat - 0.004, lon + 0.005, lat + 0.004]);
   }
 
   protected recentre(): void {
-    const point = this.ignition();
+    const point = this.centre();
     if (point) this.maps.goToBounds(domainAround(point));
   }
 
@@ -978,7 +978,7 @@ export class SimulatorView implements OnDestroy {
   private mopUpGuard(measure: Countermeasure): string | null {
     if (measure.kind !== 'mop-up') return null;
     const result = this.runs.result(),
-      centre = this.ignition();
+      centre = this.centre();
     if (!result || !centre) return 'L’extinció de restes necessita un foc calculat.';
     // Crew work begins on arrival, not at deployment time.
     const minute = workStart(measure) ?? measure.startMin ?? 0;
@@ -1085,10 +1085,10 @@ export class SimulatorView implements OnDestroy {
       this.municipalities.load(this.province());
       this.maps.focusMunicipality(null);
 
-      const point = this.ignition();
+      const point = this.centre();
       if (!point) return;
 
-      this.maps.setIgnition(point);
+      this.maps.setCentre(point);
       this.maps.setDomain(domainRing(point));
 
       this.maps.setDomainMask(true);
@@ -1107,7 +1107,7 @@ export class SimulatorView implements OnDestroy {
     effect(() => this.maps.setContours(this.contours()));
     this.maps.setReliefEmphasis(true);
     effect(() => {
-      const point = this.ignition();
+      const point = this.centre();
       if (!point) return;
 
       if (this.labels()) this.places.load(this.province(), domainAround(point));
@@ -1117,7 +1117,7 @@ export class SimulatorView implements OnDestroy {
 
   private watchDomainData(): void {
     effect(() => {
-      const point = this.ignition();
+      const point = this.centre();
       if (point) {
         this.terrain.read(point);
         void this.fuels.read(point);
@@ -1148,7 +1148,7 @@ export class SimulatorView implements OnDestroy {
       untracked(() => {
         if (this.runs.computing()) return;
         if (this.plan.kind()) {
-          const centre = this.ignition();
+          const centre = this.centre();
           if (centre)
             this.editPlan(() => this.plan.click([picked[0], picked[1]], domainAround(centre)));
           return;
@@ -1162,7 +1162,7 @@ export class SimulatorView implements OnDestroy {
 
   private watchDomainPlan(): void {
     effect(() => {
-      const centre = this.ignition();
+      const centre = this.centre();
       untracked(() => {
         const key = centre ? formatPoint(centre) : '';
         if (key === this.planDomain) return;
@@ -1193,7 +1193,7 @@ export class SimulatorView implements OnDestroy {
     });
     effect(() => {
       const map = this.maps.ready() ? this.maps.map : null,
-        centre = this.ignition();
+        centre = this.centre();
       if (map && centre) this.spottingDisplay.set(map, centre, this.visibleSpots());
     });
   }
@@ -1236,7 +1236,7 @@ export class SimulatorView implements OnDestroy {
       );
     });
     effect(() => {
-      const point = this.ignition();
+      const point = this.centre();
       const terrain = this.terrain.terrain();
       if (this.slopes() && point && terrain) {
         this.maps.setSlopes(slopeImage(terrain), domainAround(point));
@@ -1262,7 +1262,7 @@ export class SimulatorView implements OnDestroy {
   private watchFireAnimation(): EffectRef {
     return effect((onCleanup) => {
       const result = this.runs.result(),
-        centre = this.ignition();
+        centre = this.centre();
       const terrain = untracked(() => this.terrain.terrain());
       if (!result || !centre || !terrain) {
         this.maps.setFire(null);
