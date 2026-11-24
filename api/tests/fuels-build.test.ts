@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { TILE_SIZE, UNKNOWN } from '../src/fuel-grid.js';
 
 /* Mock only WorldCover HTTP reads; use real datasets, tiles and cache under a temporary directory. */
@@ -177,6 +178,32 @@ test('an answer with everything known is kept, and the second question does not 
   assert.deepEqual(second.runs, first.runs);
   assert.equal(second.generatedAt, first.generatedAt, 'it is the same answer, not a new one');
 });
+
+test.each(['broken gzip', 'broken JSON', 'wrong response shape', 'invalid runs'])(
+  'a cache with %s is rebuilt from source',
+  async (kind) => {
+    const { fuelGrid } = await fuels();
+    const first = await fuelGrid([...BOUNDS], SIZE);
+    const name = (await readdir(join(dir, 'cache')))[0]!;
+    const broken =
+      kind === 'broken gzip'
+        ? Buffer.from('not a gzip file')
+        : kind === 'broken JSON'
+          ? gzipSync('{broken')
+          : gzipSync(
+              JSON.stringify(
+                kind === 'wrong response shape'
+                  ? { ...first, warnings: 'bad' }
+                  : { ...first, runs: [8, 2, CELLS + 1] },
+              ),
+            );
+    await writeFile(join(dir, 'cache', name), broken);
+
+    const rebuilt = await fuelGrid([...BOUNDS], SIZE);
+    assert.deepEqual(rebuilt.runs, [8, 2, CELLS]);
+    assert.equal(fromUrl.mock.calls.length, 2, 'the damaged entry cannot be served');
+  },
+);
 
 test('the same box asked twice at once is one job, and a third box is busy', async () => {
   let release!: () => void;

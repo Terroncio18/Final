@@ -25,6 +25,7 @@ export const app = Fastify({ logger: { transport: undefined } });
 registerFuelRoutes(app);
 
 const cache = new HotspotCache(MAX_HOTSPOT_CACHE_ENTRIES);
+const inFlight = new Map<string, Promise<Awaited<ReturnType<typeof fetchHotspots>>>>();
 
 async function hotspots(from: Day, to: Day) {
   const key = `${from}:${to}`;
@@ -32,8 +33,13 @@ async function hotspots(from: Day, to: Day) {
   const age = hit ? Date.now() - hit.fetchedAt : Infinity;
   if (hit && age < CACHE_TTL_MS) return { ...hit, stale: false };
 
+  let job = inFlight.get(key);
   try {
-    const { body, sources } = await fetchHotspots(from, to);
+    if (!job) {
+      job = fetchHotspots(from, to);
+      inFlight.set(key, job);
+    }
+    const { body, sources } = await job;
     const entry = { body, sources, fetchedAt: Date.now() };
     cache.set(key, entry);
     return { ...entry, stale: false };
@@ -41,6 +47,8 @@ async function hotspots(from: Day, to: Day) {
     if (!hit) throw error;
     app.log.warn(`FIRMS failed, serving ${Math.round(age / 60000)} min old data: ${error}`);
     return { ...hit, stale: true };
+  } finally {
+    if (inFlight.get(key) === job) inFlight.delete(key);
   }
 }
 

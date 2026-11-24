@@ -111,6 +111,7 @@ export function readAemetObservations(value: JsonValue): Observation[] {
     const held = latest.get(row.station.id);
     if (!held || row.observedAt > held.observedAt) latest.set(row.station.id, row);
   }
+  if (value.length && !latest.size) throw new Error('AEMET data: cap observació vàlida.');
   return [...latest.values()];
 }
 
@@ -186,5 +187,7 @@ export function readIpmaObservations(
       rows = value[hour];
     if (observedAt && isJsonObject(rows)) addIpmaHour(found, stations, rows, observedAt);
   }
+  if (stations.size && Object.keys(value).length && !found.size)
+    throw new Error('IPMA: cap observació vàlida.');
   return [...found.values()];
 }

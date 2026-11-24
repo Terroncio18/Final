@@ -27,7 +27,8 @@ export class HotspotCache {
     this.stored.set(key, entry);
     while (this.stored.size > this.limit) {
       const oldest = this.stored.keys().next().value;
-      if (oldest !== undefined) this.stored.delete(oldest);
+      if (oldest === undefined) break;
+      this.stored.delete(oldest);
     }
   }
 

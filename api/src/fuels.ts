@@ -4,6 +4,7 @@ import { resolve, join } from 'node:path';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { fromUrl, type GeoTIFFImage, type TypedArrayWithDimensions } from 'geotiff';
 import { writeFuelCache } from './fuel-cache.js';
+import { isJsonObject, type JsonValue } from './json-value.js';
 import {
   encodeRuns,
   tileBounds,
@@ -286,14 +287,145 @@ let busy = 0;
 const MAX_REQUESTS = 2;
 const FUEL_CACHE_MAX_AGE_MS = 30 * 86_400_000;
 
-async function readFuelCache(path: string): Promise<FuelResponse | null> {
+function isCount(value: JsonValue | undefined): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+function isSource(value: JsonValue): value is FuelResponse['sources'][number] {
+  return (
+    isJsonObject(value) &&
+    typeof value['label'] === 'string' &&
+    typeof value['sourceUrl'] === 'string' &&
+    typeof value['sourceDate'] === 'string' &&
+    typeof value['attribution'] === 'string'
+  );
+}
+
+function isModel(value: JsonValue): value is FuelResponse['models'][number] {
+  return isJsonObject(value) && isCount(value['id']) && isCount(value['cells']);
+}
+
+function hasFuelHeader(value: JsonValue, bounds: Bounds, size: number): boolean {
+  if (!isJsonObject(value)) return false;
+  const cachedBounds = value['bounds'];
+  if (value['version'] !== FUEL_VERSION || value['size'] !== size) return false;
+  return (
+    Array.isArray(cachedBounds) &&
+    cachedBounds.length === bounds.length &&
+    bounds.every((part, i) => cachedBounds[i] === part)
+  );
+}
+
+function hasFuelCounts(value: JsonValue, cells: number): boolean {
+  if (!isJsonObject(value)) return false;
+  const official = value['officialCells'];
+  const estimated = value['estimatedCells'];
+  const missing = value['unknownCells'];
+  const nonBurnable = value['nonBurnableCells'];
+  return (
+    isCount(official) &&
+    isCount(estimated) &&
+    isCount(missing) &&
+    isCount(nonBurnable) &&
+    official + estimated + missing === cells
+  );
+}
+
+function hasFuelMetadata(value: JsonValue): boolean {
+  if (!isJsonObject(value)) return false;
+  const models = value['models'];
+  const sources = value['sources'];
+  const warnings = value['warnings'];
+  const generatedAt = value['generatedAt'];
+  return (
+    Array.isArray(models) &&
+    models.every(isModel) &&
+    Array.isArray(sources) &&
+    sources.every(isSource) &&
+    Array.isArray(warnings) &&
+    warnings.every((warning) => typeof warning === 'string') &&
+    typeof generatedAt === 'string' &&
+    Number.isFinite(Date.parse(generatedAt))
+  );
+}
+
+function hasFuelRuns(value: JsonValue | undefined, cells: number): boolean {
+  if (!Array.isArray(value) || !value.length || value.length % 3) return false;
+  let length = 0;
+  for (let i = 0; i < value.length; i += 3) {
+    const model = value[i];
+    const quality = value[i + 1];
+    const count = value[i + 2];
+    if (!isCount(model) || (model > 13 && model !== UNKNOWN)) return false;
+    if (!isCount(quality) || quality > 2 || !isCount(count) || !count) return false;
+    length += count;
+  }
+  return length === cells;
+}
+
+function readFuelResponse(value: JsonValue, bounds: Bounds, size: number): FuelResponse | null {
+  if (!hasFuelHeader(value, bounds, size) || !hasFuelCounts(value, size * size)) return null;
+  if (!hasFuelMetadata(value) || !isJsonObject(value)) return null;
+  const runs = value['runs'];
+  const models = value['models'];
+  const sources = value['sources'];
+  const warnings = value['warnings'];
+  const officialCells = value['officialCells'];
+  const estimatedCells = value['estimatedCells'];
+  const unknownCells = value['unknownCells'];
+  const nonBurnableCells = value['nonBurnableCells'];
+  const generatedAt = value['generatedAt'];
+  if (
+    !hasFuelRuns(runs, size * size) ||
+    !Array.isArray(runs) ||
+    !Array.isArray(models) ||
+    !Array.isArray(sources) ||
+    !Array.isArray(warnings) ||
+    !isCount(officialCells) ||
+    !isCount(estimatedCells) ||
+    !isCount(unknownCells) ||
+    !isCount(nonBurnableCells) ||
+    typeof generatedAt !== 'string'
+  )
+    return null;
+  return {
+    version: FUEL_VERSION,
+    bounds,
+    size,
+    runs,
+    officialCells,
+    estimatedCells,
+    unknownCells,
+    nonBurnableCells,
+    models,
+    sources,
+    warnings,
+    generatedAt,
+  };
+}
+
+async function readFuelCache(
+  path: string,
+  bounds: Bounds,
+  size: number,
+): Promise<FuelResponse | null> {
+  let compressed: Buffer;
   try {
-    if (Date.now() - (await stat(path)).mtimeMs < FUEL_CACHE_MAX_AGE_MS)
-      return JSON.parse(gunzipSync(await readFile(path)).toString()) as FuelResponse;
+    if (Date.now() - (await stat(path)).mtimeMs >= FUEL_CACHE_MAX_AGE_MS) return null;
+    compressed = await readFile(path);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    return null;
   }
-  return null;
+  try {
+    return readFuelResponse(
+      JSON.parse(gunzipSync(compressed).toString()) as JsonValue,
+      bounds,
+      size,
+    );
+  } catch {
+    return null;
+  }
 }
 
 function summarizeCells(models: Uint8Array, quality: Uint8Array) {
@@ -407,7 +539,7 @@ export async function fuelGrid(bounds: Bounds, size: number): Promise<FuelRespon
     .digest('hex');
   const cacheDir = join(FUEL_DATA_DIR, 'cache');
   const path = join(cacheDir, `${key}.json.gz`);
-  const cached = await readFuelCache(path);
+  const cached = await readFuelCache(path, bounds, size);
   if (cached) return cached;
 
   const pending = inFlight.get(key);

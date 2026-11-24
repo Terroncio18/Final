@@ -148,6 +148,28 @@ test('the same range twice is one question to FIRMS', async () => {
   assert.equal(fetchHotspots.mock.calls.length, 2, 'another range is another question');
 });
 
+test('simultaneous requests for one range share the upstream job', async () => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  fetchHotspots.mockImplementation(async () => {
+    await held;
+    return { body: detections(2), sources: ['VIIRS_SNPP_NRT'] };
+  });
+  const app = await serve();
+  const url = '/api/hotspots?from=2024-08-01&to=2024-08-01';
+  const first = app.inject(url);
+  const second = app.inject(url);
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(fetchHotspots.mock.calls.length, 1);
+  } finally {
+    release();
+  }
+  const answers = await Promise.all([first, second]);
+  assert.equal(answers[0].statusCode, 200);
+  assert.deepEqual(answers[0].json(), answers[1].json());
+});
+
 test('the range cache is bounded and retains recently visited ranges', async () => {
   const app = await serve();
   const query = (offset: number) => `/api/hotspots?from=${addDays('2024-06-01', offset)}`;

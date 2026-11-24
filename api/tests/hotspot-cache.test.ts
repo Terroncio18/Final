@@ -1,4 +1,4 @@
-import { test } from 'vitest';
+import { test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { HotspotCache, type CachedHotspots } from '../src/hotspot-cache.js';
 
@@ -43,5 +43,21 @@ test('missing ranges do not change the eviction order', () => {
 test('rejects limits that cannot retain a bounded number of entries', () => {
   for (const limit of [0, -1, 0.5, Number.NaN, Infinity]) {
     assert.throws(() => new HotspotCache(limit), RangeError);
+  }
+});
+
+test('eviction stops if the map yields no oldest key', () => {
+  const cache = new HotspotCache(1);
+  cache.set('a', entry());
+  let calls = 0;
+  const keys = vi.spyOn(Map.prototype, 'keys').mockImplementation(() => {
+    if (++calls > 1) throw new Error('eviction tried the empty iterator again');
+    return [][Symbol.iterator]();
+  });
+  try {
+    cache.set('b', entry());
+    assert.equal(calls, 1);
+  } finally {
+    keys.mockRestore();
   }
 });

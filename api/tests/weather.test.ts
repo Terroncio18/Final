@@ -364,3 +364,53 @@ test('a malformed refresh keeps the last valid observations marked stale', async
   assert.equal(answer?.stale, true);
   assert.equal(answer?.observation.windKmh, 18);
 });
+
+test('AEMET rows that are all invalid preserve the last good observation', async () => {
+  const spy = answering(aemetAnswers);
+  const { nearestObservation } = await weather();
+  await nearestObservation('ES', 2.65, 39.57);
+  vi.useFakeTimers();
+  vi.setSystemTime(Date.now() + 25 * 60 * 1000);
+  spy.mockImplementation(
+    async (url: string | URL) =>
+      new Response(
+        String(url).includes('/api/observacion')
+          ? JSON.stringify(AEMET_POINTER)
+          : JSON.stringify([AEMET_ROWS[3]]),
+        { status: 200 },
+      ),
+  );
+
+  const answer = await nearestObservation('ES', 2.65, 39.57);
+  assert.equal(answer?.stale, true);
+  assert.equal(answer?.observation.windKmh, 18);
+});
+
+test('IPMA rows that are all invalid preserve the last good observation', async () => {
+  const spy = answering(ipmaAnswers);
+  const { nearestObservation } = await weather();
+  await nearestObservation('PT', -9.14, 38.73);
+  vi.useFakeTimers();
+  vi.setSystemTime(Date.now() + 25 * 60 * 1000);
+  spy.mockImplementation(
+    async (url: string | URL) =>
+      new Response(
+        JSON.stringify(
+          String(url).includes('stations.json')
+            ? IPMA_STATIONS_JSON
+            : { '2026-11-19T11:00': { '1200535': { humidade: 'wet' } } },
+        ),
+        { status: 200 },
+      ),
+  );
+
+  const answer = await nearestObservation('PT', -9.14, 38.73);
+  assert.equal(answer?.stale, true);
+  assert.equal(answer?.observation.windKmh, 18);
+});
+
+test('an empty AEMET station list is a legitimate empty answer', async () => {
+  answering((url) => (url.includes('/api/observacion') ? AEMET_POINTER : []));
+  const { nearestObservation } = await weather();
+  assert.equal(await nearestObservation('ES', 2.65, 39.57), null);
+});
