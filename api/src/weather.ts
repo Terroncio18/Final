@@ -1,5 +1,6 @@
 import { AEMET_API_KEY, AEMET_OBSERVATIONS, IPMA_OBSERVATIONS, IPMA_STATIONS } from './config.js';
 import type { JsonValue } from './json-value.js';
+import { fetchChecked, readJson } from './read-json.js';
 import {
   readAemetPointer,
   readAemetObservations,
@@ -29,13 +30,14 @@ let ipmaStations: Cached<Map<string, WeatherStation>> | null = null;
 async function fromAemet(): Promise<Observation[]> {
   if (!AEMET_API_KEY) throw new Error('AEMET_API_KEY is not set');
 
-  const first = await fetch(AEMET_OBSERVATIONS, { headers: { api_key: AEMET_API_KEY } });
-  if (!first.ok) throw new Error(`AEMET: ${first.status}`);
   // AEMET reports its own errors inside a 200, like FIRMS does.
-  const url = readAemetPointer((await first.json()) as JsonValue);
+  const url = readAemetPointer(
+    await readJson<JsonValue>(AEMET_OBSERVATIONS, 'AEMET', {
+      headers: { api_key: AEMET_API_KEY },
+    }),
+  );
 
-  const second = await fetch(url);
-  if (!second.ok) throw new Error(`AEMET data: ${second.status}`);
+  const second = await fetchChecked(url, (status) => `AEMET data: ${status}`);
   const text = new TextDecoder('iso-8859-15').decode(await second.arrayBuffer());
   return readAemetObservations(JSON.parse(text) as JsonValue);
 }
@@ -43,17 +45,17 @@ async function fromAemet(): Promise<Observation[]> {
 async function stationsOfIpma() {
   if (ipmaStations && Date.now() - ipmaStations.at < STATIONS_TTL_MS) return ipmaStations.value;
 
-  const response = await fetch(IPMA_STATIONS);
-  if (!response.ok) throw new Error(`IPMA stations: ${response.status}`);
-  const value = readIpmaStations((await response.json()) as JsonValue);
+  const value = readIpmaStations(await readJson<JsonValue>(IPMA_STATIONS, 'IPMA stations'));
   ipmaStations = { value, at: Date.now() };
   return value;
 }
 
 async function fromIpma(): Promise<Observation[]> {
-  const [stations, response] = await Promise.all([stationsOfIpma(), fetch(IPMA_OBSERVATIONS)]);
-  if (!response.ok) throw new Error(`IPMA: ${response.status}`);
-  return readIpmaObservations((await response.json()) as JsonValue, stations);
+  const [stations, data] = await Promise.all([
+    stationsOfIpma(),
+    readJson<JsonValue>(IPMA_OBSERVATIONS, 'IPMA'),
+  ]);
+  return readIpmaObservations(data, stations);
 }
 
 // Great-circle distance in kilometres; accurate enough for picking the nearest station.

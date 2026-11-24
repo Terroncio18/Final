@@ -9,6 +9,7 @@ import {
   type Scope,
 } from './config.js';
 import type { JsonValue } from './json-value.js';
+import { fetchChecked } from './read-json.js';
 
 type Satellite = 'N' | 'N20' | 'N21' | '?';
 type Confidence = 'l' | 'n' | 'h' | '';
@@ -123,8 +124,10 @@ export async function availability(): Promise<Map<string, Span>> {
   if (held && Date.now() - held.fetchedAt < AVAILABILITY_TTL_MS) return held.table;
 
   try {
-    const response = await fetch(`${FIRMS_AVAILABILITY}/${FIRMS_MAP_KEY}/ALL`);
-    if (!response.ok) throw new Error(`FIRMS answered ${response.status}`);
+    const response = await fetchChecked(
+      `${FIRMS_AVAILABILITY}/${FIRMS_MAP_KEY}/ALL`,
+      (status) => `FIRMS answered ${status}`,
+    );
 
     const table = new Map<string, Span>();
     for (const row of parseCsv(await response.text(), 'data_id')) {
@@ -235,8 +238,7 @@ async function fetchWindow(
     ? `${FIRMS_BASE}/${FIRMS_MAP_KEY}/${source}/${box}/${days}`
     : `${FIRMS_BASE}/${FIRMS_MAP_KEY}/${source}/${box}/${days}/${start}`;
 
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`FIRMS answered ${response.status} for ${source}`);
+  const response = await fetchChecked(url, (status) => `FIRMS answered ${status} for ${source}`);
 
   const rows = parseCsv(await response.text(), 'latitude');
   const features = rows.flatMap((row) => {
