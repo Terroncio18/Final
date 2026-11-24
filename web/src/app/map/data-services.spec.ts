@@ -549,6 +549,55 @@ describe('geographic and observation services', () => {
     expect(service.earliest()).toBe('2012-01-01');
   });
 
+  it('reports an incomplete answer and forgets it once a whole one arrives', async () => {
+    vi.spyOn(TestBed.inject(StudyArea), 'inside').mockImplementation(async (f) => f);
+    fetcher
+      .mockResolvedValueOnce(
+        response(collection([]), 200, {
+          'x-partial': 'true',
+          'x-missing': 'VIIRS_NOAA20_NRT/peninsula',
+        }),
+      )
+      .mockResolvedValueOnce(response(collection([])));
+    const service = TestBed.inject(HotspotsService);
+    TestBed.tick();
+    await settle();
+    expect(service.partial()).toBe(true);
+    expect(service.missing()).toBe('VIIRS_NOAA20_NRT/peninsula');
+    expect(service.failed()).toBe(false);
+
+    // A complete answer must not leave the warning on.
+    await TestBed.inject(Router).navigateByUrl('/?des=2024-08-01&fins=2024-08-02');
+    TestBed.tick();
+    await settle();
+    expect(service.partial()).toBe(false);
+    expect(service.missing()).toBeNull();
+  });
+
+  it('reports old detections with the moment they were read, and forgets them', async () => {
+    vi.spyOn(TestBed.inject(StudyArea), 'inside').mockImplementation(async (f) => f);
+    fetcher
+      .mockResolvedValueOnce(
+        response(collection([]), 200, {
+          'x-stale': 'true',
+          'x-fetched-at': '2024-08-02T10:00:00.000Z',
+        }),
+      )
+      .mockResolvedValueOnce(response(collection([]), 200, { 'x-stale': 'false' }));
+    const service = TestBed.inject(HotspotsService);
+    TestBed.tick();
+    await settle();
+    expect(service.stale()).toBe(true);
+    expect(service.fetchedAt()).toBe('2024-08-02T10:00:00.000Z');
+    expect(service.failed()).toBe(false);
+
+    await TestBed.inject(Router).navigateByUrl('/?des=2024-08-01&fins=2024-08-02');
+    TestBed.tick();
+    await settle();
+    expect(service.stale()).toBe(false);
+    expect(service.fetchedAt()).toBeNull();
+  });
+
   it('tells a missing FIRMS key apart from a plain outage', async () => {
     vi.spyOn(TestBed.inject(StudyArea), 'inside').mockImplementation(async (f) => f);
     fetcher.mockResolvedValueOnce(

@@ -26,6 +26,8 @@ export class RangePicker {
   protected readonly loading = this.hotspots.loading;
   protected readonly failed = this.hotspots.failed;
   protected readonly missingKey = this.hotspots.missingKey;
+  protected readonly partial = this.hotspots.partial;
+  protected readonly stale = this.hotspots.stale;
   protected readonly count = this.hotspots.countInScope;
   protected readonly earliest = this.hotspots.earliest;
   protected readonly open = signal(false);
@@ -75,6 +77,17 @@ export class RangePicker {
   // the calendar and the validation back to yesterday.
   protected maxDay(): string {
     return today();
+  }
+
+  // Also read when used: an age captured once would freeze while the panel stays open.
+  protected age(): string | null {
+    const at = this.hotspots.fetchedAt();
+    if (!at) return null;
+    const minutes = Math.floor((Date.now() - Date.parse(at)) / 60_000);
+    if (!Number.isFinite(minutes) || minutes < 0) return null;
+    if (minutes < 60) return `fa ${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    return hours < 24 ? `fa ${hours} h` : `fa ${Math.floor(hours / 24)} dies`;
   }
 
   protected retry(): void {

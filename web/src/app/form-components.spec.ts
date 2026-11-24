@@ -112,9 +112,13 @@ describe('form, navigation and overview components', () => {
     loading: ReturnType<typeof signal<boolean>>;
     failed: ReturnType<typeof signal<boolean>>;
     missingKey: ReturnType<typeof signal<boolean>>;
+    partial: ReturnType<typeof signal<boolean>>;
+    stale: ReturnType<typeof signal<boolean>>;
+    fetchedAt: ReturnType<typeof signal<string | null>>;
     countInScope: ReturnType<typeof signal<number>>;
     earliest: ReturnType<typeof signal<string | null>>;
     choose: ReturnType<typeof vi.fn>;
+    retry: ReturnType<typeof vi.fn>;
   };
   const search = {
     ready: signal(true),
@@ -150,7 +154,11 @@ describe('form, navigation and overview components', () => {
       loading: signal(false),
       failed: signal(false),
       missingKey: signal(false),
+      partial: signal(false),
+      stale: signal(false),
+      fetchedAt: signal<string | null>(null),
       countInScope: signal(3),
+      retry: vi.fn(),
       earliest: signal<string | null>(null),
       choose: vi.fn(),
     };
@@ -304,6 +312,24 @@ describe('form, navigation and overview components', () => {
     c['choosePreset'](7);
     expect(hotspots.choose).toHaveBeenCalledTimes(2);
     expect(c['open']()).toBe(false);
+  });
+
+  it('offers the retry of a failed read and of an incomplete one from the panel', async () => {
+    const fixture = TestBed.createComponent(RangePicker);
+    await fixture.whenStable();
+    fixture.componentInstance['toggle']();
+    hotspots.failed.set(true);
+    await fixture.whenStable();
+    const retry = () => fixture.nativeElement.querySelector('.panel .apply') as HTMLButtonElement;
+    retry().click();
+    expect(hotspots.retry).toHaveBeenCalledTimes(1);
+
+    // An incomplete answer is not a failure: it keeps its detections and offers the same retry.
+    hotspots.failed.set(false);
+    hotspots.partial.set(true);
+    await fixture.whenStable();
+    retry().click();
+    expect(hotspots.retry).toHaveBeenCalledTimes(2);
   });
 
   it('takes the latest allowed day from the clock, not from when it was built', async () => {

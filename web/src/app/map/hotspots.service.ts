@@ -30,6 +30,12 @@ export class HotspotsService {
   public readonly loading = signal(false);
   public readonly failed = signal(false);
   public readonly missingKey = signal(false);
+  /** Some of the FIRMS queries for this range failed: there may be fires that are not shown. */
+  public readonly partial = signal(false);
+  public readonly missing = signal<string | null>(null);
+  /** FIRMS did not answer and these are the last detections that could be read. */
+  public readonly stale = signal(false);
+  public readonly fetchedAt = signal<string | null>(null);
   public readonly earliest = signal<string | null>(null);
 
   private readonly insideStudyArea = signal<FeatureCollection<Point> | null>(null);
@@ -89,6 +95,10 @@ export class HotspotsService {
     this.loading.set(true);
     this.failed.set(false);
     this.missingKey.set(false);
+    this.partial.set(false);
+    this.missing.set(null);
+    this.stale.set(false);
+    this.fetchedAt.set(null);
 
     const url = `${HOTSPOTS_URL}?from=${range.from}&to=${range.to}`;
 
@@ -99,12 +109,21 @@ export class HotspotsService {
           throw new HotspotFetchError(`${response.status} ${response.statusText}`, body?.reason);
         }
         const earliest = response.headers.get('x-earliest');
+        // Absent unless some query of this range failed; x-stale says «old», this says «not whole».
+        const partial = response.headers.get('x-partial') === 'true';
+        const missing = response.headers.get('x-missing');
+        const stale = response.headers.get('x-stale') === 'true';
+        const fetchedAt = response.headers.get('x-fetched-at');
         const collection = (await response.json()) as FeatureCollection<Point>;
-        return { earliest, collection };
+        return { earliest, partial, missing, stale, fetchedAt, collection };
       })
-      .then(async ({ earliest, collection }) => {
+      .then(async ({ earliest, partial, missing, stale, fetchedAt, collection }) => {
         if (request !== this.requests) return;
         if (earliest) this.earliest.set(earliest);
+        this.partial.set(partial);
+        this.missing.set(missing);
+        this.stale.set(stale);
+        this.fetchedAt.set(fetchedAt);
 
         const features = await this.area.inside(collection.features);
         if (request !== this.requests) return;

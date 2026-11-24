@@ -24,6 +24,21 @@
       @if (failed()) {
         <p class="note warn">No s'han pogut llegir les deteccions.</p>
         <button type="button" class="apply" (click)="retry()">Tornar-ho a provar</button>
+      } @else {
+        @if (stale()) {
+          <p class="note warn">
+            FIRMS no ha respost: es mostren les últimes deteccions que es van poder llegir.
+          </p>
+          @if (age(); as when) {
+            <p class="note">Llegides {{ when }}.</p>
+          }
+        }
+        @if (partial()) {
+          <p class="note warn">Alguna font no ha respost: hi pot haver focs que no es vegin.</p>
+        }
+        @if (stale() || partial()) {
+          <button type="button" class="apply" (click)="retry()">Tornar-ho a provar</button>
+        }
       }
 
       <p class="head">Darrers dies</p>
