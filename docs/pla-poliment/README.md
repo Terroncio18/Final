@@ -35,7 +35,7 @@ La xarxa de seguretat ja hi és: 97,9 % de cobertura i 0 avisos de Sonar
 
 | #   | Fase                                                        | Depèn de    | Estat                                                                                                        | Qui    |
 | --- | ----------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------ | ------ |
-| 0   | [El full d'estil](fase-00-full-d-estil.md)                  | —           | **A mitges**: 7 regles escrites; decisions pendents a `estil.md`                                             | Claude |
+| 0   | [El full d'estil](fase-00-full-d-estil.md)                  | —           | **Feta** 24/11: 12 regles escrites; les 3 decisions obertes, tancades (§11.80)                                | Claude |
 | 0b  | [El linter](fase-00b-linter.md)                             | 0           | **Feta** 20/11: ESLint i Prettier en verd a web i API                                                        | Claude |
 | 1   | [Inventari](fase-01-inventari.md)                           | —           | **Feta**: dues llistes a `docs/inventari-web.md` i `docs/inventari-api.md`, les sis categories cobertes      | Claude |
 | 2   | [Provar l'aplicació sencera](fase-02-provar-l-aplicacio.md) | —           | **Feta** 20/11: prova manual completada; quatre defectes resolts a la fase 3                                 | Pere   |
@@ -67,6 +67,12 @@ les dades són velles, que l'API anunciava des de sempre i ningú llegia. Les
 dues meitats, a `tareas codex/de-codex/`. Estat verificat: **440 proves** i
 les vuit portes en verd. El que no s'ha vist: cap dels avisos ni dels dos
 botons nous s'ha provat al navegador.
+
+**La revisió final, a fons**: [`revisio-final.md`](revisio-final.md), demanada
+en acabar l'avaluació i deixada al criteri de Claude. Mira el que les tres
+revisions anteriors no han mirat —repetició, codi mort al dia, si les proves
+proven, i el que no s'ha llegit a fons—, tanca les tres decisions obertes de
+la fase 0 i acaba amb el full del que la fase 7 ha de mirar al navegador.
 
 **Les independents de debò són la 1 i la 2**: es poden fer avui, alhora, i les
 dues només llegeixen. La 0 i la 0b també són independents de tot.

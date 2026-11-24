@@ -25,17 +25,28 @@
 
 ## Queda decidir
 
-Són a «Per decidir» d'`estil.md`.
+Res que bloquegi. Les tres que quedaven obertes les va tancar Pere el
+24/11/2026, deixant el criteri a Claude, i són les regles 8, 9 i 10
+d'`estil.md`:
 
-- [ ] **Com es diu «aquesta resposta ja no la vull»**: comptador, clau del que
-      s'ha demanat, o `AbortController`. Avui n'hi ha tres maneres.
-- [ ] **Cadena de promeses o `async`/`await`**.
-- [ ] **Com es diu «això no l'espero»**: `void` o un ajudant que enganxi el
-      `catch`.
+- [x] **Com es diu «aquesta resposta ja no la vull»**: són **tres** problemes
+      i es diuen diferent —`AbortController` quan la feina és un `fetch`, un
+      testimoni amb nom quan no ho és, i deduplicació per clau quan del que
+      es tracta és de no repetir el que ja s'ha demanat—. Regla 8.
+- [x] **Cadena de promeses o `async`/`await`**: `async`/`await`. Regla 9.
+- [x] **Com es diu «això no l'espero»**: un ajudant amb nom que enganxi el
+      `catch` i registri amb el prefix del mòdul, mai un `void` nu. Regla 10.
 - [x] **Els comentaris.** Decidit per Pere el 20/11/2026 (§11.70): es treuen
       per defecte; es mantenen només per aclarir comportaments no evidents o
-      instruccions per a eines. Regla 5 a `estil.md`. S'ha esmenat la portada de
-      la fase 1 de la bitàcola i `docs/README.md`, que deien que el codi cita
-      els números de les decisions als comentaris. **Afecta la fase 5**: es
-      fa fitxer per fitxer dins del seu repartiment per carpetes; les
-      funcions noves de la §11.63/§11.69 hi entren igual que la resta.
+      instruccions per a eines. Regla 5.
+- [x] **El prefix dels missatges de consola** (regla 11) i **les llengües**
+      (regla 12), que ja es complien i només calia escriure-les.
+
+**La fase queda feta.** El que continua a «Per decidir» d'`estil.md` no és
+d'aquesta fase: l'apòstrof dels textos de pantalla, els índexs per carpeta
+—que Pere va aplaçar el 19/11— i el muntatge del mapa amb nom propi, que
+s'ha de valorar cas per cas.
+
+Les regles 8, 9 i 10 **encara no les compleix el codi**: unificar els nou
+fitxers que repeteixen el patró és feina de
+[`revisio-final.md`](revisio-final.md), no d'aquesta decisió.

@@ -151,6 +151,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.77** L'avaluació es reparteix i la meitat de Claude s'arregla
 - **11.78** Els sis defectes de l'avaluació es reparteixen i cauen
 - **11.79** La cobertura incompleta i les dades velles es diuen
+- **11.80** La fase 0 es tanca amb cinc regles més
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):

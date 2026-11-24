@@ -256,34 +256,104 @@ de tipus passen. ESLint també està configurat a `api/`; resolts els seus
 usos explícits i verificades les 88 proves. Les respostes meteorològiques
 externes també es validen abans de convertir-les al contracte conegut.
 
+## 8. Una resposta que ja no es vol
+
+**Són tres problemes i es diuen diferent.** Avui el projecte en barreja les
+maneres: un comptador a `map/hotspots.service.ts`, un testimoni a
+`simulator/weather.service.ts`, `simulation/terrain.service.ts` i
+`simulator/fire-run.ts`, una clau a `map/places.service.ts`, i un
+`AbortController` a `simulation/fuel.service.ts`. Nou fitxers repeteixen la
+mateixa forma a mà. Decidit per Pere el 24/11/2026, deixant el criteri a
+Claude:
+
+**Quan la feina és un `fetch`, un `AbortController`.** Cancel·la de debò la
+petició en lloc de només descartar-ne la resposta, i amb FIRMS això és quota
+que no es gasta. És el que ja fa `fuel.service.ts`.
+
+**Quan no ho és, un testimoni amb nom.** Un càlcul com el de `fire-run.ts` o
+una importació diferida com la de `map/map-agents.ts` no es poden cancel·lar:
+només es pot deixar de fer-los cas. Això vol **una cosa petita amb nom i amb
+proves**, no tres `if (meu !== this.token) return` repetits a cada servei.
+`FireRun` ja n'és gairebé una: concentra el testimoni i diu qui pot publicar.
+
+**No repetir el que ja s'ha demanat és una tercera cosa.** `places.service.ts`
+no cancel·la res: compara la clau del que es demana amb la del que ja s'ha
+demanat per a no tornar-hi. Es diu deduplicació i no s'ha de confondre amb
+les altres dues; a l'API, `fuels.ts` ja en té una per clau.
+
+I la que va amb les tres: **una lectura que falla s'oblida**, perquè si no no
+es pot tornar a demanar. Està resolt un per un a `places.service.ts`,
+`study-area.ts`, `map-agents.ts`, `terrain.service.ts` i, per un altre camí,
+a `hotspots.service.ts`; és el mateix que hauria d'anar dins de la cosa amb
+nom.
+
+**On som avui**: la regla és escrita i el codi encara no la compleix. Unificar
+els nou fitxers és feina de la revisió final, no d'aquesta decisió.
+
+## 9. `async`/`await`, no cadenes
+
+**Les promeses s'esperen amb `await`.** Tota l'API ja ho fa. Al web en queda
+una: el `load()` de `map/hotspots.service.ts`, que és
+`.then().then(async …).catch()` amb un `await` dins d'un `then`, i és el que
+el fa costar de llegir. Decidit per Pere el 24/11/2026.
+
+Un `.then()` sol continua valent per a encadenar una cosa curta sobre una
+promesa que ja es té; el que no val és escriure un camí sencer com una cadena
+quan `await` el diu en ordre.
+
+**On som avui**: complerta a `api/` i a tot `web/` tret d'aquell `load()`.
+
+## 10. Res de `void` nu
+
+**Una promesa que es deixa anar no es deixa sense `catch`.** `void` davant
+d'una crida diu «no espero això», però no diu què passa si rebutja: es perd
+en silenci. Decidit per Pere el 24/11/2026.
+
+Hi va un ajudant amb nom que hi enganxi el `catch` i ho registri amb el
+prefix del seu mòdul, com fa `map/source-data.ts` amb `writeSource()`. Una
+navegació que falla —`void this.router.navigate(...)` a
+`map/hotspots.service.ts`— és justament el que es vol saber.
+
+**On som avui**: `writeSource()` ho fa bé; els `void` de navegació, no.
+
+## 11. El prefix dels missatges de consola
+
+**Cada missatge diu de quin mòdul surt, entre claudàtors i en anglès**, amb
+el nom del seu fitxer o subsistema: `[hotspots]`, `[places]`,
+`[study-area]`, `[terrain]`, `[weather]`, `[map]`, `[map-agents]`,
+`[agents-3d]`, `[fire-particles]`, `[hotspot-panel]`, `[simulator-view]`.
+Decidit per Pere el 24/11/2026.
+
+**On som avui**: complerta. Es va acabar el 24/11/2026 (§11.77), quan la
+revisió va trobar que de les onze crides tres desafinaven: una sense cap
+prefix i `[mapa]` contra `[map]`.
+
+## 12. Les llengües
+
+**Codi, noms i comentaris en anglès; pantalla, bitàcola i manuals en
+català.** Decidit per Pere el 24/11/2026, escrivint el que ja es feia.
+
+Els missatges d'error que veu l'usuari són de pantalla i van en català,
+també els que l'API retorna al navegador per a ensenyar-los. Els que van a
+la consola són per a qui programa i van en anglès, amb el prefix de la regla
+11.
+
+**On som avui**: complerta, amb una excepció sense decidir: els textos de
+pantalla barregen l'apòstrof tipogràfic `’` i el recte `'`, deu i deu. No
+està resolt perquè no s'ha triat.
+
 ## Per decidir
 
-Les primeres propostes surten de llegir `map/hotspots.service.ts` junts, el
-19/11/2026. La revisió del cicle de vida del 20/11/2026 hi afegeix el cas
-del muntatge del mapa. La inicialització explícita i l'agrupació d'efectes
-ja formen part de la regla 6; les propostes següents són pendents de decidir.
-
-- **Com es diu «aquesta resposta ja no la vull».** El mateix problema està
-  resolt de dues maneres: un comptador a `map/hotspots.service.ts`
-  —`asked`, i tres `if (token !== this.asked) return`— i un `AbortController`
-  a `simulation/fuel.service.ts`. Una de les dues ha de ser la del projecte.
-- **Cadena de promeses o `async`/`await`.** `load()` és
-  `.then().then(async …).catch()`, amb un `await` dins d'un `then`; tota l'API
-  està escrita amb `async`/`await`.
-- **Com es diu «això no l'espero».** `void this.router.navigate(...)` en un
-  lloc i `writeSource()` —que sí que enganxa un `catch`— a l'altre.
-- **El prefix dels missatges de consola.** `[hotspots]`, `[firms]`, `[map]`:
-  ja es fa, només cal escriure-ho.
-- **Les llengües.** Comentaris i noms en anglès; pantalla, bitàcola i manuals
-  en català. També es fa ja.
+- **L'apòstrof dels textos de pantalla.** `’` o `'`: avui n'hi ha deu de cada.
+  És una tria, no un defecte, i Prettier no la mira.
 - **Índexs per a escurçar els imports.** Plantejat per Pere el 19/11/2026 com
   a cosa de més endavant: un `index.ts` per carpeta que reexporti el que en
   surt, de manera que un import llarg passi a ser `from '../simulation'`. El
   que cal mirar abans de fer-ho: a Angular, un índex que ho reexporta tot pot
   arrossegar codi cap al paquet inicial i desfer la separació en trossos que
-  avui deixa el simulador i les figures 3D fora de la primera càrrega (1,5 MB
-  contra 0,7 MB). Val la pena per carpeta tancada —`simulation/` i `map/` ho
-  són—, i mesurant el paquet abans i després.
+  avui deixa el simulador i les figures 3D fora de la primera càrrega. Val la
+  pena per carpeta tancada —`simulation/` i `map/` ho són—, i mesurant el
+  paquet abans i després.
 - **Muntatge del mapa amb nom propi.** A `map/map-shell.ts` i
   `simulator/simulator-view.ts`, valorar un mètode privat amb nom explícit
   per crear el mapa, cridat des de `afterNextRender`. Es conserva l'espera
