@@ -128,27 +128,36 @@ function applyWorldCoverValues(
   size: number,
   models: Uint8Array,
   quality: Uint8Array,
-): void {
+): boolean {
   const [west, south, east, north] = bounds;
   const dx = (east - west) / size,
     dy = (north - south) / size;
+  let uncovered = false;
   for (let row = 0; row < size; row++) {
     const lat = north - (row + 0.5) * dy;
     if (lat < tileSouth || lat >= tileSouth + 3) continue;
     const pixelY = Math.floor((window.tileNorth - lat) / window.cellY) - window.y0;
-    if (pixelY < 0 || pixelY >= window.y1 - window.y0) continue;
     for (let col = 0; col < size; col++) {
       const lon = west + (col + 0.5) * dx;
       if (lon < tileWest || lon >= tileWest + 3) continue;
-      const pixelX = Math.floor((lon - window.tileWestEdge) / window.cellX) - window.x0;
-      if (pixelX < 0 || pixelX >= window.x1 - window.x0) continue;
-      const model = worldCoverModel(Number(values[pixelY * (window.x1 - window.x0) + pixelX]));
       const index = row * size + col;
       if (quality[index] === 1) continue;
+      const pixelX = Math.floor((lon - window.tileWestEdge) / window.cellX) - window.x0;
+      if (
+        pixelY < 0 ||
+        pixelY >= window.y1 - window.y0 ||
+        pixelX < 0 ||
+        pixelX >= window.x1 - window.x0
+      ) {
+        uncovered = true;
+        continue;
+      }
+      const model = worldCoverModel(Number(values[pixelY * (window.x1 - window.x0) + pixelX]));
       models[index] = model;
       quality[index] = model === UNKNOWN ? 0 : 2;
     }
   }
+  return uncovered;
 }
 
 async function applyWorldCoverTile(
@@ -160,13 +169,13 @@ async function applyWorldCoverTile(
   models: Uint8Array,
   quality: Uint8Array,
   signal: AbortSignal,
-): Promise<void> {
+): Promise<boolean> {
   const url = `${WC_ROOT}ESA_WorldCover_10m_2021_v200_${id}_Map.tif`;
   const tiff = await fromUrl(url, { allowFullFile: false }, signal);
   try {
     const image = await tiff.getImage();
     const window = worldCoverWindow(image, bounds, tileWest, tileSouth);
-    if (!window) return;
+    if (!window) return true;
 
     const values = await image.readRasters({
       window: [window.x0, window.y0, window.x1, window.y1],
@@ -174,7 +183,16 @@ async function applyWorldCoverTile(
       interleave: true,
       signal,
     });
-    applyWorldCoverValues(values, window, tileWest, tileSouth, bounds, size, models, quality);
+    return applyWorldCoverValues(
+      values,
+      window,
+      tileWest,
+      tileSouth,
+      bounds,
+      size,
+      models,
+      quality,
+    );
   } finally {
     await tiff.close();
   }
@@ -195,7 +213,7 @@ async function readWorldCover(
       if (!needsWorldCover(bounds, size, quality, tileWest, tileSouth)) continue;
       const id = worldCoverTile(tileWest, tileSouth);
       try {
-        await applyWorldCoverTile(
+        const uncovered = await applyWorldCoverTile(
           id,
           tileWest,
           tileSouth,
@@ -205,6 +223,11 @@ async function readWorldCover(
           quality,
           AbortSignal.timeout(60000),
         );
+        if (uncovered) {
+          warnings.push(
+            `WorldCover ${id}: el ràster no cobreix tota la zona sol·licitada; les cel·les sense altra font queden desconegudes. Tornar-ho a provar no servirà.`,
+          );
+        }
       } catch {
         warnings.push(
           `WorldCover ${id}: dades no disponibles; les cel·les sense altra font queden desconegudes.`,

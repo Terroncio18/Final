@@ -90,7 +90,7 @@ test('with no official map, every cell is estimated from the land cover', async 
   assert.equal(grid.size, SIZE);
 });
 
-test('a cropped WorldCover window leaves cells beyond its east edge unknown', async () => {
+test('partial WorldCover coverage and an inaccessible source have distinct warnings', async () => {
   fromUrl.mockResolvedValue({
     getImage: async () => ({
       getBoundingBox: () => [2.66, 39.55, 2.68, 39.6],
@@ -107,6 +107,21 @@ test('a cropped WorldCover window leaves cells beyond its east edge unknown', as
 
   assert.deepEqual(grid.runs.slice(0, 9), [255, 0, 1, 8, 2, 1, 255, 0, 3]);
   assert.equal(grid.unknownCells, 12);
+  assert.equal(grid.estimatedCells, 4);
+  assert.equal(grid.warnings.length, 2);
+  assert.match(grid.warnings[0]!, /[Cc]ap conjunt.*oficial/);
+  assert.match(grid.warnings[1]!, /WorldCover N39E000.*no cobreix.*Tornar-ho a provar no servirà/);
+  assert.deepEqual(await readdir(dir), [], 'partial coverage is not cached');
+
+  fromUrl.mockRejectedValue(new Error('the range read timed out'));
+  const inaccessible = await fuelGrid([...BOUNDS], SIZE);
+  assert.equal(inaccessible.unknownCells, CELLS);
+  assert.equal(inaccessible.estimatedCells, 0);
+  assert.equal(inaccessible.warnings.length, 2);
+  assert.match(inaccessible.warnings[0]!, /[Cc]ap conjunt.*oficial/);
+  assert.match(inaccessible.warnings[1]!, /WorldCover N39E000.*dades no disponibles/);
+  assert.notEqual(inaccessible.warnings[1], grid.warnings[1]);
+  assert.deepEqual(await readdir(dir), [], 'inaccessible source is not cached');
 });
 
 test('an official map wins over the estimate, and both are named', async () => {
@@ -154,21 +169,6 @@ test('an official map with holes leaves the estimate underneath', async () => {
   assert.ok(grid.officialCells > 0 && grid.officialCells < CELLS, 'some of each');
   assert.equal(grid.officialCells + grid.estimatedCells, CELLS);
   assert.equal(grid.sources.length, 2, 'the official map and the estimate are both cited');
-});
-
-test('a land cover that cannot be read leaves the cells unknown, and says so', async () => {
-  fromUrl.mockRejectedValue(new Error('the range read timed out'));
-  const { fuelGrid } = await fuels();
-
-  const grid = await fuelGrid([...BOUNDS], SIZE);
-
-  assert.equal(grid.unknownCells, CELLS);
-  assert.equal(grid.estimatedCells, 0);
-
-  assert.equal(grid.warnings.length, 2);
-  assert.match(grid.warnings[1]!, /WorldCover N39E000/);
-
-  assert.deepEqual(await readdir(dir), [], 'no cache is written');
 });
 
 test('a missing dataset directory is said once, and does not block caching on its own', async () => {
