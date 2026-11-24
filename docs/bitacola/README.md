@@ -149,6 +149,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.75** La segona revisió arriba a 91 i es commiteja
 - **11.76** El canal amb Codex passa a ser una carpeta
 - **11.77** L'avaluació es reparteix i la meitat de Claude s'arregla
+- **11.78** Els sis defectes de l'avaluació es reparteixen i cauen
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):

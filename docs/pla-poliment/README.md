@@ -59,9 +59,12 @@ acabades i verificades, per indicació de Pere.
 —`map/`, `simulator/`, `top-bar/`, `hotspot-panel/`— és a
 [`avaluacio-del-codi-24-11.md`](avaluacio-del-codi-24-11.md), amb 88/100 i
 cinc defectes, tots cinc arreglats i amb la seva regressió (§11.77). La de
-Codex —`simulation/` i `api/`— va per la bústia, a
-`tareas codex/para-codex/02-evaluacion-de-simulation-y-api.md`, i encara no
-ha arribat.
+Codex —`simulation/` i `api/`— va donar 88/100 i cinc defectes més, repartits
+per fitxers i arreglats entre tots dos (§11.78): en queda **un obert**, la
+resposta parcial de FIRMS que es desa com a completa, amb la decisió de Pere
+ja presa i escrita a `tareas codex/preguntas/`. Les dues meitats, a
+`tareas codex/de-codex/`. Estat verificat: 434 proves i les vuit portes en
+verd.
 
 **Les independents de debò són la 1 i la 2**: es poden fer avui, alhora, i les
 dues només llegeixen. La 0 i la 0b també són independents de tot.
