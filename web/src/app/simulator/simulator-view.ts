@@ -757,7 +757,6 @@ export class SimulatorView implements OnDestroy {
     const baseline = this.weather.base();
     const moistures = moisturesFor(baseline.temperature, baseline.humidity, LIVE_MOISTURE);
     const beds = this.fuelBedsFor(moistures, baseline.wind);
-    const { bed, midflame } = beds[1];
     const ignitions = this.starts()
       .map((point) => cellOf(centre, point))
       .filter((cell): cell is number => cell !== null);
@@ -766,6 +765,10 @@ export class SimulatorView implements OnDestroy {
     const measures = this.plan.measures();
 
     try {
+      // Inside the try: a missing reference bed must reach the same rollback as any other failure.
+      const reference = beds[1];
+      if (!reference) throw new Error('Falta el model de combustible de referència.');
+      const { bed, midflame } = reference;
       const result = await this.simulate(
         {
           elevation: terrain.elevation,
@@ -1002,7 +1005,9 @@ export class SimulatorView implements OnDestroy {
     edit();
     if (had && this.plan.measures() !== before) {
       this.plan.draft.set([]);
-      void this.start(this.minutes(), before);
+      this.start(this.minutes(), before).catch((error: Error) => {
+        console.error('[simulator-view]', error);
+      });
     }
   }
 

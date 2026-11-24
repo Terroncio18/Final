@@ -104,8 +104,8 @@ export class SearchService {
       .catch((error: Error) => {
         console.error('[search]', error);
         this.failed.set(true);
-        // Forget the failed read: these data are asked for once, so without this the screen has
-        // no way back from a passing network failure.
+        // Forget the failed read: these data are asked for once, so this is what lets typing the
+        // query again read them anew after a passing network failure.
         this.asked = false;
       });
   }

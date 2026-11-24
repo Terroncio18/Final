@@ -18,6 +18,7 @@
       <p class="warning">«{{ region() }}» no és cap codi de regió.</p>
     } @else if (failed()) {
       <p class="warning">No s'han pogut llegir les províncies.</p>
+      <button type="button" class="retry" (click)="retry()">Tornar-ho a provar</button>
     } @else if (!options().length) {
       <p class="waiting">Carregant les províncies…</p>
     } @else {

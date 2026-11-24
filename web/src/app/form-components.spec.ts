@@ -97,6 +97,7 @@ describe('form, navigation and overview components', () => {
   let municipalities: {
     municipalities: ReturnType<typeof signal<readonly (typeof municipality)[]>>;
     failed: ReturnType<typeof signal<boolean>>;
+    load: ReturnType<typeof vi.fn>;
     find: (id: string) => typeof municipality | undefined;
     at: ReturnType<typeof vi.fn>;
   };
@@ -139,6 +140,7 @@ describe('form, navigation and overview components', () => {
     municipalities = {
       municipalities: signal([municipality]),
       failed: signal(false),
+      load: vi.fn(),
       find: (id) => municipalities.municipalities().find((m) => m.id === id),
       at: vi.fn().mockReturnValue(municipality),
     };
@@ -182,6 +184,37 @@ describe('form, navigation and overview components', () => {
     });
   });
   afterEach(() => vi.restoreAllMocks());
+
+  it('offers a retry on each step whose read failed', async () => {
+    const click = (fixture: { nativeElement: HTMLElement }) =>
+      (fixture.nativeElement.querySelector('.retry') as HTMLButtonElement).click();
+
+    const first = TestBed.createComponent(RegionStep);
+    await first.whenStable();
+    regions.failed.set(true);
+    await first.whenStable();
+    click(first);
+    // Once from ngOnInit and once from the button: without the control the read is asked only once
+    // and the screen stays on its error.
+    expect(regions.load).toHaveBeenCalledTimes(2);
+
+    const second = TestBed.createComponent(ProvinceStep);
+    second.componentRef.setInput('region', 'ES53');
+    await second.whenStable();
+    provinces.failed.set(true);
+    await second.whenStable();
+    click(second);
+    expect(provinces.load).toHaveBeenCalledTimes(2);
+
+    const third = TestBed.createComponent(MunicipalityStep);
+    third.componentRef.setInput('region', 'ES53');
+    third.componentRef.setInput('province', 'ES531');
+    await third.whenStable();
+    municipalities.failed.set(true);
+    await third.whenStable();
+    click(third);
+    expect(municipalities.load).toHaveBeenCalledWith('ES531');
+  });
 
   it('groups regions by country, sorts names and previews focus', async () => {
     const fixture = TestBed.createComponent(RegionStep),

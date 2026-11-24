@@ -11,7 +11,7 @@ export default defineConfig({
       // an absence.
       include: [
         'src/main.ts',
-        'src/app/simulation/{agents,bounds,countermeasures,domain,fire-appearance,fire-display,fire-distances,fire-emitters,fire-field,fire-spread,fire-surface,fuel-data,fuel-treatments,fuel.service,point,point-locator,rothermel,scenario,slope-classes,spotting,terrain,terrain.service,wind}.ts',
+        'src/app/simulation/{agents,bounds,countermeasures,domain,fire-display,fire-distances,fire-emitters,fire-spread,fire-surface,fuel-data,fuel-treatments,fuel.service,point,point-locator,rothermel,scenario,slope-classes,spotting,terrain,terrain.service,wind}.ts',
         'src/app/map/{agents-3d,fire-particles}.ts',
       ],
       exclude: ['**/*.spec.ts'],

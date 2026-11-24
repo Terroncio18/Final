@@ -45,6 +45,10 @@ export class MunicipalityStep implements OnInit {
     this.provinces.load();
   }
 
+  protected retry(): void {
+    this.municipalities.load(this.province());
+  }
+
   protected focus(id: string | null): void {
     this.maps.focusMunicipality(id);
   }

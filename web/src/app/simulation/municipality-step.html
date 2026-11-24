@@ -18,6 +18,7 @@
       <p class="warning">«{{ province() }}» no és cap codi de província.</p>
     } @else if (failed()) {
       <p class="warning">No s'ha pogut llegir la llista.</p>
+      <button type="button" class="retry" (click)="retry()">Tornar-ho a provar</button>
     } @else if (!options().length) {
       <p class="waiting">Carregant la llista…</p>
     } @else {

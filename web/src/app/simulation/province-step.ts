@@ -47,6 +47,10 @@ export class ProvinceStep implements OnInit {
     this.provinces.load();
   }
 
+  protected retry(): void {
+    this.provinces.load();
+  }
+
   protected focus(id: string | null): void {
     this.maps.focusProvince(id);
   }

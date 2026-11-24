@@ -60,6 +60,9 @@ describe('heterogeneous fire spread', () => {
   });
   it('all thirteen Anderson models produce finite physical parameters', () => {
     expect(Object.keys(FUEL_MODELS)).toHaveLength(13);
+    // Model 1 is the reference bed a run starts from: simulator-view reads FUEL_MODELS[1] before
+    // calling the model, so losing it would break every run, not just this table.
+    expect(FUEL_MODELS[1]).toBeDefined();
     for (const model of Object.values(FUEL_MODELS)) {
       const bed = fuelBed(model, { dead1: 0.08, dead10: 0.08, dead100: 0.08, live: 1 });
       expect(bed.r0).toBeGreaterThan(0);

@@ -14,6 +14,7 @@
   <div class="panel-body">
     @if (failed()) {
       <p class="warning">No s'han pogut llegir els límits administratius.</p>
+      <button type="button" class="retry" (click)="retry()">Tornar-ho a provar</button>
     } @else if (!groups().length) {
       <p class="waiting">Carregant les regions…</p>
     } @else {

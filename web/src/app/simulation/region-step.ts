@@ -43,6 +43,10 @@ export class RegionStep implements OnInit {
     this.maps.goToView(this.maps.scope(), true);
   }
 
+  protected retry(): void {
+    this.regions.load();
+  }
+
   protected focus(id: string | null): void {
     this.maps.focusRegion(id);
   }

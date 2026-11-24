@@ -39,6 +39,12 @@ describe('model input boundaries', () => {
     ]);
     expect(formatPoints([[1, 2]])).toBe('1.00000,2.00000');
     const [w, s, e, n] = domainAround([2, 39]);
+    // Pinned by hand from 1024 cells of 30 m and 111 320 m per degree, so a wrong half-span or a
+    // missing cos(latitude) cannot pass by agreeing with domainRing().
+    expect(s).toBeCloseTo(38.8620194, 6);
+    expect(n).toBeCloseTo(39.1379806, 6);
+    expect(w).toBeCloseTo(1.82245215, 6);
+    expect(e).toBeCloseTo(2.17754785, 6);
     expect(domainRing([2, 39])).toEqual([
       [w, s],
       [e, s],

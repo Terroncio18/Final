@@ -40,7 +40,9 @@ describe('WeatherPanel', () => {
     failed: signal(false),
     load: vi.fn(),
     observationFor: vi.fn((country: 'ES' | 'PT', point: Point | null) =>
-      country === 'ES' && point?.[0] === centre[0] ? reading() : null,
+      // Latitude too: the real service compares country, longitude and latitude, and a double that
+      // only looked at longitude would keep the station while the centre moved north or south.
+      country === 'ES' && point?.[0] === centre[0] && point[1] === centre[1] ? reading() : null,
     ),
   };
   const element = () => fixture.nativeElement as HTMLElement;
@@ -121,6 +123,10 @@ describe('WeatherPanel', () => {
     expect(p['station']()).toBeNull();
     expect(p['liveState']().tag).toBe('SENSE CONNEXIÓ');
     expect(p['liveState']().note).toContain("l'IPMA");
+    // Only the latitude moves: same country, same longitude. A station of another latitude does
+    // not describe this domain, and a double that compared longitude alone would keep it.
+    await set({ country: 'ES', centre: [centre[0], centre[1] + 1] as Point });
+    expect(p['station']()).toBeNull();
     await set({ country: 'ES', centre: null });
     expect(p['station']()).toBeNull();
     expect(weather.observationFor).toHaveBeenCalledWith('ES', null);

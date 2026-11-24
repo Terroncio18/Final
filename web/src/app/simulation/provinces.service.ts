@@ -54,8 +54,8 @@ export class ProvincesService {
       .catch((error: Error) => {
         console.error('[provinces]', error);
         this.failed.set(true);
-        // Forget the failed read: these data are asked for once, so without this the screen has
-        // no way back from a passing network failure.
+        // Forget the failed read: these data are asked for once, so this is what lets the step's
+        // retry control bring them back after a passing network failure.
         this.asked = false;
       });
   }

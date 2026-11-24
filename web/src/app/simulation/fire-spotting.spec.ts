@@ -56,7 +56,11 @@ describe('experimental ember spotting', () => {
     );
   });
   it('creates a reproducible secondary ignition across a firebreak only when enabled', async () => {
-    expect(seed).toBeDefined();
+    // Pinned: the seed and its destination are found by running the very algorithm under test, so
+    // without these two a coherent change of trajectory or of the random sequence would move both
+    // and leave this green.
+    expect(seed).toBe(1);
+    expect(flight.cell).toBe(137);
     const off = await spread({ ...input, spotting: { enabled: false, seed } }),
       on = await spread(input),
       again = await spread(input);
