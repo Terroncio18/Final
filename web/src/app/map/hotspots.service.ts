@@ -15,6 +15,7 @@ import {
   spanOf,
   type Range,
 } from './hotspot-range';
+import { Latest } from '../simulation/latest';
 
 @Injectable({ providedIn: 'root' })
 export class HotspotsService {
@@ -39,7 +40,7 @@ export class HotspotsService {
   public readonly earliest = signal<string | null>(null);
 
   private readonly insideStudyArea = signal<FeatureCollection<Point> | null>(null);
-  private requests = 0;
+  private readonly latest = new Latest();
 
   public readonly range = computed<Range>(
     () => {
@@ -91,7 +92,7 @@ export class HotspotsService {
   }
 
   private load(range: Range): void {
-    const request = ++this.requests;
+    const request = this.latest.begin();
     this.loading.set(true);
     this.failed.set(false);
     this.missingKey.set(false);
@@ -118,7 +119,7 @@ export class HotspotsService {
         return { earliest, partial, missing, stale, fetchedAt, collection };
       })
       .then(async ({ earliest, partial, missing, stale, fetchedAt, collection }) => {
-        if (request !== this.requests) return;
+        if (!this.latest.owns(request)) return;
         if (earliest) this.earliest.set(earliest);
         this.partial.set(partial);
         this.missing.set(missing);
@@ -126,7 +127,7 @@ export class HotspotsService {
         this.fetchedAt.set(fetchedAt);
 
         const features = await this.area.inside(collection.features);
-        if (request !== this.requests) return;
+        if (!this.latest.owns(request)) return;
 
         const kept: FeatureCollection<Point> = {
           type: 'FeatureCollection',
@@ -142,7 +143,7 @@ export class HotspotsService {
         this.loading.set(false);
       })
       .catch((error: Error) => {
-        if (request !== this.requests) return;
+        if (!this.latest.owns(request)) return;
         console.error('[hotspots]', error);
         this.failed.set(true);
         this.missingKey.set(error instanceof HotspotFetchError && error.reason === 'missing-key');

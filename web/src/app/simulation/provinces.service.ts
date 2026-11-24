@@ -6,6 +6,7 @@ import { MapService } from '../map/map.service';
 import type { Province } from './province';
 import { boundsOf } from './bounds';
 import { readJson } from './read-json';
+import { Asked } from './asked';
 
 type ProvinceFeature = Feature<
   Polygon | MultiPolygon,
@@ -30,11 +31,10 @@ export class ProvincesService {
 
   public readonly failed = signal(false);
 
-  private asked = false;
+  private readonly asked = new Asked();
 
   public load(): void {
-    if (this.asked) return;
-    this.asked = true;
+    if (!this.asked.take(true)) return;
     this.failed.set(false);
 
     readJson<FeatureCollection<Polygon | MultiPolygon, ProvinceFeature['properties']>>(
@@ -50,7 +50,7 @@ export class ProvincesService {
         this.failed.set(true);
         // Forget the failed read: these data are asked for once, so this is what lets the step's
         // retry control bring them back after a passing network failure.
-        this.asked = false;
+        this.asked.forget(true);
       });
   }
 

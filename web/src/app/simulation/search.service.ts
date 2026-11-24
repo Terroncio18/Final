@@ -1,6 +1,7 @@
 import { computed, Injectable, signal } from '@angular/core';
 import { MUNICIPALITY_INDEX_URL } from '../map/map.config';
 import { readJson } from './read-json';
+import { Asked } from './asked';
 
 const LIMIT = 8;
 
@@ -71,14 +72,13 @@ export class SearchService {
   private readonly entries = signal<readonly Entry[]>([]);
 
   public readonly failed = signal(false);
-  private asked = false;
+  private readonly asked = new Asked();
 
   public readonly ready = computed(() => this.entries().length > 0);
 
   // Load on focus so visits that never search do not download the index.
   public load(): void {
-    if (this.asked) return;
-    this.asked = true;
+    if (!this.asked.take(true)) return;
     this.failed.set(false);
 
     readJson<Index>(MUNICIPALITY_INDEX_URL)
@@ -100,7 +100,7 @@ export class SearchService {
         this.failed.set(true);
         // Forget the failed read: these data are asked for once, so this is what lets typing the
         // query again read them anew after a passing network failure.
-        this.asked = false;
+        this.asked.forget(true);
       });
   }
 

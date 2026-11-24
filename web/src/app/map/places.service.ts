@@ -3,6 +3,7 @@ import type { FeatureCollection, Point } from 'geojson';
 import { MapService } from './map.service';
 import { PLACES_URL } from './map.config';
 import { readJson } from '../simulation/read-json';
+import { Asked } from '../simulation/asked';
 
 // Limit summit labels so they do not crowd out town names.
 const PEAKS_IN_VIEW = 12;
@@ -33,12 +34,11 @@ export class PlacesService {
   private readonly maps = inject(MapService);
 
   private readonly cache = new Map<string, FeatureCollection<Point>>();
-  private asked: string | null = null;
+  private readonly asked = new Asked<string>();
 
   public load(province: string, within?: readonly [number, number, number, number]): void {
     const key = province + (within ? '@' + within.join(',') : '');
-    if (this.asked === key) return;
-    this.asked = key;
+    if (!this.asked.take(key)) return;
 
     const held = this.cache.get(province);
     if (held) {
@@ -50,18 +50,18 @@ export class PlacesService {
       .then((collection) => {
         this.cache.set(province, collection);
         // Ignore an older request after navigation has moved to another province.
-        if (this.asked === key) this.maps.setPlaces(clip(collection, within));
+        if (this.asked.holds(key)) this.maps.setPlaces(clip(collection, within));
       })
       .catch((error: Error) => {
         console.error('[places]', error);
         // Forget the failed request: this province has no labels, and asking again must be able
         // to bring them.
-        if (this.asked === key) this.asked = null;
+        this.asked.forget(key);
       });
   }
 
   public release(): void {
-    this.asked = null;
+    this.asked.reset();
     this.maps.setPlaces(null);
   }
 }

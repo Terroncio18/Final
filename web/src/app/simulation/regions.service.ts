@@ -3,6 +3,7 @@ import { REGIONS_URL } from '../map/map.config';
 import { boundsOf, type AreaGeometry } from './bounds';
 import type { Region } from './region';
 import { readJson } from './read-json';
+import { Asked } from './asked';
 
 interface RegionFeature {
   readonly properties: {
@@ -36,12 +37,11 @@ export class RegionsService {
 
   public readonly failed = signal(false);
 
-  private asked = false;
+  private readonly asked = new Asked();
 
   // Reuse the same region file as the map so names and borders share one source.
   public load(): void {
-    if (this.asked) return;
-    this.asked = true;
+    if (!this.asked.take(true)) return;
     this.failed.set(false);
 
     readJson<RegionCollection>(REGIONS_URL)
@@ -51,7 +51,7 @@ export class RegionsService {
         this.failed.set(true);
         // Forget the failed read: these data are asked for once, so this is what lets the step's
         // retry control bring them back after a passing network failure.
-        this.asked = false;
+        this.asked.forget(true);
       });
   }
 

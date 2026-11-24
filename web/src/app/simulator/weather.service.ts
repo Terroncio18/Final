@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import type { Point } from '../simulation/point';
 import { readJson } from '../simulation/read-json';
+import { Latest } from '../simulation/latest';
 
 export interface Observation {
   readonly source: 'AEMET' | 'IPMA';
@@ -54,11 +55,11 @@ export class WeatherService {
   private readonly reading = signal<Reading | null>(null);
 
   private asked: Domain | null = null;
-  private token = 0;
+  private readonly latest = new Latest();
 
   public load(country: 'ES' | 'PT', point: Point): void {
     const domain = domainOf(country, point);
-    const mine = (this.token += 1);
+    const mine = this.latest.begin();
     // A station of another domain describes neither its weather nor its country, not even while
     // the new reading is on its way.
     if (!this.asked || !sameDomain(this.asked, domain)) {
@@ -71,13 +72,13 @@ export class WeatherService {
     const url = `/api/weather?country=${country}&lon=${point[0]}&lat=${point[1]}`;
     readJson<Observation>(url)
       .then((observation) => {
-        if (mine !== this.token) return;
+        if (!this.latest.owns(mine)) return;
         this.reading.set({ domain, observation });
         this.loading.set(false);
       })
       .catch((error: Error) => {
         console.error('[weather]', error);
-        if (mine !== this.token) return;
+        if (!this.latest.owns(mine)) return;
         // Retain the last dated observation when a refresh of the same domain fails.
         this.failed.set(true);
         this.loading.set(false);
@@ -92,7 +93,7 @@ export class WeatherService {
   }
 
   public clear(): void {
-    this.token += 1;
+    this.latest.abandon();
     this.asked = null;
     this.reading.set(null);
     this.loading.set(false);

@@ -6,6 +6,7 @@ import { boundsOf, contains, type AreaGeometry } from './bounds';
 import type { Municipality } from './municipality';
 import type { Point } from './point';
 import { readJson } from './read-json';
+import { Asked } from './asked';
 
 type MunicipalityFeature = Feature<
   Polygon | MultiPolygon,
@@ -34,11 +35,10 @@ export class MunicipalitiesService {
 
   // Keep outlines as well as bounds: coastal bounding boxes can include sea.
   private readonly shapes = new Map<string, AreaGeometry>();
-  private asked: string | null = null;
+  private readonly asked = new Asked<string>();
 
   public load(province: string): void {
-    if (this.asked === province) return;
-    this.asked = province;
+    if (!this.asked.take(province)) return;
     this.failed.set(false);
 
     const held = this.cache.get(province);
@@ -59,20 +59,20 @@ export class MunicipalitiesService {
         this.cache.set(province, list);
         this.sources.set(province, collection);
         // Ignore a late response after the user switches provinces.
-        if (this.asked === province) this.show(province, list);
+        if (this.asked.holds(province)) this.show(province, list);
       })
       .catch((error: Error) => {
         console.error('[municipalities]', error);
-        if (this.asked !== province) return;
+        if (!this.asked.holds(province)) return;
         this.failed.set(true);
         // Forget the failed province so choosing it again reads it anew, and not only after
         // visiting another one.
-        this.asked = null;
+        this.asked.forget(province);
       });
   }
 
   public release(): void {
-    this.asked = null;
+    this.asked.reset();
     this.municipalities.set([]);
     this.maps.setMunicipalities(null);
   }
