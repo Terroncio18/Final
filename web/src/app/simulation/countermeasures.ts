@@ -53,18 +53,16 @@ interface CrewDefault {
   readonly placeholder: boolean;
 }
 
-const ORTEGA_2023 =
-  'Ortega, Rodríguez y Silva & Molina (2023), IJWF 32:1503–1514, doi:10.1071/WF22087 — shrub, direct attack, 0.67 m/min per firefighter';
-// Default crew size 20 follows NWCG sustained line-production tables. Hand line: Ortega et al.
-// (2023), models 5–6, 0.67 m/min per person. Hose: NWCG (2021/PMS 210), model 5, engine crew of 4,
-// 16 chains/h = 80.5 m/h per person (initial action only). Other rates are editable placeholders.
+// NWCG's sustained 471 ft/h is for a 20-person crew in brush (model 5), Type II direct attack:
+// about 7 m/h per person. The hose rate is for initial action, not sustained work.
 export const CREW_DEFAULTS: Readonly<Record<CrewKind, CrewDefault>> = {
   'defense-line': {
     arrivalMin: 0,
     crewSize: 20,
-    ratePerPerson: 40.2,
+    ratePerPerson: 7,
     unit: 'm/h',
-    source: ORTEGA_2023,
+    source:
+      'NWCG Fire Line Production Rate Tables (2021), sustained line production for a 20-person crew, fuel model 5 (brush), Type II & II IA direct attack: 471 ft/h, about 7 m/h per person',
     placeholder: false,
   },
   firebreak: {
@@ -72,7 +70,7 @@ export const CREW_DEFAULTS: Readonly<Record<CrewKind, CrewDefault>> = {
     crewSize: 20,
     ratePerPerson: 40.2,
     unit: 'm/h',
-    source: 'Placeholder: hand-line rate (Ortega et al. 2023); a 60 m firebreak is machine work',
+    source: 'Placeholder: editable firebreak production assumption; no published source',
     placeholder: true,
   },
   clearing: {
@@ -80,7 +78,7 @@ export const CREW_DEFAULTS: Readonly<Record<CrewKind, CrewDefault>> = {
     crewSize: 20,
     ratePerPerson: 40.2,
     unit: 'm/h',
-    source: 'Placeholder: hand-line rate (Ortega et al. 2023)',
+    source: 'Placeholder: editable clearing production assumption; no published source',
     placeholder: true,
   },
   'water-line': {

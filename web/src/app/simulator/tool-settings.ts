@@ -27,8 +27,8 @@ export interface ToolConfig {
 // A missing production source means the rate is an editable placeholder.
 const CREW_CITATIONS: Partial<Record<CrewKind, { cite: string; url: string }>> = {
   'defense-line': {
-    cite: 'Ortega et al. 2023',
-    url: 'https://doi.org/10.1071/WF22087',
+    cite: 'NWCG 2021',
+    url: 'https://www.frames.gov/documents/behaveplus/publications/NWCG_2021_FireLineProductionRates.pdf',
   },
   'water-line': {
     cite: 'NWCG 2021',

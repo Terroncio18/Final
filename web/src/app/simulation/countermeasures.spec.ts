@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { domainAround, GRID } from './domain';
 import {
   COUNTERMEASURE_CATALOG,
+  CREW_DEFAULTS,
   compileCountermeasures,
   countermeasureCells,
   crewSchedule,
@@ -40,6 +41,36 @@ const crew = (patch: Partial<Countermeasure> = {}): Countermeasure =>
   });
 
 describe('crew validation, schedule and head', () => {
+  it('uses the sustained hand-line default without changing the provisional or hose rates', () => {
+    expect(CREW_DEFAULTS['defense-line']).toMatchObject({
+      crewSize: 20,
+      ratePerPerson: 7,
+      unit: 'm/h',
+      placeholder: false,
+    });
+    expect(CREW_DEFAULTS['defense-line'].source).toContain('471 ft/h');
+    for (const kind of ['firebreak', 'clearing'] as const) {
+      expect(CREW_DEFAULTS[kind]).toMatchObject({ ratePerPerson: 40.2, placeholder: true });
+      expect(CREW_DEFAULTS[kind].source).not.toMatch(/Ortega|hand-line rate/);
+    }
+    expect(CREW_DEFAULTS['water-line']).toMatchObject({
+      crewSize: 4,
+      ratePerPerson: 80.5,
+      placeholder: false,
+    });
+    const defaults = CREW_DEFAULTS['defense-line'];
+    const schedule = crewSchedule(
+      centre,
+      crew({
+        startMin: 0,
+        arrivalMin: defaults.arrivalMin,
+        crewSize: defaults.crewSize,
+        ratePerPerson: defaults.ratePerPerson,
+      }),
+    )!;
+    expect(schedule.workEnd).toBeCloseTo((600 / 140) * 60, 6);
+  });
+
   it('never rounds fractional activation into the past', () => {
     const m = crew({ startMin: 100.000001, arrivalMin: 0 });
     const schedule = crewSchedule(centre, m)!;

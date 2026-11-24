@@ -53,8 +53,10 @@ describe('ToolSettingsModal', () => {
     expect(element().querySelector('.tool-modal a')?.textContent).toContain('capacitat 1350 L');
     fixture.destroy();
     await open(configFor('defense-line'));
+    // The hand line cites the NWCG sustained tables since the 12.25 (b) decision, not Ortega.
+    expect(element().querySelector('.tool-modal > a')?.textContent).toContain('NWCG 2021');
     expect(element().querySelector('.tool-modal > a')?.getAttribute('href')).toBe(
-      'https://doi.org/10.1071/WF22087',
+      'https://www.frames.gov/documents/behaveplus/publications/NWCG_2021_FireLineProductionRates.pdf',
     );
     fixture.destroy();
     await open(configFor('firebreak'));
