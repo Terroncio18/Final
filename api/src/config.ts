@@ -27,6 +27,9 @@ export type Scope = (typeof AREAS)[number]['scope'];
 // A pass changes the answer only a few times daily; this also protects FIRMS' request quota.
 export const CACHE_TTL_MS = 10 * 60 * 1000;
 
+// Retry incomplete FIRMS coverage sooner without repeating every upstream request on each visit.
+export const PARTIAL_CACHE_TTL_MS = 60 * 1000;
+
 export const MAX_HOTSPOT_CACHE_ENTRIES = 32;
 
 // The NRT/SP cutoff changes about monthly.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { HotspotCache, type CachedHotspots } from '../src/hotspot-cache.js';
 
 function entry(fetchedAt = 0): CachedHotspots {
-  return { body: { type: 'FeatureCollection', features: [] }, sources: [], fetchedAt };
+  return { body: { type: 'FeatureCollection', features: [] }, sources: [], missing: [], fetchedAt };
 }
 
 test('evicts the least recently used range when the cache reaches its limit', () => {

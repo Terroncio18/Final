@@ -3,6 +3,7 @@ import type { FirmsSource, HotspotCollection } from './firms.js';
 export interface CachedHotspots {
   readonly body: HotspotCollection;
   readonly sources: readonly FirmsSource[];
+  readonly missing: readonly string[];
   readonly fetchedAt: number;
 }
 

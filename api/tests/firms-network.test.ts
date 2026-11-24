@@ -180,6 +180,22 @@ test('one platform failing is a partial answer; every platform failing is an err
   await assert.rejects(() => again.fetchHotspots('2024-08-01', '2024-08-01'), /answered 500/);
 });
 
+test('an empty successful area and a failed area remain a partial answer', async () => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const empty = 'latitude,longitude,acq_date,acq_time,satellite,confidence,frp,daynight';
+  firmsAnswering((url) => {
+    if (url.includes('data_availability')) return { text: AVAILABILITY };
+    if (url.includes('-9.9,35.8,4.4,44')) return { text: '', ok: false, status: 503 };
+    return { text: empty };
+  });
+  const { fetchHotspots } = await firms();
+
+  const answer = await fetchHotspots('2024-08-01', '2024-08-01');
+  assert.equal(answer.body.features.length, 0);
+  assert.deepEqual(answer.sources, ['VIIRS_NOAA20_SP', 'VIIRS_SNPP_SP']);
+  assert.deepEqual(answer.missing, ['VIIRS_SNPP_SP/peninsula', 'VIIRS_NOAA20_SP/peninsula']);
+});
+
 const INVALID_DETECTIONS: [string, string][] = [
   ['latitude text', 'bad,2.65,2024-08-01,1312,N,n,12.5,D'],
   ['longitude text', '39.57,bad,2024-08-01,1312,N,n,12.5,D'],

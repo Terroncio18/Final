@@ -6,6 +6,7 @@ import {
   FIRMS_MAP_KEY,
   MAX_HOTSPOT_CACHE_ENTRIES,
   MAX_RANGE_DAYS,
+  PARTIAL_CACHE_TTL_MS,
 } from './config.js';
 import {
   addDays,
@@ -31,7 +32,9 @@ async function hotspots(from: Day, to: Day) {
   const key = `${from}:${to}`;
   const hit = cache.get(key);
   const age = hit ? Date.now() - hit.fetchedAt : Infinity;
-  if (hit && age < CACHE_TTL_MS) return { ...hit, stale: false };
+  if (hit && age < (hit.missing.length ? PARTIAL_CACHE_TTL_MS : CACHE_TTL_MS)) {
+    return { ...hit, stale: false };
+  }
 
   let job = inFlight.get(key);
   try {
@@ -39,8 +42,8 @@ async function hotspots(from: Day, to: Day) {
       job = fetchHotspots(from, to);
       inFlight.set(key, job);
     }
-    const { body, sources } = await job;
-    const entry = { body, sources, fetchedAt: Date.now() };
+    const { body, sources, missing } = await job;
+    const entry = { body, sources, missing, fetchedAt: Date.now() };
     cache.set(key, entry);
     return { ...entry, stale: false };
   } catch (error) {
@@ -92,18 +95,22 @@ app.get<{ Querystring: { from?: string; to?: string; days?: string } }>(
 
     try {
       const { from, to } = range.range;
-      const { body, sources, fetchedAt, stale } = await hotspots(from, to);
+      const { body, sources, missing, fetchedAt, stale } = await hotspots(from, to);
 
       // Return the resolved dates even when the client requested a number of days.
       reply.header('x-from', from);
       reply.header('x-to', to);
       reply.header('x-sources', sources.join(','));
+      if (missing.length) {
+        reply.header('x-partial', 'true');
+        reply.header('x-missing', missing.join(','));
+      }
       const first = await earliest();
       if (first) reply.header('x-earliest', first);
       // NRT detections arrive hours after overpass; the interface displays their age.
       reply.header('x-fetched-at', new Date(fetchedAt).toISOString());
       reply.header('x-stale', String(stale));
-      reply.header('cache-control', 'public, max-age=300');
+      reply.header('cache-control', missing.length ? 'public, max-age=30' : 'public, max-age=300');
       return body;
     } catch (error) {
       request.log.error(error);

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import type { FastifyInstance } from 'fastify';
 import { addDays, today } from '../src/firms.js';
-import { MAX_HOTSPOT_CACHE_ENTRIES } from '../src/config.js';
+import { MAX_HOTSPOT_CACHE_ENTRIES, PARTIAL_CACHE_TTL_MS } from '../src/config.js';
 
 const fetchHotspots = vi.hoisted(() => vi.fn());
 const earliest = vi.hoisted(() => vi.fn());
@@ -48,7 +48,11 @@ async function serve() {
 
 beforeEach(() => {
   vi.resetModules();
-  fetchHotspots.mockResolvedValue({ body: detections(2), sources: ['VIIRS_SNPP_NRT'] });
+  fetchHotspots.mockResolvedValue({
+    body: detections(2),
+    sources: ['VIIRS_SNPP_NRT'],
+    missing: [],
+  });
   earliest.mockResolvedValue('2012-01-20');
   availability.mockResolvedValue(
     new Map([['VIIRS_SNPP_NRT', { min: '2026-08-01', max: today() }]]),
@@ -130,11 +134,75 @@ test('the answer carries the range, the sources, the age and the first date ther
   assert.equal(answer.headers['x-sources'], 'VIIRS_SNPP_NRT');
   assert.equal(answer.headers['x-earliest'], '2012-01-20');
   assert.equal(answer.headers['x-stale'], 'false');
+  assert.equal(answer.headers['x-partial'], undefined);
+  assert.equal(answer.headers['x-missing'], undefined);
   assert.equal(answer.headers['cache-control'], 'public, max-age=300');
   assert.ok(
     Date.parse(String(answer.headers['x-fetched-at'])),
     'an instant, so the age can be shown',
   );
+});
+
+test('an empty partial answer advertises missing coverage and retries before the full TTL', async () => {
+  const missing = ['VIIRS_NOAA20_SP/peninsula'];
+  fetchHotspots.mockResolvedValue({ body: detections(0), sources: ['VIIRS_SNPP_SP'], missing });
+  const app = await serve();
+  const url = '/api/hotspots?from=2024-08-01&to=2024-08-01';
+  const first = await app.inject(url);
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.json().features.length, 0);
+  assert.equal(first.headers['x-sources'], 'VIIRS_SNPP_SP');
+  assert.equal(first.headers['x-partial'], 'true');
+  assert.equal(first.headers['x-missing'], missing[0]);
+  assert.equal(first.headers['x-stale'], 'false');
+  assert.equal(first.headers['cache-control'], 'public, max-age=30');
+
+  vi.useFakeTimers();
+  try {
+    const fetchedAt = Date.parse(String(first.headers['x-fetched-at']));
+    vi.setSystemTime(fetchedAt + PARTIAL_CACHE_TTL_MS - 1);
+    const cached = await app.inject(url);
+    assert.equal(cached.headers['x-partial'], 'true');
+    assert.equal(fetchHotspots.mock.calls.length, 1);
+
+    vi.setSystemTime(Date.now() + 2);
+    fetchHotspots.mockResolvedValue({
+      body: detections(2),
+      sources: ['VIIRS_SNPP_SP'],
+      missing: [],
+    });
+    const retried = await app.inject(url);
+    assert.equal(fetchHotspots.mock.calls.length, 2);
+    assert.equal(retried.json().features.length, 2);
+    assert.equal(retried.headers['x-partial'], undefined);
+    assert.equal(retried.headers['x-missing'], undefined);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test('a failed retry serves the previous partial answer as stale and partial', async () => {
+  const missing = ['VIIRS_NOAA20_SP/peninsula'];
+  fetchHotspots.mockResolvedValue({ body: detections(0), sources: ['VIIRS_SNPP_SP'], missing });
+  const app = await serve();
+  const url = '/api/hotspots?from=2024-08-01&to=2024-08-01';
+  const first = await app.inject(url);
+
+  vi.useFakeTimers();
+  try {
+    const fetchedAt = Date.parse(String(first.headers['x-fetched-at']));
+    vi.setSystemTime(fetchedAt + PARTIAL_CACHE_TTL_MS);
+    fetchHotspots.mockRejectedValue(new Error('FIRMS answered 503'));
+    const answer = await app.inject(url);
+    assert.equal(answer.statusCode, 200);
+    assert.equal(answer.json().features.length, 0);
+    assert.equal(answer.headers['x-stale'], 'true');
+    assert.equal(answer.headers['x-partial'], 'true');
+    assert.equal(answer.headers['x-missing'], missing[0]);
+    assert.equal(fetchHotspots.mock.calls.length, 2);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test('the same range twice is one question to FIRMS', async () => {
@@ -153,7 +221,7 @@ test('simultaneous requests for one range share the upstream job', async () => {
   const held = new Promise<void>((resolve) => (release = resolve));
   fetchHotspots.mockImplementation(async () => {
     await held;
-    return { body: detections(2), sources: ['VIIRS_SNPP_NRT'] };
+    return { body: detections(2), sources: ['VIIRS_SNPP_NRT'], missing: [] };
   });
   const app = await serve();
   const url = '/api/hotspots?from=2024-08-01&to=2024-08-01';

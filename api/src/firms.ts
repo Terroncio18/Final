@@ -43,8 +43,8 @@ export type HotspotCollection = {
 
 interface HotspotAnswer {
   readonly body: HotspotCollection;
-
   readonly sources: readonly FirmsSource[];
+  readonly missing: readonly string[];
 }
 
 // FIRMS can return errors with HTTP 200; the CSV header distinguishes data from an error.
@@ -272,7 +272,8 @@ export async function fetchHotspots(from: Day, to: Day): Promise<HotspotAnswer> 
     );
   });
 
-  if (!jobs.length) return { body: { type: 'FeatureCollection', features: [] }, sources: [] };
+  if (!jobs.length)
+    return { body: { type: 'FeatureCollection', features: [] }, sources: [], missing: [] };
 
   const results = await Promise.allSettled(jobs.map((job) => job.task));
 
@@ -280,11 +281,13 @@ export async function fetchHotspots(from: Day, to: Day): Promise<HotspotAnswer> 
   const keys = new Set<string>();
   const answered = new Set<FirmsSource>();
   const failures: string[] = [];
+  const missing = new Set<string>();
 
   for (const [i, result] of results.entries()) {
     const job = jobs[i]!;
     if (result.status === 'rejected') {
       failures.push(`${job.source}/${job.area.scope}: ${result.reason?.message}`);
+      missing.add(`${job.source}/${job.area.scope}`);
       continue;
     }
     answered.add(job.source);
@@ -302,5 +305,6 @@ export async function fetchHotspots(from: Day, to: Day): Promise<HotspotAnswer> 
   return {
     body: { type: 'FeatureCollection', features },
     sources: [...answered].sort((a, b) => a.localeCompare(b)),
+    missing: [...missing],
   };
 }
