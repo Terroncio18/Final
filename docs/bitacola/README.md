@@ -153,6 +153,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.79** La cobertura incompleta i les dades velles es diuen
 - **11.80** La fase 0 es tanca amb cinc regles més
 - **11.81** La revisió creuada troba el que cadascú no veia
+- **11.82** La repetició cau en dues tandes
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):

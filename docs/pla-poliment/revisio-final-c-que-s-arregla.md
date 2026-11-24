@@ -85,6 +85,15 @@ comportament. Tres coses, **en aquest ordre**:
 1. **La lectura de JSON**, repetida a nou fitxers del web i sis de l'API. Una
    funció, `async`, amb el `catch` enganxat on toca. És la que més estalvia i
    la que menys risc té.
+
+   > **Feta 24/11/2026** (§11.82). **Dues** funcions, no una: `web/` i `api/`
+   > són paquets separats. Al web, `simulation/read-json.ts`, vuit llocs;
+   > `terrain.ts` es queda fora perquè el seu missatge porta la URL. A l'API,
+   > `fetchChecked()` i `readJson()`, perquè **només tres dels sis llegien
+   > JSON** —els altres són CSV i bytes ISO-8859-15, i B1 ho descrivia
+   > malament—. El tros gros del paquet no es mou i el total baixa 807 bytes.
+   > Les cadenes `.then()` d'aquells serveis **continuen sent cadenes**: la
+   > regla 9 demana canviar-les i és una tanda pròpia.
 2. **Oblidar la lectura fallida**, set vegades a mà, que ha d'anar dins de la
    cosa del punt 3.
 3. **El testimoni amb nom**, el de la regla 8. `FireRun` ja és el model: no

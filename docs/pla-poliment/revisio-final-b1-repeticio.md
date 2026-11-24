@@ -54,9 +54,17 @@ Canvien la constant de la URL i el tipus.
 les regles 9 i 10 acabades d'escriure, `async` i amb el `catch` enganxat on
 toca.
 
-A l'API passa el mateix amb sis llocs de `firms.ts` i `weather.ts`, cada un
-amb el seu format de missatge: `FIRMS answered 503`, `AEMET: 503`,
-`IPMA stations: 503`.
+A l'API hi ha sis llocs de `firms.ts` i `weather.ts` amb el mateix
+`if (!res.ok) throw`, cada un amb el seu format de missatge:
+`FIRMS answered 503`, `AEMET: 503`, `IPMA stations: 503`.
+
+> **Esmena del 24/11/2026.** Aquest paràgraf deia que a l'API «passa el
+> mateix» i no és exacte: **només tres dels sis llegeixen JSON**. Els altres
+> tres són dos CSV de FIRMS i uns bytes d'AEMET que volen ISO-8859-15. El que
+> comparteixen tots sis és la comprovació de l'estat HTTP, no la lectura. Ho
+> va trobar Codex en anar a fer-ho, i per això en van sortir dues funcions
+> —`fetchChecked()` per a la comprovació i `readJson()` per als tres que
+> parsegen— en lloc d'una de forçada.
 
 ### 3. Set fitxers oblidem la lectura fallida a mà
 
