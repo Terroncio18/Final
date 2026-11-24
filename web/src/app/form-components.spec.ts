@@ -634,6 +634,7 @@ describe('form, navigation and overview components', () => {
     const ground = {
       elevation: new Float32Array(GRID * GRID),
       slope: new Float32Array(GRID * GRID),
+      landCells: GRID * GRID,
       minElevation: 1.2,
       maxElevation: 101.8,
       meanSlope: 5.12,
@@ -642,7 +643,10 @@ describe('form, navigation and overview components', () => {
     } as Terrain;
     terrain.terrain.set(ground);
     await fixture.whenStable();
-    expect(c['slopes']()).toMatchObject({ low: 1, high: 102, mean: '5,1', max: '30,1', tiles: 4 });
+    expect(c['slopes']()).toMatchObject({
+      tiles: 4,
+      facts: { low: 1, high: 102, mean: '5,1', max: '30,1' },
+    });
     expect(putImageData).toHaveBeenCalled();
     expect(createImageData.mock.results[0].value.data[3]).toBe(255);
     getContext.mockReturnValue(null);

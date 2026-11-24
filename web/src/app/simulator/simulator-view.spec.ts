@@ -52,6 +52,7 @@ const measure = (patch: Partial<Countermeasure> = {}): Countermeasure => ({
 const ground = (): Terrain => ({
   elevation: new Float32Array(GRID * GRID).fill(100),
   slope: new Float32Array(GRID * GRID).fill(5),
+  landCells: GRID * GRID,
   minElevation: 100,
   maxElevation: 100,
   meanSlope: 5,
@@ -372,7 +373,9 @@ describe('simulator screen', () => {
     expect(maps.setContours).toHaveBeenLastCalledWith(false);
     terrain.terrain.set(ground());
     await fixture.whenStable();
-    expect(block(DomainPanel)['ground']()).toMatchObject({ low: 100, high: 100, max: '5' });
+    expect(block(DomainPanel)['ground']()).toMatchObject({
+      facts: { low: 100, high: 100, max: '5' },
+    });
     expect(c['state']().short).toBe('Falta una ignició');
     maps.pointer.set(centre);
     expect(c['under']()).toMatchObject({ elevation: 100, slope: '5' });

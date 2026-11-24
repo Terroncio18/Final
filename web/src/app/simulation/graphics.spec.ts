@@ -463,6 +463,73 @@ describe('terrain pixels and sampling', () => {
     }
     expect(groundAt(terrain, [0, 0], [-0.00099, 0.00099])?.slope).toBe(terrain.slope[9]);
   });
+  // Terrarium encodes a height as R*256 + G + B/256 - 32768, so a negative height needs the
+  // offset to go below 32768. heightAt gets the pixel's column and row of the whole mosaic.
+  const stubTiles = (heightAt: (column: number, row: number) => number) => {
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => ({ close: vi.fn() })),
+    );
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('pixels')),
+    );
+    vi.stubGlobal(
+      'OffscreenCanvas',
+      class {
+        public constructor(
+          public width: number,
+          public height: number,
+        ) {}
+        public getContext() {
+          return {
+            drawImage: vi.fn(),
+            getImageData: () => {
+              const data = new Uint8ClampedArray(this.width * this.height * 4);
+              for (let i = 0; i < this.width * this.height; i++) {
+                const value = 32768 + heightAt(i % this.width, Math.floor(i / this.width));
+                data[i * 4] = value >> 8;
+                data[i * 4 + 1] = value & 255;
+              }
+              return { data };
+            },
+          };
+        }
+      },
+    );
+  };
+
+  it('leaves the sea out of the altitude and slope figures of a coastal domain', async () => {
+    // The domain of this mock samples columns 253 to 259, so the shore falls inside it.
+    stubTiles((column) => (column < 256 ? -60 : 240));
+    const terrain = await readTerrain([0, 0]);
+
+    expect(terrain.landCells).toBeGreaterThan(0);
+    expect(terrain.landCells).toBeLessThan(64);
+    // The defect: the minimum used to be the sea floor, and the mean slope counted its scarps.
+    expect(terrain.minElevation).toBeGreaterThan(0);
+    expect(terrain.maxElevation).toBe(240);
+
+    let total = 0;
+    for (let row = 1; row < 7; row += 1) {
+      for (let column = 1; column < 7; column += 1) total += terrain.slope[row * 8 + column];
+    }
+    // Every interior cell keeps its slope; only the figures stop counting the ones at sea.
+    expect(terrain.meanSlope).not.toBeCloseTo(total / 36, 3);
+  });
+
+  it('reports no terrain figures when the whole domain is sea', async () => {
+    stubTiles(() => -40);
+    const terrain = await readTerrain([0, 0]);
+
+    expect(terrain.landCells).toBe(0);
+    expect(terrain.minElevation).toBe(0);
+    expect(terrain.maxElevation).toBe(0);
+    expect(terrain.maxSlope).toBe(0);
+    expect(terrain.meanSlope).toBe(0);
+    expect(terrain.elevation.every((height) => height < 0)).toBe(true);
+  });
+
   it('rejects absent 2D contexts and failed tile requests', async () => {
     vi.stubGlobal(
       'OffscreenCanvas',

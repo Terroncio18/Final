@@ -10,21 +10,23 @@
     </span>
   </div>
 
-  @if (ground(); as ground) {
+  @if (ground()?.facts; as facts) {
     <dl class="terrain-facts">
       <div>
         <dt>Altitud</dt>
-        <dd>{{ ground.low }}–{{ ground.high }} m</dd>
+        <dd>{{ facts.low }}–{{ facts.high }} m</dd>
       </div>
       <div>
         <dt>Pendent mitjana</dt>
-        <dd>{{ ground.mean }}°</dd>
+        <dd>{{ facts.mean }}°</dd>
       </div>
       <div>
         <dt>Pendent màxima</dt>
-        <dd>{{ ground.max }}°</dd>
+        <dd>{{ facts.max }}°</dd>
       </div>
     </dl>
+  } @else if (ground()) {
+    <p class="terrain-note">El domini és tot mar: no hi ha terreny per mesurar.</p>
   } @else if (terrainFailed()) {
     <p class="terrain-note">No s'ha pogut llegir l'elevació del domini.</p>
   } @else {

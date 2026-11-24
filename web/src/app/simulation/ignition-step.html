@@ -36,15 +36,18 @@
         <dt>Cel·la</dt>
         <dd>{{ domain.cell }} m</dd>
 
-        @if (slopes(); as ground) {
+        @if (slopes()?.facts; as facts) {
           <dt>Altitud</dt>
-          <dd>{{ ground.low }}–{{ ground.high }} m</dd>
+          <dd>{{ facts.low }}–{{ facts.high }} m</dd>
 
           <dt>Pendent màx.</dt>
-          <dd>{{ ground.max }}°</dd>
+          <dd>{{ facts.max }}°</dd>
 
           <dt>Pendent mitjana</dt>
-          <dd>{{ ground.mean }}°</dd>
+          <dd>{{ facts.mean }}°</dd>
+        } @else if (slopes()) {
+          <dt>Terreny</dt>
+          <dd>tot mar</dd>
         }
       </dl>
 

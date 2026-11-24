@@ -24,12 +24,15 @@ export class DomainPanel {
   protected readonly ground = computed(() => {
     const ground = this.terrain.terrain();
     if (!ground) return null;
+    if (ground.landCells === 0) return { facts: null };
     const degrees = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
     return {
-      low: Math.round(ground.minElevation),
-      high: Math.round(ground.maxElevation),
-      mean: degrees.format(ground.meanSlope),
-      max: degrees.format(ground.maxSlope),
+      facts: {
+        low: Math.round(ground.minElevation),
+        high: Math.round(ground.maxElevation),
+        mean: degrees.format(ground.meanSlope),
+        max: degrees.format(ground.maxSlope),
+      },
     };
   });
 

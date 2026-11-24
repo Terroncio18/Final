@@ -36,6 +36,12 @@ export interface Terrain {
   readonly elevation: Float32Array;
   /** Degrees from horizontal, the same shape as the elevation. */
   readonly slope: Float32Array;
+  /**
+   * Cells above sea level. The four figures below describe only these: the model does not burn
+   * elevation <= 0, so sea floor has no place in the terrain a domain reports. Zero means the
+   * domain is all sea and the figures say nothing.
+   */
+  readonly landCells: number;
   readonly minElevation: number;
   readonly maxElevation: number;
   readonly maxSlope: number;
@@ -109,10 +115,11 @@ function sampleElevation(
   [west, south, east, north]: DomainBounds,
   mosaic: TerrainMosaic,
   heights: Float32Array,
-): Pick<Terrain, 'elevation' | 'minElevation' | 'maxElevation'> {
+): Pick<Terrain, 'elevation' | 'landCells' | 'minElevation' | 'maxElevation'> {
   const { originX, originY, width, height: rasterHeight } = mosaic;
   const elevation = new Float32Array(GRID * GRID);
 
+  let landCells = 0;
   let minElevation = Infinity;
   let maxElevation = -Infinity;
 
@@ -136,12 +143,17 @@ function sampleElevation(
       const height = top * (1 - fy) + bottom * fy;
 
       elevation[row * GRID + column] = height;
-      if (height < minElevation) minElevation = height;
-      if (height > maxElevation) maxElevation = height;
+      // Sea is kept in the elevation grid, which the fire reads, but left out of the figures.
+      if (height > 0) {
+        landCells += 1;
+        if (height < minElevation) minElevation = height;
+        if (height > maxElevation) maxElevation = height;
+      }
     }
   }
 
-  return { elevation, minElevation, maxElevation };
+  if (landCells === 0) return { elevation, landCells, minElevation: 0, maxElevation: 0 };
+  return { elevation, landCells, minElevation, maxElevation };
 }
 
 export async function readTerrain(point: Point): Promise<Terrain> {
@@ -163,6 +175,7 @@ function slopeOf(elevation: Float32Array): {
 
   let maxSlope = 0;
   let total = 0;
+  let counted = 0;
 
   for (let row = 1; row < GRID - 1; row += 1) {
     for (let column = 1; column < GRID - 1; column += 1) {
@@ -170,14 +183,18 @@ function slopeOf(elevation: Float32Array): {
       const dzdx = (elevation[index + 1] - elevation[index - 1]) / span;
       const dzdy = (elevation[index + GRID] - elevation[index - GRID]) / span;
       const degrees = (Math.atan(Math.hypot(dzdx, dzdy)) * 180) / Math.PI;
+      // The whole grid keeps its slope, which the cursor and the layer read; the figures below
+      // count land only. A land cell by the shore still takes its neighbours, sea among them, so
+      // this is the slope of the domain's terrain and not an exact coastline.
       slope[index] = degrees;
+      if (elevation[index] <= 0) continue;
       if (degrees > maxSlope) maxSlope = degrees;
       total += degrees;
+      counted += 1;
     }
   }
 
-  const inner = (GRID - 2) * (GRID - 2);
-  return { slope, maxSlope, meanSlope: total / inner };
+  return { slope, maxSlope, meanSlope: counted === 0 ? 0 : total / counted };
 }
 
 // Rows run north to south; coordinates select cell areas rather than grid vertices.

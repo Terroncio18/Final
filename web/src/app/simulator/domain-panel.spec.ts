@@ -32,6 +32,7 @@ describe('DomainPanel', () => {
     expect(text()).toContain("No s'ha pogut llegir");
     fixture.componentRef.setInput('place', 'Sóller');
     terrain.set({
+      landCells: 1024 * 1024,
       minElevation: 12.4,
       maxElevation: 1044.6,
       meanSlope: 18.26,
@@ -40,11 +41,20 @@ describe('DomainPanel', () => {
     await fixture.whenStable();
     expect(text()).toContain('Sóller');
     expect(fixture.componentInstance['ground']()).toEqual({
-      low: 12,
-      high: 1045,
-      mean: '18,3',
-      max: '61',
+      facts: { low: 12, high: 1045, mean: '18,3', max: '61' },
     });
     expect(text()).toContain('12–1045 m');
+
+    // A domain with no land says so instead of printing figures that describe the sea floor.
+    terrain.set({
+      landCells: 0,
+      minElevation: 0,
+      maxElevation: 0,
+      meanSlope: 0,
+      maxSlope: 0,
+    } as Terrain);
+    await fixture.whenStable();
+    expect(text()).toContain('tot mar');
+    expect(text()).not.toContain('Altitud');
   });
 });

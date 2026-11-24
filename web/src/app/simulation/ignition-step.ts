@@ -74,11 +74,16 @@ export class IgnitionStep implements OnInit, OnDestroy {
     if (!ground) return null;
     const degrees = new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 1 });
     return {
-      max: degrees.format(ground.maxSlope),
-      mean: degrees.format(ground.meanSlope),
-      low: Math.round(ground.minElevation),
-      high: Math.round(ground.maxElevation),
       tiles: ground.tiles,
+      facts:
+        ground.landCells === 0
+          ? null
+          : {
+              max: degrees.format(ground.maxSlope),
+              mean: degrees.format(ground.meanSlope),
+              low: Math.round(ground.minElevation),
+              high: Math.round(ground.maxElevation),
+            },
     };
   });
 
