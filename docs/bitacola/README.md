@@ -155,6 +155,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.81** La revisió creuada troba el que cadascú no veia
 - **11.82** La repetició cau en dues tandes
 - **11.83** El testimoni i la deduplicació tenen nom
+- **11.84** L'últim defecte cau i el projecte s'explica
 
 Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
 amb el que es plantejava):

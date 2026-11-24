@@ -140,6 +140,11 @@ La fase E recull això en una llista: cada cosa nova des de la fase 5, on es
 veu, què s'ha de fer per a veure-la, i què hauria de passar. Perquè la prova
 de la fase 7 no sigui recordar-ho de memòria.
 
+**Escrita el 24/11/2026**:
+[`revisio-final-e-full-per-a-la-fase-7.md`](revisio-final-e-full-per-a-la-fase-7.md).
+Catorze coses a mirar, i tres que no es poden provar sense les dades o sense
+que passi de debò.
+
 ## Els límits, que es mesuren
 
 - **El paquet inicial no creix.** El tros gros són 1,06 MB avui; es mesura
