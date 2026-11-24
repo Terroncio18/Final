@@ -55,5 +55,13 @@ meteorologia del domini, importació 3D i separació de responsabilitats.
 La integració i els commits per mòduls es fan quan les dues parts estan
 acabades i verificades, per indicació de Pere.
 
+**Avaluació del codi del 24/11**, també repartida: la meitat de Claude
+—`map/`, `simulator/`, `top-bar/`, `hotspot-panel/`— és a
+[`avaluacio-del-codi-24-11.md`](avaluacio-del-codi-24-11.md), amb 88/100 i
+cinc defectes, tots cinc arreglats i amb la seva regressió (§11.77). La de
+Codex —`simulation/` i `api/`— va per la bústia, a
+`tareas codex/para-codex/02-evaluacion-de-simulation-y-api.md`, i encara no
+ha arribat.
+
 **Les independents de debò són la 1 i la 2**: es poden fer avui, alhora, i les
 dues només llegeixen. La 0 i la 0b també són independents de tot.
