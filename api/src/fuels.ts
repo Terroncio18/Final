@@ -136,10 +136,12 @@ function applyWorldCoverValues(
     const lat = north - (row + 0.5) * dy;
     if (lat < tileSouth || lat >= tileSouth + 3) continue;
     const pixelY = Math.floor((window.tileNorth - lat) / window.cellY) - window.y0;
+    if (pixelY < 0 || pixelY >= window.y1 - window.y0) continue;
     for (let col = 0; col < size; col++) {
       const lon = west + (col + 0.5) * dx;
       if (lon < tileWest || lon >= tileWest + 3) continue;
       const pixelX = Math.floor((lon - window.tileWestEdge) / window.cellX) - window.x0;
+      if (pixelX < 0 || pixelX >= window.x1 - window.x0) continue;
       const model = worldCoverModel(Number(values[pixelY * (window.x1 - window.x0) + pixelX]));
       const index = row * size + col;
       if (quality[index] === 1) continue;
@@ -296,13 +298,21 @@ function isSource(value: JsonValue): value is FuelResponse['sources'][number] {
     isJsonObject(value) &&
     typeof value['label'] === 'string' &&
     typeof value['sourceUrl'] === 'string' &&
+    value['sourceUrl'].startsWith('https://') &&
     typeof value['sourceDate'] === 'string' &&
     typeof value['attribution'] === 'string'
   );
 }
 
 function isModel(value: JsonValue): value is FuelResponse['models'][number] {
-  return isJsonObject(value) && isCount(value['id']) && isCount(value['cells']);
+  return (
+    isJsonObject(value) &&
+    isCount(value['id']) &&
+    value['id'] >= 1 &&
+    value['id'] <= 13 &&
+    isCount(value['cells']) &&
+    value['cells'] > 0
+  );
 }
 
 function hasFuelHeader(value: JsonValue, bounds: Bounds, size: number): boolean {
@@ -349,23 +359,83 @@ function hasFuelMetadata(value: JsonValue): boolean {
   );
 }
 
-function hasFuelRuns(value: JsonValue | undefined, cells: number): boolean {
-  if (!Array.isArray(value) || !value.length || value.length % 3) return false;
+interface FuelRunSummary {
+  officialCells: number;
+  estimatedCells: number;
+  unknownCells: number;
+  nonBurnableCells: number;
+  models: Map<number, number>;
+}
+
+function isValidFuelTriple(
+  value: JsonValue[],
+  remaining: number,
+): value is [number, number, number] {
+  const [model, quality, count] = value;
+  return (
+    isCount(model) &&
+    (model <= 13 || model === UNKNOWN) &&
+    isCount(quality) &&
+    quality <= 2 &&
+    (model === UNKNOWN) === (quality === 0) &&
+    isCount(count) &&
+    count > 0 &&
+    count <= remaining
+  );
+}
+
+function summarizeFuelRuns(value: JsonValue | undefined, cells: number): FuelRunSummary | null {
+  if (!Array.isArray(value) || !value.length || value.length % 3) return null;
   let length = 0;
+  const summary: FuelRunSummary = {
+    officialCells: 0,
+    estimatedCells: 0,
+    unknownCells: 0,
+    nonBurnableCells: 0,
+    models: new Map(),
+  };
   for (let i = 0; i < value.length; i += 3) {
-    const model = value[i];
-    const quality = value[i + 1];
-    const count = value[i + 2];
-    if (!isCount(model) || (model > 13 && model !== UNKNOWN)) return false;
-    if (!isCount(quality) || quality > 2 || !isCount(count) || !count) return false;
+    const triple = value.slice(i, i + 3);
+    if (!isValidFuelTriple(triple, cells - length)) return null;
+    const [model, quality, count] = triple;
     length += count;
+    if (quality === 1) summary.officialCells += count;
+    else if (quality === 2) summary.estimatedCells += count;
+    else summary.unknownCells += count;
+    if (model === 0) summary.nonBurnableCells += count;
+    else if (model !== UNKNOWN) summary.models.set(model, (summary.models.get(model) ?? 0) + count);
   }
-  return length === cells;
+  return length === cells ? summary : null;
+}
+
+function hasFuelEnvelope(value: JsonValue, bounds: Bounds, size: number): boolean {
+  return (
+    hasFuelHeader(value, bounds, size) &&
+    hasFuelCounts(value, size * size) &&
+    hasFuelMetadata(value)
+  );
+}
+
+function matchesFuelSummary(
+  summary: FuelRunSummary,
+  officialCells: number,
+  estimatedCells: number,
+  unknownCells: number,
+  nonBurnableCells: number,
+  models: JsonValue[],
+): boolean {
+  return (
+    summary.officialCells === officialCells &&
+    summary.estimatedCells === estimatedCells &&
+    summary.unknownCells === unknownCells &&
+    summary.nonBurnableCells === nonBurnableCells &&
+    summary.models.size === models.length &&
+    models.every((model) => isModel(model) && summary.models.get(model.id) === model.cells)
+  );
 }
 
 function readFuelResponse(value: JsonValue, bounds: Bounds, size: number): FuelResponse | null {
-  if (!hasFuelHeader(value, bounds, size) || !hasFuelCounts(value, size * size)) return null;
-  if (!hasFuelMetadata(value) || !isJsonObject(value)) return null;
+  if (!hasFuelEnvelope(value, bounds, size) || !isJsonObject(value)) return null;
   const runs = value['runs'];
   const models = value['models'];
   const sources = value['sources'];
@@ -375,8 +445,9 @@ function readFuelResponse(value: JsonValue, bounds: Bounds, size: number): FuelR
   const unknownCells = value['unknownCells'];
   const nonBurnableCells = value['nonBurnableCells'];
   const generatedAt = value['generatedAt'];
+  const summary = summarizeFuelRuns(runs, size * size);
   if (
-    !hasFuelRuns(runs, size * size) ||
+    !summary ||
     !Array.isArray(runs) ||
     !Array.isArray(models) ||
     !Array.isArray(sources) ||
@@ -386,6 +457,17 @@ function readFuelResponse(value: JsonValue, bounds: Bounds, size: number): FuelR
     !isCount(unknownCells) ||
     !isCount(nonBurnableCells) ||
     typeof generatedAt !== 'string'
+  )
+    return null;
+  if (
+    !matchesFuelSummary(
+      summary,
+      officialCells,
+      estimatedCells,
+      unknownCells,
+      nonBurnableCells,
+      models,
+    )
   )
     return null;
   return {

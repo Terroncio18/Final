@@ -299,16 +299,19 @@ test('a missing key is said plainly, and not folded into the generic outage', as
 test('the weather asks for a country and a place, and refuses anything else', async () => {
   const app = await serve();
 
-  for (const url of [
-    '/api/weather?lon=2.7&lat=39.6',
-    '/api/weather?country=FR&lon=2.7&lat=39.6',
-    '/api/weather?country=ES&lat=39.6',
-    '/api/weather?country=ES&lon=&lat=39.6',
-    '/api/weather?country=ES&lon=molt&lat=39.6',
-    '/api/weather?country=ES&lon=200&lat=39.6',
-    '/api/weather?country=ES&lon=2.7&lat=91',
-  ]) {
-    assert.equal((await app.inject(url)).statusCode, 400, url);
+  const refusals: [string, RegExp][] = [
+    ['/api/weather?lon=2.7&lat=39.6', /país.*ES o PT/],
+    ['/api/weather?country=FR&lon=2.7&lat=39.6', /país.*ES o PT/],
+    ['/api/weather?country=ES&lat=39.6', /Calen lon i lat/],
+    ['/api/weather?country=ES&lon=&lat=39.6', /Calen lon i lat/],
+    ['/api/weather?country=ES&lon=molt&lat=39.6', /Calen lon i lat/],
+    ['/api/weather?country=ES&lon=200&lat=39.6', /Coordenades fora de rang/],
+    ['/api/weather?country=ES&lon=2.7&lat=91', /Coordenades fora de rang/],
+  ];
+  for (const [url, says] of refusals) {
+    const answer = await app.inject(url);
+    assert.equal(answer.statusCode, 400, url);
+    assert.match(answer.json().error, says, url);
   }
   assert.equal(nearestObservation.mock.calls.length, 0);
 });

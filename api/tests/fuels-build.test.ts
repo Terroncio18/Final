@@ -90,6 +90,25 @@ test('with no official map, every cell is estimated from the land cover', async 
   assert.equal(grid.size, SIZE);
 });
 
+test('a cropped WorldCover window leaves cells beyond its east edge unknown', async () => {
+  fromUrl.mockResolvedValue({
+    getImage: async () => ({
+      getBoundingBox: () => [2.66, 39.55, 2.68, 39.6],
+      getResolution: () => [0.01, -0.01],
+      getWidth: () => 2,
+      getHeight: () => 5,
+      readRasters: async () => Uint8Array.from([10, 10, 20, 20, 20, 20, 20, 20, 20, 20]),
+    }),
+    close: async () => {},
+  });
+  const { fuelGrid } = await fuels();
+
+  const grid = await fuelGrid([...BOUNDS], SIZE);
+
+  assert.deepEqual(grid.runs.slice(0, 9), [255, 0, 1, 8, 2, 1, 255, 0, 3]);
+  assert.equal(grid.unknownCells, 12);
+});
+
 test('an official map wins over the estimate, and both are named', async () => {
   await dataset('balears', 4);
   const { fuelGrid } = await fuels();
@@ -204,6 +223,41 @@ test.each(['broken gzip', 'broken JSON', 'wrong response shape', 'invalid runs']
     assert.equal(fromUrl.mock.calls.length, 2, 'the damaged entry cannot be served');
   },
 );
+
+test.each([
+  [
+    'UNKNOWN with estimated quality',
+    (grid: { runs: number[] }) => ({ ...grid, runs: [255, 2, CELLS] }),
+  ],
+  [
+    'mismatched provenance totals',
+    (grid: { runs: number[] }) => ({ ...grid, officialCells: CELLS, estimatedCells: 0 }),
+  ],
+  [
+    'mismatched non-burnable total',
+    (grid: { runs: number[] }) => ({ ...grid, nonBurnableCells: 1 }),
+  ],
+  [
+    'mismatched model counts',
+    (grid: { runs: number[] }) => ({ ...grid, models: [{ id: 8, cells: CELLS - 1 }] }),
+  ],
+  [
+    'insecure source URL',
+    (grid: { runs: number[]; sources: { sourceUrl: string }[] }) => ({
+      ...grid,
+      sources: grid.sources.map((source) => ({ ...source, sourceUrl: 'http://example.invalid/' })),
+    }),
+  ],
+] as const)('a cache with %s is rebuilt from source', async (_kind, corrupt) => {
+  const { fuelGrid } = await fuels();
+  const first = await fuelGrid([...BOUNDS], SIZE);
+  const name = (await readdir(join(dir, 'cache')))[0]!;
+  await writeFile(join(dir, 'cache', name), gzipSync(JSON.stringify(corrupt(first))));
+
+  const rebuilt = await fuelGrid([...BOUNDS], SIZE);
+  assert.deepEqual(rebuilt.runs, [8, 2, CELLS]);
+  assert.equal(fromUrl.mock.calls.length, 2, 'the incoherent entry cannot be served');
+});
 
 test('the same box asked twice at once is one job, and a third box is busy', async () => {
   let release!: () => void;
