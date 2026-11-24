@@ -52,6 +52,7 @@
         <p class="waiting">Llegint l'elevació…</p>
       } @else if (failedTerrain()) {
         <p class="warning">No s'ha pogut llegir l'elevació del domini.</p>
+        <button type="button" class="retry" (click)="retryTerrain()">Tornar-ho a provar</button>
       } @else if (slopes(); as ground) {
         <canvas #relief class="relief" width="256" height="256"></canvas>
         <p class="note">Relleu del domini, de {{ ground.tiles }} tessel·les</p>

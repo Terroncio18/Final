@@ -180,6 +180,23 @@ h3 {
   color: #e8a87c;
 }
 
+.retry {
+  margin: 8px 0 0;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.retry:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 dl {
   display: grid;
   grid-template-columns: auto 1fr;

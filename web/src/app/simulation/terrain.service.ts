@@ -30,8 +30,10 @@ export class TerrainService {
         this.reading.set(false);
       })
       .catch((error: Error) => {
-        console.error('[terrain]', error);
         if (mine !== this.token) return;
+        console.error('[terrain]', error);
+        // Forget the failed read: asking for this same centre again must be able to bring it.
+        if (this.last === key) this.last = null;
         this.failed.set(true);
         this.reading.set(false);
       });

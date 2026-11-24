@@ -35,7 +35,6 @@ export class RangePicker {
 
   protected readonly presets = PRESETS;
   protected readonly maxDays = MAX_RANGE_DAYS;
-  protected readonly today = today();
   protected readonly label = computed(() => labelOf(this.range()));
   protected readonly current = computed(() => presetOf(this.range()));
 
@@ -44,7 +43,7 @@ export class RangePicker {
     const to = this.to();
     if (!isDay(from) || !isDay(to)) return 'Falta una data.';
     if (from > to) return 'La data inicial és posterior a la final.';
-    if (to > this.today) return 'No hi ha deteccions de dates futures.';
+    if (to > this.maxDay()) return 'No hi ha deteccions de dates futures.';
     const first = this.earliest();
     if (first && from < first) return `No hi ha dades anteriors al ${first}.`;
     const span = spanOf({ from, to });
@@ -70,6 +69,12 @@ export class RangePicker {
 
   protected key(event: KeyboardEvent): void {
     if (event.key === 'Escape') this.open.set(false);
+  }
+
+  // Read when used, not when the component is built: past midnight UTC a captured day would hold
+  // the calendar and the validation back to yesterday.
+  protected maxDay(): string {
+    return today();
   }
 
   protected retry(): void {

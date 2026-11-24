@@ -306,6 +306,25 @@ describe('form, navigation and overview components', () => {
     expect(c['open']()).toBe(false);
   });
 
+  it('takes the latest allowed day from the clock, not from when it was built', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2024-08-02T23:59:00Z'));
+    const fixture = TestBed.createComponent(RangePicker),
+      c = fixture.componentInstance;
+    await fixture.whenStable();
+    expect(c['maxDay']()).toBe('2024-08-02');
+    c['from'].set('2024-08-03');
+    c['to'].set('2024-08-03');
+    expect(c['problem']()).toContain('futures');
+    // Past midnight UTC the same live component must accept the day that has just started.
+    vi.setSystemTime(new Date('2024-08-03T00:01:00Z'));
+    expect(c['maxDay']()).toBe('2024-08-03');
+    c['to'].set('2024-08-02');
+    c['to'].set('2024-08-03');
+    expect(c['problem']()).toBeNull();
+    vi.useRealTimers();
+  });
+
   it('closes the date picker only when focus leaves it or Escape is pressed', async () => {
     const fixture = TestBed.createComponent(RangePicker),
       c = fixture.componentInstance;

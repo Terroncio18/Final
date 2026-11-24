@@ -168,6 +168,11 @@ export class IgnitionStep implements OnInit, OnDestroy {
   }
 
   // Replace an existing coordinate entry so Back returns to the list instead of replaying nudges.
+  protected retryTerrain(): void {
+    const point = this.ignition();
+    if (point) this.terrain.read(point);
+  }
+
   private goTo(region: string, province: string, municipality: string, point: Point): void {
     void this.router.navigate(['/simulacio', region, province, municipality, formatPoint(point)], {
       replaceUrl: this.ignition() !== null,

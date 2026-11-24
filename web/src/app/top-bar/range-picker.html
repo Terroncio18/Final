@@ -48,7 +48,7 @@
             type="date"
             [value]="from()"
             [attr.min]="earliest()"
-            [max]="today"
+            [max]="maxDay()"
             (input)="edit('from', $event)"
           />
         </label>
@@ -58,7 +58,7 @@
             type="date"
             [value]="to()"
             [attr.min]="earliest()"
-            [max]="today"
+            [max]="maxDay()"
             (input)="edit('to', $event)"
           />
         </label>

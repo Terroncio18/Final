@@ -162,6 +162,24 @@ describe('simulation input requests', () => {
     expect(service.failed()).toBe(false);
   });
 
+  it('reads the same centre again after a failed terrain read', async () => {
+    const good = { elevation: new Float32Array([100]) } as Terrain;
+    vi.mocked(readTerrain)
+      .mockRejectedValueOnce(new Error('missing tiles'))
+      .mockResolvedValueOnce(good);
+    const service = new TerrainService();
+    service.read([2, 2]);
+    await settle();
+    expect(service.failed()).toBe(true);
+    expect(readTerrain).toHaveBeenCalledTimes(1);
+    // Without forgetting the failed key, this same centre would be refused for ever.
+    service.read([2, 2]);
+    await settle();
+    expect(readTerrain).toHaveBeenCalledTimes(2);
+    expect(service.terrain()).toBe(good);
+    expect(service.failed()).toBe(false);
+  });
+
   it('locates a municipality by its polygon, caches both reads and rejects missing files', async () => {
     fetcher
       .mockResolvedValueOnce(
