@@ -100,6 +100,15 @@ comportament. Tres coses, **en aquest ordre**:
    s'ha d'inventar, s'ha de generalitzar. Van amb ell els quatre noms de camp
    per a dues idees.
 
+   > **Fets els punts 2 i 3 el 24/11/2026** (§11.83): `simulation/latest.ts`
+   > per al testimoni —tres llocs— i `simulation/asked.ts` per a la
+   > deduplicació i l'oblit —sis—. **Afegeix 145 línies i 421 bytes de
+   > paquet**, no n'estalvia; el que es compra és que la prova de `Latest` va
+   > trobar que l'original deia posseir el testimoni 0, que no havia entregat
+   > mai. `map-agents.ts` queda fora perquè guarda una promesa, no una clau, i
+   > les cadenes `.then()` continuen sent cadenes: la regla 9 és una tanda
+   > pròpia.
+
 I abans d'aquests tres, la que no era a la llista i és la pitjor: **la
 conversió de metres a graus**, que B1 va afegir després.
 
