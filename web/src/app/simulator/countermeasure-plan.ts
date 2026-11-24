@@ -15,6 +15,7 @@ import {
   type CountermeasureKind,
 } from '../simulation/countermeasures';
 import type { Point } from '../simulation/point';
+import { metresFor } from '../simulation/geo';
 
 // Bounds order: west, south, east, north.
 export type Bounds = readonly [number, number, number, number];
@@ -136,8 +137,8 @@ export function lengthM(points: readonly Point[]): number {
   for (let i = 1; i < points.length; i += 1) {
     const [lon0, lat0] = points[i - 1];
     const [lon1, lat1] = points[i];
-    const north = (lat1 - lat0) * 111_320;
-    const east = (lon1 - lon0) * 111_320 * Math.cos((((lat0 + lat1) / 2) * Math.PI) / 180);
+    // The mid-latitude, not an endpoint's: it is the right one for the length of a segment.
+    const { east, north } = metresFor(lon1 - lon0, lat1 - lat0, (lat0 + lat1) / 2);
     total += Math.hypot(north, east);
   }
   return total;

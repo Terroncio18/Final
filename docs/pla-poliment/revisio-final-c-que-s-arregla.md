@@ -91,8 +91,21 @@ comportament. Tres coses, **en aquest ordre**:
    s'ha d'inventar, s'ha de generalitzar. Van amb ell els quatre noms de camp
    per a dues idees.
 
+I abans d'aquests tres, la que no era a la llista i és la pitjor: **la
+conversió de metres a graus**, que B1 va afegir després.
+
 Cada punt és una tanda pròpia, amb les vuit portes en verd i **el paquet
 mesurat abans i després**: avui el tros gros són 1,06 MB i no pot créixer.
+
+> **Fet 24/11/2026: la conversió de metres a graus.** A `simulation/geo.ts`,
+> amb `M_PER_DEGREE`, `degreesFor`, `metresFor` i `offsetBy`, i tres proves
+> amb valors calculats a part. Eren **quatre** llocs, no cinc: un va
+> desaparèixer en els refactors anteriors. **Cap número canvia**: cada lloc
+> rep la latitud que li toca —la del punt a tres d'ells, la mitjana al llarg
+> d'un segment—, perquè unificar aquella tria hauria alterat els llargs
+> mesurats dels plans que ja existeixen. El tros gros del paquet passa de
+> 1.063.338 a **1.063.582 bytes**, 244 més; el total baixa 204. Ha crescut,
+> poc, i es diu amb el número.
 
 ### 9. L'avís i el botó, un component
 

@@ -15,6 +15,7 @@ import {
 } from './agent-models';
 import type { GroundAgent, Pass } from '../simulation/agents';
 import type { Point } from '../simulation/point';
+import { offsetBy } from '../simulation/geo';
 
 // Figures keep a minimum screen length so real-size crews remain visible at domain scale.
 const SCREEN_LENGTH_PX = 56;
@@ -206,7 +207,7 @@ export class Agents3D implements CustomLayerInterface {
             smooth(clamp01((t - PASS.release - 0.4) / (PASS.seconds - PASS.release)));
     const east = Math.sin(heading) * along,
       north = Math.cos(heading) * along;
-    const point = offset(pass.drop, east, north);
+    const point = offsetBy(pass.drop, east, north);
     const pitch = t < PASS.release ? -0.12 : 0.18 * clamp01((t - PASS.release - 0.3) / 1.5);
     place(model, frame, point, height * length, pass.heading, grow, pitch);
 
@@ -242,11 +243,6 @@ export class Agents3D implements CustomLayerInterface {
     disposeModel(flight.model);
     disposeModel(flight.curtain);
   }
-}
-
-// Flat-earth east/north offsets in metres are sufficient over a few kilometres.
-function offset([lon, lat]: Point, east: number, north: number): Point {
-  return [lon + east / (111_320 * Math.cos((lat * Math.PI) / 180)), lat + north / 111_320];
 }
 
 function spin(model: THREE.Object3D, t: number): void {

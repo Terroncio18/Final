@@ -8,6 +8,7 @@ import type {
 } from 'maplibre-gl';
 import type { Feature, FeatureCollection } from 'geojson';
 import { writeSource } from './source-data';
+import { degreesFor } from '../simulation/geo';
 
 type Point = readonly [number, number];
 
@@ -47,7 +48,6 @@ const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 // Metres per pixel at zoom 0 on the equator, using MapLibre 512 px tiles.
 const M_PER_PX_Z0 = 78_271.517;
-const M_PER_DEGREE = 111_320;
 const HIT_SLOP = 4;
 
 // MapLibre line widths are pixels: w0 × 2^zoom converts a ground width at the feature latitude.
@@ -69,8 +69,7 @@ function widthAtZoom0(widthM: number, latitude: number): number {
 // A fill polygon drapes the disc over terrain.
 function discRing(centre: Point, diameterM: number): [number, number][] {
   const radius = diameterM / 2;
-  const dLat = radius / M_PER_DEGREE;
-  const dLon = radius / (M_PER_DEGREE * Math.cos((centre[1] * Math.PI) / 180));
+  const { dLat, dLon } = degreesFor(radius, centre[1]);
   const ring: [number, number][] = [];
   for (let i = 0; i <= 48; i += 1) {
     const angle = (i / 48) * 2 * Math.PI;
