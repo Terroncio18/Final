@@ -35,7 +35,7 @@ La xarxa de seguretat ja hi és: 97,9 % de cobertura i 0 avisos de Sonar
 
 | #   | Fase                                                        | Depèn de    | Estat                                                                                                        | Qui    |
 | --- | ----------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------ | ------ |
-| 0   | [El full d'estil](fase-00-full-d-estil.md)                  | —           | **Feta** 24/11: 12 regles escrites; les 3 decisions obertes, tancades (§11.80)                                | Claude |
+| 0   | [El full d'estil](fase-00-full-d-estil.md)                  | —           | **Feta** 24/11: 12 regles escrites; les 3 decisions obertes, tancades (§11.80)                               | Claude |
 | 0b  | [El linter](fase-00b-linter.md)                             | 0           | **Feta** 20/11: ESLint i Prettier en verd a web i API                                                        | Claude |
 | 1   | [Inventari](fase-01-inventari.md)                           | —           | **Feta**: dues llistes a `docs/inventari-web.md` i `docs/inventari-api.md`, les sis categories cobertes      | Claude |
 | 2   | [Provar l'aplicació sencera](fase-02-provar-l-aplicacio.md) | —           | **Feta** 20/11: prova manual completada; quatre defectes resolts a la fase 3                                 | Pere   |
@@ -43,8 +43,8 @@ La xarxa de seguretat ja hi és: 97,9 % de cobertura i 0 avisos de Sonar
 | 4   | [Codi mort](fase-04-codi-mort.md)                           | 1           | **Feta** el 20/11/2026: rutes de càrrega i pintors sense importador retirats; inventaris revisats            | Codex  |
 | 5   | [Estil](fase-05-estil.md)                                   | 0, 0b, 4    | **Feta** 20/11: set regles aplicades, cinc funcions dividides, JSON meteorològic validat; 386 proves en verd | Codex  |
 | 6   | [Optimitzacions](fase-06-optimitzacions.md)                 | 1, 2        | **Feta** 20/11: dades −17,9%; recuperació `ENOSPC`; paquet inicial dins del límit                            | Codex  |
-| 7   | [Prova global final](fase-07-prova-global.md)               | 3, 4, 5, 6  | Per començar                                                                                                 | —      |
-| 8   | [Manuals i README](fase-08-manuals.md)                      | 7           | Per començar                                                                                                 | —      |
+| 7   | [Prova global final](fase-07-prova-global.md)               | 3, 4, 5, 6  | **A punt**: el full de què mirar és a `revisio-final-e-full-per-a-la-fase-7.md`                              | Pere   |
+| 8   | [Manuals i README](fase-08-manuals.md)                      | 7           | **A mitges**: els README de l'arrel i de `web/` fets 24/11; falten els dos manuals i el de l'`api/`          | Claude |
 | 9   | [Publicar](fase-09-publicar.md)                             | 8 + decisió | **Bloquejada per una decisió**                                                                               | —      |
 | 10  | [Sonar i tancament](fase-10-sonar-i-tancament.md)           | 9           | Per començar                                                                                                 | —      |
 
@@ -73,6 +73,13 @@ en acabar l'avaluació i deixada al criteri de Claude. Mira el que les tres
 revisions anteriors no han mirat —repetició, codi mort al dia, si les proves
 proven, i el que no s'ha llegit a fons—, tanca les tres decisions obertes de
 la fase 0 i acaba amb el full del que la fase 7 ha de mirar al navegador.
+
+**Les setze pendents del punt 12**, demanades per Pere el 24/11 —«anem a
+tancar-les totes»—: la proposta és a
+[`les-setze-pendents.md`](les-setze-pendents.md), feta per Claude i Codex per
+separat i contrastada. No eren setze decisions: nou es tanquen sense preguntar
+res, quatre volen la resposta de Pere, la 12.8 vol codi i la 12.18 no es pot
+tancar fins que el manual d'usuari existeixi. **Esperant les respostes.**
 
 **Les independents de debò són la 1 i la 2**: es poden fer avui, alhora, i les
 dues només llegeixen. La 0 i la 0b també són independents de tot.

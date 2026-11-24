@@ -1,0 +1,11 @@
+# 10 — Preguntas para Pere
+
+24/11/2026. Una pregunta por línea; la recomendación está junto a cada una. Las respuestas de Pere pueden anotarse debajo, conforme al protocolo del buzón.
+
+- **12.1:** ¿Confirmas que el TFG se entrega con Terrarium como DEM del relieve y de la pendiente, citando Copernicus GLO-30 solo como mejora futura? **Recomiendo sí**, porque cambiarlo ahora implica servir teselas, repetir las comprobaciones del terreno y describir de nuevo los resultados.
+- **12.10:** ¿Aceptas que la meteorología en directo siga usando la estación completa más próxima al centro, sin distancia máxima ni corrección por relieve, mostrando su distancia y explicando ese límite en la memoria? **Recomiendo sí para este TFG**; la §11.18 ya implementó estación, caché y actualización manual, y comprobó el CORS de IPMA.
+- **12.16:** ¿Aceptas presentar los resultados numéricos de contramedidas y brases solo como escenarios condicionados a parámetros editables, sin afirmar eficacia real ni calibración de la retención, el secado o las probabilidades? **Recomiendo sí** y dejar expresamente sin medir el plan máximo de 100 medidas/512 vértices.
+- **12.25(a):** ¿Aceptas conservar como provisionales y sin fuente específica los rendimientos de cortafuego, tala y extinción de restos, y evitar conclusiones cuantitativas sobre su productividad real? **Recomiendo sí**; el modal ya los distingue y una fuente de línea manual no valida esos trabajos.
+- **12.25(b):** ¿Ratificas los 40,2 m/h por persona de Ortega et al. como valor editable por defecto de la línea manual, en vez de los 7 m/h sostenidos de NWCG? **Recomiendo conservar Ortega** por su ámbito español y declarar las condiciones distintas de las dos mediciones.
+- **12.25(c):** ¿Mantienes el contrafuego instantáneo, sin llegada ni rendimiento de brigada, como simplificación explícita de esta entrega? **Recomiendo sí** para conservar el contrato de §11.42; asignarle brigada requeriría modificar modelo, pantalla, escenarios y pruebas.
+- **12.25(d):** ¿Mantienes las pasadas de agua futuras ya programadas sobre celdas hechas cuando la brigada se detiene? **Recomiendo sí** como lectura literal del contrato actual, documentando que es una simplificación; cancelarlas cambiaría el fuego calculado y requiere una decisión e implementación propias.
