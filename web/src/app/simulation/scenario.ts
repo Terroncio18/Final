@@ -4,6 +4,7 @@ import { domainAround } from './domain';
 import { parseSpotting, type SpottingOptions } from './spotting';
 import { parseWindChanges, type WindChange } from './wind';
 import type { JsonValue } from './json-value';
+import { fail, ParseError } from './parse-error';
 
 // Save inputs rather than computed fields; terrain and fuel are loaded again when the scenario
 // opens.
@@ -136,17 +137,26 @@ function readValues(text: string): Map<string, string> {
 }
 
 /** A newer version is refused whole: what it adds may change the fire. */
-function checkVersionSupported(version: string | undefined): string | null {
+function checkVersionSupported(version: string | undefined): void {
   const known = ['1', '2', '3', '4', '5', '6', '7', VERSION];
-  if (version !== undefined && !known.includes(version)) {
-    return 'Versió d’escenari no compatible.';
-  }
-  return null;
+  if (version !== undefined && !known.includes(version)) fail('Versió d’escenari no compatible.');
 }
 
-function readDomain(
-  values: Map<string, string>,
-): { region: string; province: string; municipality: string; centre: Point } | string {
+/** The three JSON keys fail the same way, so they read the same way. */
+function readJsonKey(values: Map<string, string>, key: string, message: string): JsonValue {
+  try {
+    return JSON.parse(values.get(key)!) as JsonValue;
+  } catch {
+    fail(message);
+  }
+}
+
+function readDomain(values: Map<string, string>): {
+  region: string;
+  province: string;
+  municipality: string;
+  centre: Point;
+} {
   const code = (key: string) => {
     const value = values.get(key) ?? '';
     return /^[A-Za-z0-9_]+$/.test(value) ? value : null;
@@ -155,9 +165,8 @@ function readDomain(
   const province = code('provincia');
   const municipality = code('municipi');
   const centre = parsePoint('@' + (values.get('centre') ?? ''));
-  if (!region || !province || !municipality || !centre) {
-    return 'A l’escenari li falta el domini: regió, província, municipi o centre.';
-  }
+  if (!region || !province || !municipality || !centre)
+    fail('A l’escenari li falta el domini: regió, província, municipi o centre.');
   return { region, province, municipality, centre };
 }
 
@@ -166,7 +175,7 @@ function readDomain(
 function readWeather(
   values: Map<string, string>,
   filled: string[],
-): { wind: number; from: number; humidity: number; temperature: number } | string {
+): { wind: number; from: number; humidity: number; temperature: number } {
   const number = (
     key: string,
     label: string,
@@ -187,67 +196,53 @@ function readWeather(
   const from = number('vent_des_de', 'direcció del vent', d.windFrom);
   const humidity = number('humitat', 'humitat', d.humidity, LIMITS.humidity);
   const temperature = number('temperatura', 'temperatura', d.temperature, LIMITS.temperature);
-  if (wind === null || humidity === null || temperature === null || from === null) {
-    return 'La meteorologia de l’escenari no es pot llegir: vent, direcció, humitat o temperatura.';
-  }
+  if (wind === null || humidity === null || temperature === null || from === null)
+    fail('La meteorologia de l’escenari no es pot llegir: vent, direcció, humitat o temperatura.');
   return { wind, from, humidity, temperature };
 }
 
 function readSpottingKey(
   values: Map<string, string>,
   filled: string[],
-): SpottingOptions | undefined | string {
+): SpottingOptions | undefined {
   if (!values.has('brases')) {
     filled.push('brases');
     return undefined;
   }
-  let raw: JsonValue;
-  try {
-    raw = JSON.parse(values.get('brases')!);
-  } catch {
-    return 'Les brases no són un JSON vàlid.';
-  }
-  return parseSpotting(raw);
+  const parsed = parseSpotting(readJsonKey(values, 'brases', 'Les brases no són un JSON vàlid.'));
+  if (typeof parsed === 'string') fail(parsed);
+  return parsed;
 }
 
 function readWindChangesKey(
   values: Map<string, string>,
   filled: string[],
-): readonly WindChange[] | undefined | string {
+): readonly WindChange[] | undefined {
   if (!values.has('canvis_vent')) {
     filled.push('canvis de vent');
     return undefined;
   }
-  let raw: JsonValue;
-  try {
-    raw = JSON.parse(values.get('canvis_vent')!);
-  } catch {
-    return 'Els canvis de vent no són un JSON vàlid.';
-  }
-  return parseWindChanges(raw);
+  const key = readJsonKey(values, 'canvis_vent', 'Els canvis de vent no són un JSON vàlid.');
+  const parsed = parseWindChanges(key);
+  if (typeof parsed === 'string') fail(parsed);
+  return parsed;
 }
 
 function readCountermeasuresKey(
   values: Map<string, string>,
   filled: string[],
   centre: Point,
-): readonly Countermeasure[] | undefined | string {
+): readonly Countermeasure[] | undefined {
   if (!values.has('contramesures')) {
     filled.push('contramesures');
     return undefined;
   }
-  let raw: JsonValue;
-  try {
-    raw = JSON.parse(values.get('contramesures')!);
-  } catch {
-    return 'El pla de contramesures no és un JSON vàlid.';
-  }
-  const parsed = parseCountermeasures(raw);
-  if (typeof parsed === 'string') return parsed;
+  const key = readJsonKey(values, 'contramesures', 'El pla de contramesures no és un JSON vàlid.');
+  const parsed = parseCountermeasures(key);
+  if (typeof parsed === 'string') fail(parsed);
   const [w, s, e, n] = domainAround(centre);
-  if (parsed.some((m) => m.points.some(([lon, lat]) => lon < w || lon > e || lat < s || lat > n))) {
-    return 'Una contramesura surt del domini de l’escenari.';
-  }
+  if (parsed.some((m) => m.points.some(([lon, lat]) => lon < w || lon > e || lat < s || lat > n)))
+    fail('Una contramesura surt del domini de l’escenari.');
   return parsed;
 }
 
@@ -259,45 +254,36 @@ export function readScenario(text: string): ScenarioRead | string {
   if (!text.includes('IgnisLab')) return 'El fitxer no és un escenari d’IgnisLab.';
 
   const values = readValues(text);
-
   const version = values.get('versio');
-  const versionError = checkVersionSupported(version);
-  if (versionError) return versionError;
-
-  const domain = readDomain(values);
-  if (typeof domain === 'string') return domain;
-  const { region, province, municipality, centre } = domain;
-
   const filled: string[] = [];
-  const weather = readWeather(values, filled);
-  if (typeof weather === 'string') return weather;
-  const { wind, from, humidity, temperature } = weather;
 
-  const spotting = readSpottingKey(values, filled);
-  if (typeof spotting === 'string') return spotting;
-
-  const windChanges = readWindChangesKey(values, filled);
-  if (typeof windChanges === 'string') return windChanges;
-
-  const countermeasures = readCountermeasuresKey(values, filled, centre);
-  if (typeof countermeasures === 'string') return countermeasures;
-
-  const scenario: Scenario = {
-    name: values.get('nom') ?? '',
-    region,
-    province,
-    municipality,
-    centre,
-    ignitions: parsePoints(values.get('ignicions')),
-    wind: Math.round(wind),
-    windFrom: ((Math.round(from) % 360) + 360) % 360,
-    humidity: Math.round(humidity),
-    temperature: Math.round(temperature),
-    ...(countermeasures !== undefined ? { countermeasures } : {}),
-    ...(windChanges !== undefined ? { windChanges } : {}),
-    ...(spotting !== undefined ? { spotting } : {}),
-  };
-  return { scenario, version: version ?? '1', filled };
+  try {
+    checkVersionSupported(version);
+    const { region, province, municipality, centre } = readDomain(values);
+    const { wind, from, humidity, temperature } = readWeather(values, filled);
+    const spotting = readSpottingKey(values, filled);
+    const windChanges = readWindChangesKey(values, filled);
+    const countermeasures = readCountermeasuresKey(values, filled, centre);
+    const scenario: Scenario = {
+      name: values.get('nom') ?? '',
+      region,
+      province,
+      municipality,
+      centre,
+      ignitions: parsePoints(values.get('ignicions')),
+      wind: Math.round(wind),
+      windFrom: ((Math.round(from) % 360) + 360) % 360,
+      humidity: Math.round(humidity),
+      temperature: Math.round(temperature),
+      ...(countermeasures !== undefined ? { countermeasures } : {}),
+      ...(windChanges !== undefined ? { windChanges } : {}),
+      ...(spotting !== undefined ? { spotting } : {}),
+    };
+    return { scenario, version: version ?? '1', filled };
+  } catch (error) {
+    if (error instanceof ParseError) return error.message;
+    throw error;
+  }
 }
 
 export function scenarioFileName(name: string): string {

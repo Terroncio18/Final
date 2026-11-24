@@ -1,6 +1,7 @@
 import { CELL_M, domainAround, GRID } from './domain';
 import type { Point } from './point';
 import type { JsonObject, JsonValue } from './json-value';
+import { fail, ParseError } from './parse-error';
 
 export type CountermeasureKind =
   | 'defense-line'
@@ -288,6 +289,7 @@ export const COUNTERMEASURE_CATALOG: readonly MeasureDefinition[] = [
 export const MOP_UP_MAX_FLAME_M = 1.2;
 
 const MAX_COUNTERMEASURES = 100;
+const MAX_PLAN_VERTICES = 512;
 export const WIDTH_LIMITS = { min: CELL_M, max: 3000 } as const;
 export const DURATION_LIMITS = { min: 1, max: 720 } as const;
 export const MAX_VERTICES = 64;
@@ -326,80 +328,79 @@ function isMeasureObject(value: JsonValue | Countermeasure): value is UncheckedM
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function identifyMeasure(
-  raw: JsonValue | Countermeasure,
-): { raw: UncheckedMeasure; definition: MeasureDefinition } | string {
-  if (!isMeasureObject(raw)) return 'Contramesura incorrecta.';
+/** The validators below report a bad plan by throwing; see `parse-error.ts`. */
+function identifyMeasure(raw: JsonValue | Countermeasure): {
+  raw: UncheckedMeasure;
+  definition: MeasureDefinition;
+} {
+  if (!isMeasureObject(raw)) fail('Contramesura incorrecta.');
   // A field this version does not know may be one that changes the fire.
   const unknown = Object.keys(raw).find((key) => !FIELDS.has(key));
-  if (unknown !== undefined) return `Camp de contramesura desconegut: «${unknown}».`;
+  if (unknown !== undefined) fail(`Camp de contramesura desconegut: «${unknown}».`);
   const def = COUNTERMEASURE_CATALOG.find((d) => d.kind === raw.kind);
-  return def ? { raw, definition: def } : 'Tipus de contramesura desconegut.';
+  if (!def) fail('Tipus de contramesura desconegut.');
+  return { raw, definition: def };
 }
 
 function validateCrewFields(
   raw: UncheckedMeasure,
   def: MeasureDefinition,
-): Pick<Countermeasure, 'arrivalMin' | 'crewSize' | 'ratePerPerson'> | string {
+): Pick<Countermeasure, 'arrivalMin' | 'crewSize' | 'ratePerPerson'> {
   const crew = ['arrivalMin', 'crewSize', 'ratePerPerson'].some((key) => key in raw);
   if (!crew) return {};
-  if (!crewKind(def.kind)) return 'Aquest tipus de contramesura no admet brigades.';
+  if (!crewKind(def.kind)) fail('Aquest tipus de contramesura no admet brigades.');
   const { arrivalMin, crewSize, ratePerPerson } = raw;
   if (!finite(arrivalMin) || !finite(crewSize) || !finite(ratePerPerson))
-    return 'La brigada necessita arribada, efectius i rendiment, tots tres numèrics.';
+    fail('La brigada necessita arribada, efectius i rendiment, tots tres numèrics.');
   if (arrivalMin < CREW_LIMITS.arrivalMin.min || arrivalMin > CREW_LIMITS.arrivalMin.max)
-    return 'L’arribada de la brigada ha de ser entre 0 i 720 minuts.';
+    fail('L’arribada de la brigada ha de ser entre 0 i 720 minuts.');
   if (
     !Number.isInteger(crewSize) ||
     crewSize < CREW_LIMITS.crewSize.min ||
     crewSize > CREW_LIMITS.crewSize.max
   )
-    return 'La brigada ha de tenir entre 1 i 500 efectius, sense decimals.';
+    fail('La brigada ha de tenir entre 1 i 500 efectius, sense decimals.');
   const unit = def.kind === 'mop-up' ? 'ha/h' : 'm/h';
   const limits = CREW_LIMITS[unit];
   if (ratePerPerson < limits.min || ratePerPerson > limits.max)
-    return `El rendiment per efectiu ha de ser entre ${limits.min} i ${limits.max} ${unit}.`;
+    fail(`El rendiment per efectiu ha de ser entre ${limits.min} i ${limits.max} ${unit}.`);
   return { arrivalMin, crewSize, ratePerPerson };
 }
 
 function validateIdentifier(
   raw: UncheckedMeasure,
   ids: ReadonlySet<string>,
-): Pick<Countermeasure, 'id'> | string {
+): Pick<Countermeasure, 'id'> {
   if (typeof raw.id !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(raw.id) || ids.has(raw.id))
-    return 'Identificador de contramesura incorrecte o repetit.';
+    fail('Identificador de contramesura incorrecte o repetit.');
   return { id: raw.id };
 }
 
 function validatePointsShape(
   raw: UncheckedMeasure,
   def: MeasureDefinition,
-): Pick<Countermeasure, 'points'> | string {
+): Pick<Countermeasure, 'points'> {
   if (
     !Array.isArray(raw.points) ||
     !raw.points.every(validPoint) ||
     (def.geometry === 'point' ? raw.points.length !== 1 : raw.points.length < 2) ||
     raw.points.length > MAX_VERTICES
   )
-    return 'Geometria de contramesura incorrecta.';
+    fail('Geometria de contramesura incorrecta.');
   return { points: raw.points };
 }
 
-function validateLineDistinct(
-  points: readonly Point[],
-  def: MeasureDefinition,
-): string | undefined {
+function validateLineDistinct(points: readonly Point[], def: MeasureDefinition): void {
   if (
     def.geometry === 'line' &&
     !points.some((p) => p[0] !== points[0][0] || p[1] !== points[0][1])
   )
-    return 'La franja necessita dos punts diferents.';
-  return undefined;
+    fail('La franja necessita dos punts diferents.');
 }
 
-function validateWidth(raw: UncheckedMeasure): Pick<Countermeasure, 'widthM'> | string {
+function validateWidth(raw: UncheckedMeasure): Pick<Countermeasure, 'widthM'> {
   if (!finite(raw.widthM) || raw.widthM < WIDTH_LIMITS.min || raw.widthM > WIDTH_LIMITS.max)
-    return `L'amplada ha d'estar entre ${CELL_M} i 3000 m.`;
+    fail(`L'amplada ha d'estar entre ${CELL_M} i 3000 m.`);
   return { widthM: raw.widthM };
 }
 
@@ -416,7 +417,7 @@ function validateLiquid(
   raw: UncheckedMeasure,
   def: MeasureDefinition,
   liquid: boolean,
-): Pick<Countermeasure, 'litresPerPass' | 'passes' | 'passIntervalMin'> | string {
+): Pick<Countermeasure, 'litresPerPass' | 'passes' | 'passIntervalMin'> {
   if (!liquid) return {};
   if (
     !liquidKind(def.kind) ||
@@ -431,7 +432,9 @@ function validateLiquid(
     raw.passIntervalMin < 1 ||
     raw.passIntervalMin > 120
   )
-    return `Descàrrega incorrecta: 1–${liquidCapacity(def.kind)} L per passada, 1–20 passades i 1–120 min entre passades.`;
+    fail(
+      `Descàrrega incorrecta: 1–${liquidCapacity(def.kind)} L per passada, 1–20 passades i 1–120 min entre passades.`,
+    );
   return {
     litresPerPass: raw.litresPerPass,
     passes: raw.passes,
@@ -443,7 +446,7 @@ function validateRemoval(
   raw: UncheckedMeasure,
   def: MeasureDefinition,
   removal: boolean,
-): Pick<Countermeasure, 'fuelRemaining'> | string {
+): Pick<Countermeasure, 'fuelRemaining'> {
   if (!removal) return {};
   if (
     def.kind !== 'clearing' ||
@@ -451,7 +454,7 @@ function validateRemoval(
     raw.fuelRemaining < 0.05 ||
     raw.fuelRemaining > 1
   )
-    return 'La tala ha de conservar entre el 5 i el 100 % de la càrrega original.';
+    fail('La tala ha de conservar entre el 5 i el 100 % de la càrrega original.');
   return { fuelRemaining: raw.fuelRemaining };
 }
 
@@ -460,28 +463,63 @@ function validateStrengthDuration(
   def: MeasureDefinition,
   liquid: boolean,
   removal: boolean,
-): Pick<Countermeasure, 'strength' | 'durationMin'> | string {
+): Pick<Countermeasure, 'strength' | 'durationMin'> {
   if ((liquid || removal) && (raw.strength !== 0 || raw.durationMin !== 0))
-    return 'Les mesures de líquid o càrrega no admeten reducció artificial ni durada fixa.';
+    fail('Les mesures de líquid o càrrega no admeten reducció artificial ni durada fixa.');
   if (!finite(raw.strength) || raw.strength < 0 || raw.strength > 0.95)
-    return 'La reducció ha d’estar entre 0 i 95 %.';
+    fail('La reducció ha d’estar entre 0 i 95 %.');
   if (
     !finite(raw.durationMin) ||
     (!liquid && temporary(def.kind)
       ? raw.durationMin < DURATION_LIMITS.min || raw.durationMin > DURATION_LIMITS.max
       : raw.durationMin !== 0)
   )
-    return 'Durada incorrecta: 1–720 min per als efectes temporals; 0 per als permanents.';
+    fail('Durada incorrecta: 1–720 min per als efectes temporals; 0 per als permanents.');
   return { strength: raw.strength, durationMin: raw.durationMin };
 }
 
-function validateStartMin(raw: UncheckedMeasure): Pick<Countermeasure, 'startMin'> | string {
-  if (
-    raw.startMin !== undefined &&
-    (!finite(raw.startMin) || raw.startMin < 0 || raw.startMin > 720)
-  )
-    return 'El desplegament ha de ser entre 0 i 720 minuts.';
-  return raw.startMin !== undefined ? { startMin: raw.startMin } : {};
+function validateStartMin(raw: UncheckedMeasure): Pick<Countermeasure, 'startMin'> {
+  if (raw.startMin === undefined) return {};
+  if (!finite(raw.startMin) || raw.startMin < 0 || raw.startMin > 720)
+    fail('El desplegament ha de ser entre 0 i 720 minuts.');
+  return { startMin: raw.startMin };
+}
+
+/** The vertex budget is the plan’s, not the measure’s, so it outlives each call. */
+interface PlanBudget {
+  vertices: number;
+}
+
+/** The order of the checks is the order of the messages: what is wrong first is what gets said. */
+function parseMeasure(
+  value: JsonValue | Countermeasure,
+  ids: ReadonlySet<string>,
+  budget: PlanBudget,
+): Countermeasure {
+  const { raw, definition } = identifyMeasure(value);
+  const crew = validateCrewFields(raw, definition);
+  const identifier = validateIdentifier(raw, ids);
+  const geometry = validatePointsShape(raw, definition);
+  budget.vertices += geometry.points.length;
+  if (budget.vertices > MAX_PLAN_VERTICES) fail(`El pla supera els ${MAX_PLAN_VERTICES} vèrtexs.`);
+  validateLineDistinct(geometry.points, definition);
+  const width = validateWidth(raw);
+  const { liquid, removal } = physicalFlags(raw);
+  const liquidFields = validateLiquid(raw, definition, liquid);
+  const removalFields = validateRemoval(raw, definition, removal);
+  const strengthDuration = validateStrengthDuration(raw, definition, liquid, removal);
+  const start = validateStartMin(raw);
+  return {
+    ...identifier,
+    kind: definition.kind,
+    points: geometry.points.map((point): Point => [point[0], point[1]]),
+    ...width,
+    ...strengthDuration,
+    ...start,
+    ...liquidFields,
+    ...removalFields,
+    ...crew,
+  };
 }
 
 /** Strict, bounded and all-or-nothing: a malformed barrier must never disappear silently. */
@@ -490,47 +528,19 @@ export function parseCountermeasures(
 ): readonly Countermeasure[] | string {
   if (!Array.isArray(value) || value.length > MAX_COUNTERMEASURES)
     return `El pla admet fins a ${MAX_COUNTERMEASURES} contramesures.`;
+  const measures: readonly (JsonValue | Countermeasure)[] = value;
   const ids = new Set<string>();
   const result: Countermeasure[] = [];
-  const measures: readonly (JsonValue | Countermeasure)[] = value;
-  let vertices = 0;
-  for (const measure of measures) {
-    const identified = identifyMeasure(measure);
-    if (typeof identified === 'string') return identified;
-    const { raw, definition } = identified;
-    const crew = validateCrewFields(raw, definition);
-    if (typeof crew === 'string') return crew;
-    const identifier = validateIdentifier(raw, ids);
-    if (typeof identifier === 'string') return identifier;
-    const geometry = validatePointsShape(raw, definition);
-    if (typeof geometry === 'string') return geometry;
-    vertices += geometry.points.length;
-    if (vertices > 512) return 'El pla supera els 512 vèrtexs.';
-    const lineError = validateLineDistinct(geometry.points, definition);
-    if (lineError) return lineError;
-    const width = validateWidth(raw);
-    if (typeof width === 'string') return width;
-    const { liquid, removal } = physicalFlags(raw);
-    const liquidFields = validateLiquid(raw, definition, liquid);
-    if (typeof liquidFields === 'string') return liquidFields;
-    const removalFields = validateRemoval(raw, definition, removal);
-    if (typeof removalFields === 'string') return removalFields;
-    const strengthDuration = validateStrengthDuration(raw, definition, liquid, removal);
-    if (typeof strengthDuration === 'string') return strengthDuration;
-    ids.add(identifier.id);
-    const start = validateStartMin(raw);
-    if (typeof start === 'string') return start;
-    result.push({
-      ...identifier,
-      kind: definition.kind,
-      points: geometry.points.map((point): Point => [point[0], point[1]]),
-      ...width,
-      ...strengthDuration,
-      ...start,
-      ...liquidFields,
-      ...removalFields,
-      ...crew,
-    });
+  const budget: PlanBudget = { vertices: 0 };
+  try {
+    for (const measure of measures) {
+      const parsed = parseMeasure(measure, ids, budget);
+      ids.add(parsed.id);
+      result.push(parsed);
+    }
+  } catch (error) {
+    if (error instanceof ParseError) return error.message;
+    throw error;
   }
   return result;
 }
