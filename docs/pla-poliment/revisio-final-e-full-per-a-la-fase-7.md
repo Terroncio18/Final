@@ -89,10 +89,41 @@ Hauria de passar: les cel·les sense dada surten desconegudes, **no** amb un
 model plausible. És l'únic defecte d'avui que, si tornés, no es veuria: el que
 surt sembla bo.
 
-## 5. El que la fase 7 ja demanava
+## 5. El que va canviar el 24/11 i encara no s'ha vist (§11.86)
+
+Tres canvis de comportament del dia que tanca les pendents. Els dos primers es
+veuen; el tercer no hauria de veure's gens, i això és el que es comprova.
+
+**a) Les xifres del terreny ja no compten el mar.** Agafa un domini **costaner**
+—Sóller mateix, o qualsevol municipi amb costa—. L'altitud mínima ha de sortir
+**positiva**; abans sortia negativa perquè comptava el fons marí, i la pendent
+mitjana promediava talussos submarins. Les xifres surten a dos llocs i han de
+dir el mateix: l'últim pas del formulari i el panell «ÀREA D'ESTUDI» del
+simulador.
+
+**b) I un domini tot mar ho diu.** Fes clic al mig del mar. Ha de dir «tot mar»
+al formulari i «El domini és tot mar: no hi ha terreny per mesurar» al panell,
+en lloc d'un «0–0 m». És el cas que abans donava xifres que no volien dir res.
+
+**c) La línia manual va sis vegades més lenta.** El rendiment per defecte passa
+de 40,2 a **7 m/h per persona** (decisió 12.25 b). Al modal de l'eina, la font
+ha de dir **NWCG 2021** i l'enllaç ha d'obrir la taula; abans deia Ortega i
+l'enllaç era un DOI. I una línia de defensa que abans es completava en un
+escenari ara pot no acabar-se: **això és el que s'espera**, no un defecte. Un
+fitxer d'escenari desat **abans** d'avui ha de seguir obrint-se i conservant el
+seu 40,2.
+
+**d) El canvi de nom no hauria de notar-se.** El pas del centre ara és
+`CentreStep` i el nivell del formulari es diu `centre` (decisió 12.7). No canvia
+res de la pantalla, de manera que el que es comprova és que **tot continua
+funcionant**: els quatre passos, tornar enrere, l'URL amb el punt, i que el
+simulador s'obri amb el centre correcte. Si alguna cosa s'ha trencat amb el
+canvi de nom, es veurà aquí i no a les proves.
+
+## 6. El que la fase 7 ja demanava
 
 - El guió de la fase 2, sencer.
-- La suite automàtica: **469 proves** avui.
+- La suite automàtica: **471 proves** el 24/11.
 - El linter a les dues meitats.
 - Sonar, que no s'ha tornat a llançar des de la §11.62.
 

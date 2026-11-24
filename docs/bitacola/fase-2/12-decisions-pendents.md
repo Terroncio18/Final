@@ -40,22 +40,25 @@
   19/11/2026 a la §11.55: sí, SonarQube Cloud, amb l'escàner a mà i sense CI.
   El que es plantejava: la cobertura no el necessita: la dona vitest, i Sonar
   llegiria el mateix `lcov` que la §11.54 ja genera. El que hi afegiria és
-  anàlisi pròpia —duplicació, complexitat ciclomàtica, *code smells*,
-  *security hotspots*—, un historial per *commit* i un panell d'on sortirien
+  anàlisi pròpia —duplicació, complexitat ciclomàtica, _code smells_,
+  _security hotspots_—, un historial per _commit_ i un panell d'on sortirien
   una captura i una taula per a la memòria. El que costaria: SonarCloud és
   gratuït només amb el repositori públic, i en privat és de pagament;
   SonarQube Community en local vol Docker, Java i uns 3 GB de memòria. Si es
   fa, la via barata és SonarCloud amb el repositori públic, un
   `sonar-project.properties` i l'escàner llançat a mà un parell de vegades,
-  no a cada *commit*, i després del manual (12.18). El linter que es plantejava
+  no a cada _commit_, i després del manual (12.18). El linter que es plantejava
   al costat és ara la 12.28.
 
-- **12.16. Calibrar els coeficients de les contramesures.** Ve de la §11.27,
+- ~~**12.16. Calibrar els coeficients de les contramesures.**~~ Resolta el
+  24/11/2026 a la §11.86: no se'n busca font; es presenten com a escenaris amb
+  paràmetres editables, sense afirmar eficàcia real, i el pla màxim —100
+  mesures, 512 vèrtexs— queda dit com a no mesurat. El que es plantejava: Ve de la §11.27,
   i s'amplia a la §11.31. Les reduccions dels escenaris antics, la retenció
   del 30 %, l'assecat d'una hora i les probabilitats d'emissió i d'ignició de
   les brases (§11.30) són hipòtesis. Si la memòria n'ha de treure
   conclusions quantitatives, cal una font —literatura d'extinció, dades
-  d'operacions, els models de *spotting* d'Albini— o dir explícitament que no
+  d'operacions, els models de _spotting_ d'Albini— o dir explícitament que no
   n'hi ha. Queden també sense mesurar el rendiment amb plans màxims (100
   mesures, 512 vèrtexs) i una revisió en més d'un navegador.
 - **12.18. El manual d'usuari.** Ve de la §11.34. Ha de recollir el que la
@@ -63,14 +66,28 @@
   model —combustible estimat, foc de superfície, retenció i assecat de les
   descàrregues, brases experimentals— i que el simulador no serveix per
   prendre decisions d'emergència.
-- **12.26. El que falta dels llocs de càrrega.** Ve de la §11.44. (a) La mida
+- ~~**12.26. El que falta dels llocs de càrrega.**~~ Resolta el 24/11/2026 a
+  la §11.86: no s'inventa una mida mínima per a la làmina d'aigua. Els 410 m de
+  carrera del CL-415EAF no són un llindar de superfície ni valen per al DHC-515
+  de referència, i la tria del lloc de càrrega és fora de l'entrega (§11.49).
+  El que es plantejava: Ve de la §11.44. (a) La mida
   mínima de la làmina d'aigua per a l'amfibi: no s'ha trobat publicada (Viking
   dona 410 m de carrera per al CL-415EAF, una modificació). Queda oberta. Les
   (b), (c) i (d) es van resoldre el mateix dia a les §11.45 i §11.46: llacs i
   embassaments de tot Espanya (IGN), llocs de fora del domini fins a 30 km en
   una llista, i les marques amagades ja no es treuen de la tria. Llacs de
   Portugal: només els punts de l'ICNF de tipus embassament o llac.
-- **12.25. Rendiments que falten i preguntes de les brigades.** Ve de la §11.42.
+- **12.25. Rendiments que falten i preguntes de les brigades.** Contestada a
+  mitges el 24/11/2026 (§11.86). **(a)** Els rendiments del tallafoc, la tala i
+  l'extinció de restes es queden provisionals i sense font, dient-ho, i no se'n
+  treu cap conclusió quantitativa. **(b)** La línia manual passa d'Ortega al
+  NWCG sostingut: de 40,2 a 7 m/h per persona, que és gairebé sis vegades més
+  lent i canvia tot escenari fet amb el valor nou; els fitxers desats es queden
+  amb el seu. **(c)** El contrafoc deixarà de ser instantani i **(d)** les
+  passades d'aigua programades es cancel·laran quan la brigada s'aturi: les
+  dues canvien el foc calculat, i el contracte és a
+  `tareas codex/de-codex/12-la-linia-manual-y-el-contrafuego.md` amb cinc
+  preguntes per acordar. El que es plantejava: ve de la §11.42.
   (a) Els rendiments del tallafoc, la tala i l'extinció de restes són
   provisionals: cal una font —les taules de bulldòzer del NWCG per als
   tallafocs?— o dir que no n'hi ha. (b) Quin rendiment de línia manual es vol
@@ -80,8 +97,10 @@
   fetes es mantenen (lectura literal del contracte); s'haurien de cancel·lar?
   (e) Cada parada repeteix el càlcul sencer i la barra de progrés torna a
   començar: si es fa servir amb moltes brigades, caldria mirar-ne el temps.
-- **12.19. Les brigades no són instantànies: arribada, efectius i
-  rendiment.** Feta la nit del 16/11/2026 a la §11.42, a la branca `brigades`;
+- ~~**12.19. Les brigades no són instantànies: arribada, efectius i
+  rendiment.**~~ Resolta el 16/11/2026 a la §11.42: arribada, efectius,
+  rendiment per cel·la i parada de seguretat, implementats; els valors i els
+  casos oberts són la 12.25. El que es plantejava: Feta la nit del 16/11/2026 a la §11.42, a la branca `brigades`;
   el que en queda és la 12.25. Plantejat per Pere el 16/11/2026. Avui una mesura terrestre
   apareix sencera al minut del desplegament (§11.28), i la pregunta clau d'un
   incendi —s'acaba la línia abans que hi arribi el cap?— no es pot fer. La
@@ -103,10 +122,14 @@
   Fora, per no complicar-ho: composició i fatiga de les brigades, relleus,
   accessos, i un rendiment que depengui del combustible i de la pendent (les
   taules existeixen; seria el pas següent). **Els valors per defecte han de
-  sortir d'una font** —el *Fireline Handbook* del NWCG o els manuals espanyols
+  sortir d'una font** —el _Fireline Handbook_ del NWCG o els manuals espanyols
   de defensa contra incendis, amb taules per tipus de brigada i de
   combustible—, i com la resta seran hipòtesis editables.
-- **12.20. Agents que fan visible qui treballa.** El primer pas és fet la nit
+
+- ~~**12.20. Agents que fan visible qui treballa.**~~ Resolta el 24/11/2026 a
+  la §11.86: els agents lliurats representen la feina que el model ja ha
+  calculat i no decideixen res; l'autonomia és fora d'aquest treball, i és la
+  12.22. El que es plantejava: El primer pas és fet la nit
   del 16/11/2026 a la §11.43, a la branca `agents-visuals`. Plantejat per Pere el
   16/11/2026: veure al mapa les persones o grups, la maquinària, els avions i
   els helicòpters de cada mesura. El primer pas no necessita IA: si la 12.19
@@ -116,7 +139,11 @@
   calculat, i no hi afegeixen res. Que decideixin pel seu compte —on anar, quan
   retirar-se, a quin punt d'aigua— ja seria simulació d'agents de debò, i
   canviaria el foc: és un altre treball.
-- **12.21. Fer-lo servir de debò per coordinar unitats reals.** Una
+- ~~**12.21. Fer-lo servir de debò per coordinar unitats reals.**~~ Resolta el
+  24/11/2026 a la §11.86: queda com a horitzó i fora de l'abast. Les tres
+  condicions que la mateixa entrada enumera —model validat, dades en temps
+  real, auditabilitat— són cada una més grans que aquest treball sencer. El
+  que es plantejava: Una
   curiositat de Pere, el 16/11/2026, que es deixa escrita com a horitzó i no
   com a feina: que els agents de la 12.20 fossin, algun dia, persones i
   vehicles reals amb la seva posició GPS. La idea existeix al sector —eines
@@ -135,7 +162,10 @@
   serveix per prendre decisions d'emergència. Com a demostració en un TFG, en
   canvi, una entrada de posicions que avui alimenten els agents simulats i
   demà podria alimentar un GPS seria un bon final de capítol.
-- **12.22. Brigades que decideixen les coses petites.** Plantejat per Pere
+
+- ~~**12.22. Brigades que decideixen les coses petites.**~~ Resolta el
+  24/11/2026 a la §11.86: és un altre treball, i a més depèn de la 12.19 i de
+  la 12.23, que es tanquen avui. El que es plantejava: Plantejat per Pere
   el 16/11/2026, i en una **branca a part**, perquè pot no donar temps: l'usuari
   dona l'ordre —obre una línia d'aquí a aquí, apaga aquestes restes— i cada
   brigada la porta a terme amb les decisions que prendria gent amb
@@ -160,7 +190,11 @@
     propi.
   - **Depèn de la 12.19** (rendiment i arribada) i de la 12.23 (d'on surten
     les brigades i on carreguen aigua els helicòpters).
-- **12.23. Parcs de bombers i punts d'aigua al mapa.** Feta en part la nit del
+- ~~**12.23. Parcs de bombers i punts d'aigua al mapa.**~~ Resolta el
+  24/11/2026 a la §11.86: **retirada**. La §11.49 va treure de la pantalla les
+  marques i la tria del lloc de càrrega per decisió de Pere, i amb elles les
+  rutes de l'API i el script de preparació; els agents es queden sense aquestes
+  dades i l'interval entre passades torna a ser un camp. El que es plantejava: Feta en part la nit del
   16/11/2026 a la §11.41, a la branca `senyals-mapa`: el que falta és la 12.24.
   Demanat per Pere el
   16/11/2026: dues marques verdes, una per als parcs i estructures de bombers i
@@ -182,7 +216,13 @@
   són les bases aèries de mitjans contra incendis que publiquen el ministeri i
   les comunitats, i els aeròdroms de l'AIP d'ENAIRE; OpenStreetMap
   (`aeroway=aerodrome`), com a últim recurs i dient-ho.
-- **12.24. Punts d'aigua i bases aèries a Espanya.** En part feta el 16/11/2026
+
+- ~~**12.24. Punts d'aigua i bases aèries a Espanya.**~~ Resolta el 24/11/2026
+  a la §11.86: no s'amplia, perquè la funció que ho consumia es va retirar
+  (§11.49). I no es diu que Espanya no tingui fonts, que seria fals: la §11.45
+  en va trobar del País Valencià i d'Andalusia, i la §11.46 llacs de l'IGN. Les
+  llicències de l'ICNF i d'ENAIRE queden sense confirmar, i no s'afirmen. El
+  que es plantejava: En part feta el 16/11/2026
   a la §11.45: el País Valencià i Andalusia. Queda la resta d'Espanya, que no
   publica res obert, i les bases aèries. Ve de la §11.41. L'ICNF
   publica els de Portugal; a Espanya cada comunitat ho fa pel seu compte i a
@@ -213,14 +253,26 @@
   deia que podia sobreestimar molt. L'alternativa és no combustible, que
   convertiria en barrera un pedregar amb càrritx.
 
-- **12.7. El canvi de nom d'«ignició» a «centre».** Ve de la §11.11: el text ja
+- ~~**12.7. El canvi de nom d'«ignició» a «centre».**~~ Resolta el 24/11/2026
+  a la §11.86: **fet**. La premissa havia caducat —els focus de debò existeixen
+  des de la §11.15—, i la mateixa paraula anomenava dues coses: el pas, el
+  mètode del mapa i el nivell del formulari diuen centre, i l'eina, el panell i
+  la variant del marcador segueixen dient ignició, que és el que són. El que es
+  plantejava: Ve de la §11.11: el text ja
   diu centre i els identificadors encara diuen ignició —`IgnitionStep`,
   `IGNITION_SOURCE`, `setIgnition()`, `LAYERS.ignitionDot`— i el que és
   realment el punt d'ignició encara no existeix. Convé fer-ho el dia que
   l'eina del simulador col·loqui focus de debò, perquè llavors els dos
   conceptes hauran de conviure i els noms hauran de distingir-los.
 
-- **12.8. Les cel·les de mar dins del domini.** Resolta per al model el
+- ~~**12.8. Les cel·les de mar dins del domini.**~~ Resolta del tot el
+  24/11/2026 a la §11.86: les quatre xifres —mínim i màxim d'altitud, màxim i
+  mitjana de pendent— exclouen les cel·les d'elevació ≤ 0, el mateix criteri
+  que el model, i un domini sense terra ho diu en lloc de donar xifres. La
+  graella de pendents es queda sencera, que és el que el cursor i la capa
+  llegeixen, i una cel·la de costa continua prenent els seus veïns: és el
+  terreny del domini, no una línia de costa exacta. Abans deia: resolta per al
+  model el
   14/11/2026 a la §11.19: altitud ≤ 0 no crema. Queda només treure el mar de
   les xifres d'altitud i pendent de la §11.12. El plantejament: Ve de la §11.12. Un domini
   costaner inclou mar, i Terrarium hi dona el fons marí: l'altitud mínima surt
@@ -233,7 +285,14 @@
   paràmetre de consulta, `?ignicions=`, i cada canvi substitueix l'entrada de
   l'historial.
 
-- **12.10. La meteorologia en directe.** Ve de la §11.17. Cal decidir quina
+- ~~**12.10. La meteorologia en directe.**~~ Resolta el 24/11/2026 a la
+  §11.86: es queda el que la §11.18 ja feia i no estava escrit —l'estació
+  completa més propera al centre, sense interpolació ni correcció de relleu,
+  amb la distància a la pantalla perquè es vegi com de representativa és; cau
+  de 20 minuts, i la còpia vella marcada si el refresc falla—. Una observació
+  sense vent vàlid es descarta sencera, de manera que contesta la següent
+  estació. El CORS d'IPMA sí que es va comprovar, i és obert. El que es
+  plantejava: Ve de la §11.17. Cal decidir quina
   estació parla per un domini de 30 km —la més propera al centre, o una
   interpolació—, cada quant es refresca, i què es fa quan l'estació no dona
   vent. AEMET va pel servidor per la clau; IPMA es pot demanar des del
@@ -248,16 +307,31 @@
   a ignicions. El que es plantejava: ve de la §11.17, i és del model (§12.5):
   treure combustible, apujar-ne la humitat, o aturar el front.
 
-La primera que toca és la 12.4, perquè condiciona on viu la resta: si el foc es
-pinta dins de MapLibre o en un segon canvas, el model no escriu al mateix lloc.
+Les tres que queden obertes són la 12.1 —esperant la mesura A/B que Pere va
+triar el 24/11—, la 12.18, que és l'entrega de la fase 8, i les lletres (c) i
+(d) de la 12.25, que canvien el foc calculat i tenen el contracte per acordar.
 
-- **12.1. Model digital d'elevacions.** Ve de la 3.2 de la fase 1. Terrarium per
+- **12.1. Model digital d'elevacions.** **Esperant la mesura**, decidit per
+  Pere el 24/11/2026 (§11.86): amb l'estudi a la mà no va triar ni entregar
+  amb Terrarium ni migrar, sinó mesurar primer. L'estudi és a
+  `tareas codex/de-codex/11-el-estudio-del-glo-30.md`, i el que diu és que el
+  GLO-30 **no dona resolució** a aquesta malla —les tessel·les d'avui ja fan
+  29,4 m/píxel a Sóller, la cel·la és de 30 m i la pendent es deriva amb base
+  de 60 m—, que és un model de **superfície**, amb vegetació i edificis, i que
+  migrar-lo són 19–36 h si només es canvia el model i 31–59 h si el mapa també.
+  La diferència de dada queda sense mesurar: la mesura A/B són 6–12 h
+  projectant les dues fonts sobre els mateixos 1024² centres en quatre dominis
+  i comparant pendent, àrea cremada i perímetre. El que es plantejava: ve de la
+  3.2 de la fase 1. Terrarium per
   comoditat; l'estat de l'art cita el Copernicus DEM GLO-30, de més qualitat.
   Des del 29/10/2026 Terrarium ja no és només el relleu ombrejat: és la font de
   la pendent que alimenta el model, de manera que la pendent pesa més.
   Canviar-lo voldria dir servir les tessel·les nosaltres, perquè el GLO-30 no es
   distribueix com a tessel·les obertes.
-- **12.2. Polígons sense model de combustible.** Ve de la 3.3 de la fase 1.
+- ~~**12.2. Polígons sense model de combustible.**~~ Resolta el 14/11/2026 a
+  la §11.21: `MODCOMB = 0` vol dir desconegut, no incombustible, i hi respon la
+  coberta del sòl. Quedava sense ratllar. El que es plantejava: ve de la 3.3 de
+  la fase 1.
   `MODCOMB = 0` són 5.471 d'11.654 polígons a l'inventari balear. Confondre'ls
   amb terreny no combustible convertiria mitja illa en tallafocs. Resolta el
   14/11/2026 a la §11.21: es tracten com a desconeguts i hi respon la coberta
@@ -273,12 +347,16 @@ pinta dins de MapLibre o en un segon canvas, el model no escriu al mateix lloc.
   l'estat del foc com una capa a sobre; un segon canvas —WebGL propi o
   Three.js— que tingui la graella com a malla i l'estat com a textura; o mapa
   pla amb inclinació opcional i el 3D només com a decoració.
-  - La hipòtesi era que MapLibre drapeja les fonts *raster* però no els
+  - La hipòtesi era que MapLibre drapeja les fonts _raster_ però no els
     `CustomLayer`. Comprovada el mateix dia, i surt millor: drapeja les dues
     coses (§11.2).
 - ~~**12.6. Si el mapa del darrer pas s'ha de poder orbitar.**~~ Resolta el
   5/11/2026 a la §11.3: sí, girar i inclinar; desplaçar i fer zoom, no.
-- **12.5. El model de propagació.** Oberta amb una primera versió a la §11.19
+- ~~**12.5. El model de propagació.**~~ Resolta el 24/11/2026 a la §11.86: el
+  model lliurat és Rothermel per a foc de superfície amb temps mínim de viatge,
+  amb les ampliacions i els límits de les §11.19, §11.21 i §11.29 a §11.31; la
+  validació contra incendis reals és recerca futura i la memòria ho diu. El que
+  es plantejava: Oberta amb una primera versió a la §11.19
   —Rothermel i temps mínim de viatge sobre combustible suposat—; el que en
   queda és allà, llevat del combustible per cel·la, que ja hi és (§11.21).
   Abans deia: encara sense investigar. És el centre de la

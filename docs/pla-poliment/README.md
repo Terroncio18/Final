@@ -79,7 +79,17 @@ tancar-les totes»—: la proposta és a
 [`les-setze-pendents.md`](les-setze-pendents.md), feta per Claude i Codex per
 separat i contrastada. No eren setze decisions: nou es tanquen sense preguntar
 res, quatre volen la resposta de Pere, la 12.8 vol codi i la 12.18 no es pot
-tancar fins que el manual d'usuari existeixi. **Esperant les respostes.**
+tancar fins que el manual d'usuari existeixi.
+
+**Contestades les nou el 24/11**, i tres no eren la recomanació. Fetes i en
+verd: la **12.8** —el mar fora de les quatre xifres del terreny, i les
+pantalles dient-ho quan el domini no té terra—, la **12.25 (b)** —la línia
+manual passa de 40,2 a 7 m/h per persona, amb la cita del NWCG comprovada— i
+la **12.7**, el canvi de nom d'«ignició» a «centre» al pas del formulari, al
+servei de nivells i als vint usos de `simulator-view.ts`. Queden el contracte
+de la **12.25 (c) i (d)**, que canvien el foc calculat i tenen cinc preguntes
+per contestar a `tareas codex/preguntas/12-...`, i l'estudi del GLO-30 ja fet:
+la **12.1** espera la mesura A/B que Pere ha triat.
 
 **Les independents de debò són la 1 i la 2**: es poden fer avui, alhora, i les
 dues només llegeixen. La 0 i la 0b també són independents de tot.

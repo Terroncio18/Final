@@ -157,26 +157,17 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.83** El testimoni i la deduplicació tenen nom
 - **11.84** L'últim defecte cau i el projecte s'explica
 - **11.85** La tira d'`if`s dels dos parsers
+- **11.86** Les setze pendents no eren setze decisions
 
-Pendents obertes, a `12-decisions-pendents.md` (les resoltes hi són ratllades,
-amb el que es plantejava):
+El **12 es va tancar el 24/11/2026** (§11.86): de les setze que semblaven
+obertes, tretze es van resoldre i tres no ho eren del tot. A
+`12-decisions-pendents.md`, amb les resoltes ratllades i el que es plantejava
+intacte. **Les que queden:**
 
-- **12.16** Calibrar els coeficients de les contramesures
-- **12.18** El manual d'usuari
-- **12.26** El que falta dels llocs de càrrega
-- **12.25** Rendiments que falten i preguntes de les brigades
-- **12.19** Les brigades no són instantànies: arribada, efectius i rendiment
-- **12.20** Agents que fan visible qui treballa
-- **12.21** Fer-lo servir de debò per coordinar unitats reals
-- **12.22** Brigades que decideixen les coses petites
-- **12.23** Parcs de bombers i punts d'aigua al mapa
-- **12.24** Punts d'aigua i bases aèries a Espanya
-- **12.7** El canvi de nom d'«ignició» a «centre»
-- **12.8** Les cel·les de mar dins del domini
-- **12.10** La meteorologia en directe
-- **12.1** Model digital d'elevacions
-- **12.2** Polígons sense model de combustible
-- **12.5** El model de propagació
+- **12.1** Model digital d'elevacions — esperant la mesura A/B del GLO-30
+- **12.18** El manual d'usuari — és l'entrega de la fase 8
+- **12.25** (c) i (d) — el contrafoc amb arribada, i les passades cancel·lades:
+  canvien el foc calculat i tenen el contracte per acordar
 
 I, al costat: `13-troballes-tecniques.md` —set coses que només es veuen
 provant: què drapeja MapLibre, per què el foc sortia tallat, per què les
