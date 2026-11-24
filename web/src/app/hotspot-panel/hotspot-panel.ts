@@ -60,6 +60,8 @@ export class HotspotPanel {
 
   protected readonly observed = computed(() => {
     const when = new Date(this.hotspot().observedAt);
+    // Intl throws on an invalid date, and this is read from the template.
+    if (Number.isNaN(when.getTime())) return 'data desconeguda';
     const format = new Intl.DateTimeFormat('ca-ES', {
       dateStyle: 'medium',
       timeStyle: 'short',

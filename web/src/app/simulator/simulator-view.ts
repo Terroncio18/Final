@@ -1269,7 +1269,7 @@ export class SimulatorView implements OnDestroy {
         painter = new FireSurface(result.arrival, result.horizon);
       } catch (error) {
         this.runs.error.set('No s’ha pogut dibuixar el foc.');
-        console.error(error);
+        console.error('[simulator-view]', error);
         return;
       }
       const animation = new FireAnimation(this.maps, painter, {

@@ -66,6 +66,12 @@ export class HotspotsService {
     this.choose(defaultRange());
   }
 
+  // Choosing the same range again cannot ask for a failed read a second time: the range comes from
+  // the URL and an equal range leaves the effect without anything to react to.
+  public retry(): void {
+    this.load(this.range());
+  }
+
   private stampPositionInRange(collection: FeatureCollection, range: Range): void {
     const start = Date.parse(range.from + 'T00:00:00Z');
     const end = Date.parse(addDays(range.to, 1) + 'T00:00:00Z');
@@ -93,11 +99,12 @@ export class HotspotsService {
           throw new HotspotFetchError(`${response.status} ${response.statusText}`, body?.reason);
         }
         const earliest = response.headers.get('x-earliest');
-        if (earliest) this.earliest.set(earliest);
-        return response.json() as Promise<FeatureCollection<Point>>;
+        const collection = (await response.json()) as FeatureCollection<Point>;
+        return { earliest, collection };
       })
-      .then(async (collection) => {
+      .then(async ({ earliest, collection }) => {
         if (request !== this.requests) return;
+        if (earliest) this.earliest.set(earliest);
 
         const features = await this.area.inside(collection.features);
         if (request !== this.requests) return;
@@ -116,8 +123,8 @@ export class HotspotsService {
         this.loading.set(false);
       })
       .catch((error: Error) => {
-        console.error('[hotspots]', error);
         if (request !== this.requests) return;
+        console.error('[hotspots]', error);
         this.failed.set(true);
         this.missingKey.set(error instanceof HotspotFetchError && error.reason === 'missing-key');
         this.loading.set(false);

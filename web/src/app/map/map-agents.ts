@@ -70,7 +70,7 @@ export class MapAgents {
         then(this.layer);
       },
       (error: Error) => {
-        console.error('[mapa]', error);
+        console.error('[map-agents]', error);
         // Forget the failed load so the next agent asks for three.js again.
         if (this.module === pending) this.module = null;
       },

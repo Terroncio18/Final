@@ -21,6 +21,11 @@
 
   @if (open()) {
     <div class="panel" role="dialog" aria-label="Dates de les deteccions">
+      @if (failed()) {
+        <p class="note warn">No s'han pogut llegir les deteccions.</p>
+        <button type="button" class="apply" (click)="retry()">Tornar-ho a provar</button>
+      }
+
       <p class="head">Darrers dies</p>
       <div class="presets">
         @for (days of presets; track days) {

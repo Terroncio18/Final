@@ -403,6 +403,10 @@ describe('form, navigation and overview components', () => {
     await fixture.whenStable();
     expect(c['band']()).toBe('alta');
     expect(c['moment']()).toBe('desconegut');
+    // Intl throws on an invalid date, and the template reads this.
+    fixture.componentRef.setInput('hotspot', { ...hotspot, observedAt: 'no és una data' });
+    await fixture.whenStable();
+    expect(c['observed']()).toBe('data desconeguda');
   });
 
   it('shows unavailable locations and ignores a location that arrives for a deselected detection', async () => {

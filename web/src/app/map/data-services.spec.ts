@@ -507,6 +507,48 @@ describe('geographic and observation services', () => {
     expect(maps.setHotspots).toHaveBeenCalledTimes(1);
   });
 
+  it('asks a failed range again only when the retry is used', async () => {
+    vi.spyOn(TestBed.inject(StudyArea), 'inside').mockImplementation(async (f) => f);
+    fetcher.mockResolvedValueOnce(response({}, 500));
+    const service = TestBed.inject(HotspotsService);
+    TestBed.tick();
+    await settle();
+    expect(service.failed()).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    // The same range leaves the computed equal, so choosing it again re-runs nothing.
+    await TestBed.inject(Router).navigateByUrl('/');
+    TestBed.tick();
+    await settle();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    fetcher.mockResolvedValueOnce(response(collection([])));
+    service.retry();
+    TestBed.tick();
+    await settle();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(service.failed()).toBe(false);
+  });
+
+  it('does not take the earliest date from a superseded response', async () => {
+    const old = deferred<Response>();
+    vi.spyOn(TestBed.inject(StudyArea), 'inside').mockImplementation(async (f) => f);
+    fetcher
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValue(response(collection([]), 200, { 'x-earliest': '2012-01-01' }));
+    const service = TestBed.inject(HotspotsService);
+    TestBed.tick();
+    await settle();
+    await TestBed.inject(Router).navigateByUrl('/?des=2024-08-01&fins=2024-08-02');
+    TestBed.tick();
+    await settle();
+    expect(service.earliest()).toBe('2012-01-01');
+
+    old.resolve(response(collection([]), 200, { 'x-earliest': '1999-01-01' }));
+    await settle();
+    expect(service.earliest()).toBe('2012-01-01');
+  });
+
   it('tells a missing FIRMS key apart from a plain outage', async () => {
     vi.spyOn(TestBed.inject(StudyArea), 'inside').mockImplementation(async (f) => f);
     fetcher.mockResolvedValueOnce(

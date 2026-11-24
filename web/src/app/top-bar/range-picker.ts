@@ -72,6 +72,10 @@ export class RangePicker {
     if (event.key === 'Escape') this.open.set(false);
   }
 
+  protected retry(): void {
+    this.hotspots.retry();
+  }
+
   protected choosePreset(days: PresetDays): void {
     this.hotspots.choose(lastDays(days));
     this.open.set(false);

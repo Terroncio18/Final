@@ -176,7 +176,7 @@ export class MapService {
     this.addControls(map);
 
     map.on('error', (event) => {
-      console.error('[mapa]', event.error?.message ?? event.error);
+      console.error('[map]', event.error?.message ?? event.error);
     });
     this.listenForSelection(map);
     this.listenForRightClicks(map);
@@ -638,6 +638,10 @@ export class MapService {
     this.centreMarker = null;
     for (const mark of this.fireStarts) mark.remove();
     this.fireStarts = [];
+    // Take the move listener off while its map is still alive, and keep no closure over it.
+    this.unclamp?.();
+    this.unclamp = null;
+    this.clamping = false;
     this.instance?.remove();
     this.instance = null;
     this.queued.length = 0;

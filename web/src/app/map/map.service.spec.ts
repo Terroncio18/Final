@@ -223,7 +223,7 @@ describe('MapService and map overlays', () => {
     map.emit('error', { error: new Error('worker') });
     map.emit('error', { error: 'unknown' });
     map.emit('error', {});
-    expect(error).toHaveBeenCalledWith('[mapa]', 'worker');
+    expect(error).toHaveBeenCalledWith('[map]', 'worker');
     service.destroy();
     expect(service.map).toBeNull();
     expect(service.ready()).toBe(false);
@@ -456,6 +456,15 @@ describe('MapService and map overlays', () => {
     expect(map.easeTo).toHaveBeenCalledWith({ zoom: 12, duration: 250 });
     service.focusFire(bounds);
     expect(map.fitBounds.mock.lastCall![1]).toMatchObject({ maxZoom: 15, duration: 850 });
+  });
+
+  it('lets go of the sandbox clamp when its map is destroyed', () => {
+    start();
+    service.setSandboxBounds(bounds);
+    expect(map.handlers.get('move')?.size).toBe(1);
+    service.destroy();
+    // The listener goes while its own map is still there, and no closure over it is kept.
+    expect(map.handlers.get('move')?.size).toBe(0);
   });
 
   it('creates fire and agent layers lazily and applies motion preferences', async () => {
