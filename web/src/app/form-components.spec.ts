@@ -84,6 +84,7 @@ describe('form, navigation and overview components', () => {
   };
   const levels = { show: vi.fn(), clear: vi.fn() };
   const provinces = {
+    provinces: signal([province]),
     load: vi.fn(),
     failed: signal(false),
     find: (id: string) => (id === province.id ? province : undefined),
@@ -584,6 +585,32 @@ describe('form, navigation and overview components', () => {
     fixture.destroy();
     expect(maps.setPicking).toHaveBeenLastCalledWith(false);
     expect(terrain.clear).toHaveBeenCalled();
+  });
+
+  it('names a wrong province or municipality code in a hand-made address', async () => {
+    const fixture = TestBed.createComponent(CentreStep);
+    const shown = () => (fixture.nativeElement as HTMLElement).textContent ?? '';
+    fixture.componentRef.setInput('region', 'ES53');
+    fixture.componentRef.setInput('province', 'ES531');
+    fixture.componentRef.setInput('municipality', 'ES_99999');
+    await fixture.whenStable();
+    expect(shown()).toContain('«ES_99999» no és cap codi de municipi.');
+    expect(shown()).toContain('el punt triarà el municipi');
+
+    fixture.componentRef.setInput('province', 'ES599');
+    await fixture.whenStable();
+    expect(shown()).toContain('«ES599» no és cap codi de província.');
+
+    // Until the list arrives nothing is known to be wrong.
+    fixture.componentRef.setInput('province', 'ES531');
+    municipalities.municipalities.set([]);
+    await fixture.whenStable();
+    expect(shown()).not.toContain('no és cap codi');
+
+    municipalities.municipalities.set([municipality]);
+    fixture.componentRef.setInput('municipality', 'one');
+    await fixture.whenStable();
+    expect(shown()).not.toContain('no és cap codi');
   });
 
   it('re-resolves the whole address when a click lands outside the province, in another country', async () => {

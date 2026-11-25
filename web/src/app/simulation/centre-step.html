@@ -77,6 +77,9 @@
       }
 
       <p class="pending">Torna a fer clic al mapa per moure el centre.</p>
+    } @else if (unknown(); as wrong) {
+      <p class="warning">«{{ wrong.code }}» no és cap codi de {{ wrong.level }}.</p>
+      <p class="pending">Fes clic al mapa: el punt triarà el municipi.</p>
     } @else {
       <p class="pending">
         Fes clic al mapa per marcar el <strong>centre de la simulació</strong>. El domini es

@@ -53,6 +53,17 @@ export class CentreStep implements OnInit, OnDestroy {
 
   protected readonly chosen = computed(() => this.municipalities.find(this.municipality()));
 
+  // A hand-made address can carry a wrong code; it is named once its list has arrived. A click on
+  // the map still resolves the right municipality.
+  protected readonly unknown = computed(() => {
+    if (!this.provinces.provinces().length) return null;
+    if (!this.provinces.find(this.province())) {
+      return { code: this.province(), level: 'província' };
+    }
+    if (!this.municipalities.municipalities().length || this.chosen()) return null;
+    return { code: this.municipality(), level: 'municipi' };
+  });
+
   // An unlocated point keeps the URL municipality but is flagged outside it; this can mean sea or
   // a neighbouring province.
   protected readonly outside = computed(() => {
