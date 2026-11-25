@@ -158,6 +158,7 @@ i els mitjans aeris, i la qualitat del codi. Context: `0-portada.md` i
 - **11.84** L'últim defecte cau i el projecte s'explica
 - **11.85** La tira d'`if`s dels dos parsers
 - **11.86** Les setze pendents no eren setze decisions
+- **11.87** La prova global troba quatre defectes, i cauen
 
 El **12 es va tancar el 24/11/2026** (§11.86): de les setze que semblaven
 obertes, tretze es van resoldre i tres no ho eren del tot. A

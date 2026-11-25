@@ -43,7 +43,7 @@ La xarxa de seguretat ja hi és: 97,9 % de cobertura i 0 avisos de Sonar
 | 4   | [Codi mort](fase-04-codi-mort.md)                           | 1           | **Feta** el 20/11/2026: rutes de càrrega i pintors sense importador retirats; inventaris revisats            | Codex  |
 | 5   | [Estil](fase-05-estil.md)                                   | 0, 0b, 4    | **Feta** 20/11: set regles aplicades, cinc funcions dividides, JSON meteorològic validat; 386 proves en verd | Codex  |
 | 6   | [Optimitzacions](fase-06-optimitzacions.md)                 | 1, 2        | **Feta** 20/11: dades −17,9%; recuperació `ENOSPC`; paquet inicial dins del límit                            | Codex  |
-| 7   | [Prova global final](fase-07-prova-global.md)               | 3, 4, 5, 6  | **A punt**: el full de què mirar és a `revisio-final-e-full-per-a-la-fase-7.md`                              | Pere   |
+| 7   | [Prova global final](fase-07-prova-global.md)               | 3, 4, 5, 6  | **A mitges** 25/11: passada al navegador, 4 defectes apuntats; falten els judicis a ull, el seient 4 i Sonar | Pere   |
 | 8   | [Manuals i README](fase-08-manuals.md)                      | 7           | **A mitges**: els README de l'arrel i de `web/` fets 24/11; falten els dos manuals i el de l'`api/`          | Claude |
 | 9   | [Publicar](fase-09-publicar.md)                             | 8 + decisió | **Bloquejada per una decisió**                                                                               | —      |
 | 10  | [Sonar i tancament](fase-10-sonar-i-tancament.md)           | 9           | Per començar                                                                                                 | —      |
