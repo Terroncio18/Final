@@ -365,6 +365,20 @@ describe('form, navigation and overview components', () => {
     expect(hotspots.retry).toHaveBeenCalledTimes(2);
   });
 
+  it('says the FIRMS key is missing and offers no retry that could not fix it', async () => {
+    const fixture = TestBed.createComponent(RangePicker);
+    await fixture.whenStable();
+    fixture.componentInstance['toggle']();
+    hotspots.failed.set(true);
+    hotspots.missingKey.set(true);
+    await fixture.whenStable();
+    const panel = fixture.nativeElement.querySelector('.panel') as HTMLElement;
+    expect(panel.textContent).toContain('clau de FIRMS');
+    expect(panel.textContent).not.toContain("No s'han pogut llegir");
+    const buttons = [...panel.querySelectorAll('button')].map((b) => b.textContent?.trim());
+    expect(buttons).not.toContain('Tornar-ho a provar');
+  });
+
   it('takes the latest allowed day from the clock, not from when it was built', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2024-08-02T23:59:00Z'));
