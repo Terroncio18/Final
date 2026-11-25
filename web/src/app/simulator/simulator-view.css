@@ -841,6 +841,29 @@ select:focus-visible {
   }
 }
 
+/* On a phone the header wraps: the place is already named over the map and in the study area. */
+@media (max-width: 640px) {
+  .topbar {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+
+  .brand strong {
+    font-size: 22px;
+  }
+
+  .where {
+    display: none;
+  }
+
+  .workspace-heading {
+    flex-wrap: wrap;
+    padding: 14px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .loader {
     animation: none;
