@@ -47,8 +47,13 @@ test('western tiles use floor, including the two sides of a tile boundary', () =
 });
 
 test('unrecognised cover never means non-burnable', () => {
-  assert.equal(worldCoverModel(0), UNKNOWN);
   assert.equal(worldCoverModel(NaN), UNKNOWN);
+  assert.equal(worldCoverModel(255), UNKNOWN);
+  assert.equal(worldCoverModel(15), UNKNOWN);
+});
+
+test('a classless pixel inside a WorldCover tile is open sea, not missing data', () => {
+  assert.equal(worldCoverModel(0), 0);
   assert.equal(worldCoverModel(80), 0);
   assert.equal(worldCoverModel(10), 8);
   assert.equal(worldCoverModel(20), 5);

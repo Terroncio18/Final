@@ -44,6 +44,8 @@ interface FuelResponse {
     attribution: string;
   }[];
   warnings: string[];
+  /** True only when a source failed to answer: asking again could fill the unknown cells. */
+  retry: boolean;
   generatedAt: string;
 }
 
@@ -205,8 +207,9 @@ async function readWorldCover(
   models: Uint8Array,
   quality: Uint8Array,
   warnings: string[],
-): Promise<void> {
+): Promise<boolean> {
   const [west, south, east, north] = bounds;
+  let failed = false;
   for (let tileSouth = Math.floor(south / 3) * 3; tileSouth < north; tileSouth += 3) {
     for (let tileWest = Math.floor(west / 3) * 3; tileWest < east; tileWest += 3) {
       // Official coverage must not depend on the availability of the fallback.
@@ -229,12 +232,14 @@ async function readWorldCover(
           );
         }
       } catch {
+        failed = true;
         warnings.push(
           `WorldCover ${id}: dades no disponibles; les cel·les sense altra font queden desconegudes.`,
         );
       }
     }
   }
+  return failed;
 }
 
 async function datasets(warnings: string[]): Promise<FuelDataset[]> {
@@ -505,6 +510,8 @@ function readFuelResponse(value: JsonValue, bounds: Bounds, size: number): FuelR
     models,
     sources,
     warnings,
+    // Only complete answers are cached, so a cached one never asks for a retry.
+    retry: false,
     generatedAt,
   };
 }
@@ -603,9 +610,7 @@ async function buildFuelResponse(
     if (await overlay(data, bounds, size, models, quality)) sources.push(data);
   }
 
-  const warningsBeforeRaster = warnings.length;
-  await readWorldCover(bounds, size, models, quality, warnings);
-  const rasterUnreachable = warnings.length > warningsBeforeRaster;
+  const rasterUnreachable = await readWorldCover(bounds, size, models, quality, warnings);
   const summary = summarizeCells(models, quality);
   if (summary.estimatedCells) {
     sources.push({
@@ -630,6 +635,7 @@ async function buildFuelResponse(
       attribution,
     })),
     warnings,
+    retry: rasterUnreachable,
     generatedAt: new Date().toISOString(),
   };
   await cacheFuelResponse(cacheDir, path, response, rasterUnreachable);

@@ -55,6 +55,7 @@ export function worldCoverModel(cover: number): number {
       return 0; // bare or sparse ground: too little cover to carry a surface fire
     case 90:
       return 3; // herbaceous wetland can carry a surface fire
+    case 0: // no class inside a tile: in WorldCover v200 that is open sea
     case 50:
     case 70:
     case 80:

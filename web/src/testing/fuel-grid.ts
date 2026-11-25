@@ -15,6 +15,7 @@ export function fuelGrid(patch: Partial<FuelGrid> = {}): FuelGrid {
     counts: [],
     sources: [],
     warnings: [],
+    retry: false,
     ...patch,
   };
 }

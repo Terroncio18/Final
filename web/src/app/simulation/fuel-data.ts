@@ -20,6 +20,8 @@ export interface FuelGrid {
   counts: { id: number; cells: number }[];
   sources: FuelSource[];
   warnings: string[];
+  /** A source failed to answer, so asking again could fill the unknown cells. */
+  retry: boolean;
 }
 
 function hasValidHeader(
@@ -127,8 +129,10 @@ export function decodeFuels(data: JsonValue, bounds: readonly number[], size: nu
   if (!runsResult) return fail();
   const { officialCells, estimatedCells, unknownCells, nonBurnableCells, counts } = runsResult;
   const sources = data['sources'],
-    warnings = data['warnings'];
-  if (!hasValidSources(sources) || !hasValidWarnings(warnings)) return fail();
+    warnings = data['warnings'],
+    retry = data['retry'] === undefined ? false : data['retry'];
+  if (!hasValidSources(sources) || !hasValidWarnings(warnings) || typeof retry !== 'boolean')
+    return fail();
   return {
     version: 'anderson13-worldcover2021-v2',
     bounds,
@@ -142,5 +146,6 @@ export function decodeFuels(data: JsonValue, bounds: readonly number[], size: nu
     counts: [...counts].map(([id, cells]) => ({ id, cells })).sort((a, b) => b.cells - a.cells),
     sources,
     warnings,
+    retry,
   };
 }

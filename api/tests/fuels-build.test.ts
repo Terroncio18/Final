@@ -84,6 +84,7 @@ test('with no official map, every cell is estimated from the land cover', async 
 
   assert.equal(grid.warnings.length, 1);
   assert.match(grid.warnings[0]!, /[Cc]ap conjunt.*oficial/);
+  assert.equal(grid.retry, false);
   assert.equal(grid.sources.length, 1);
   assert.match(grid.sources[0]!.label, /WorldCover/);
   assert.match(grid.sources[0]!.attribution, /ESA WorldCover project 2021/);
@@ -111,6 +112,7 @@ test('partial WorldCover coverage and an inaccessible source have distinct warni
   assert.equal(grid.warnings.length, 2);
   assert.match(grid.warnings[0]!, /[Cc]ap conjunt.*oficial/);
   assert.match(grid.warnings[1]!, /WorldCover N39E000.*no cobreix.*Tornar-ho a provar no servirà/);
+  assert.equal(grid.retry, false, 'a raster that does not reach the box will not reach it later');
   assert.deepEqual(await readdir(dir), [], 'partial coverage is not cached');
 
   fromUrl.mockRejectedValue(new Error('the range read timed out'));
@@ -121,6 +123,7 @@ test('partial WorldCover coverage and an inaccessible source have distinct warni
   assert.match(inaccessible.warnings[0]!, /[Cc]ap conjunt.*oficial/);
   assert.match(inaccessible.warnings[1]!, /WorldCover N39E000.*dades no disponibles/);
   assert.notEqual(inaccessible.warnings[1], grid.warnings[1]);
+  assert.equal(inaccessible.retry, true, 'a source that did not answer may answer later');
   assert.deepEqual(await readdir(dir), [], 'inaccessible source is not cached');
 });
 
@@ -196,6 +199,19 @@ test('an answer with everything known is kept, and the second question does not 
   assert.equal(fromUrl.mock.calls.length, 1, 'the raster is not read again');
   assert.deepEqual(second.runs, first.runs);
   assert.equal(second.generatedAt, first.generatedAt, 'it is the same answer, not a new one');
+  assert.equal(second.retry, false, 'only complete answers are kept, so none asks for a retry');
+});
+
+test('open sea inside a WorldCover tile has no fuel, and is neither unknown nor worth a retry', async () => {
+  fromUrl.mockResolvedValue(worldCover(0));
+  const { fuelGrid } = await fuels();
+
+  const grid = await fuelGrid([...BOUNDS], SIZE);
+
+  assert.equal(grid.nonBurnableCells, CELLS);
+  assert.equal(grid.unknownCells, 0);
+  assert.equal(grid.retry, false);
+  assert.equal(grid.warnings.length, 1, 'only the missing official dataset is said');
 });
 
 test.each(['broken gzip', 'broken JSON', 'wrong response shape', 'invalid runs'])(

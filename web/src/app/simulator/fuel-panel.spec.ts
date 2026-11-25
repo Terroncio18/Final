@@ -104,6 +104,10 @@ describe('FuelPanel', () => {
       expect(tag()?.textContent?.trim()).toBe(label);
       expect(tag()?.classList.contains('warn')).toBe(true);
     }
-    expect(element().querySelector('button')).not.toBeNull();
+    // Unknown cells alone are not worth a retry: open sea or a raster that stops short stays so.
+    expect(element().querySelector('button')).toBeNull();
+    fuels.grid.set(gridWith({ unknownCells: 5, retry: true }));
+    await fixture.whenStable();
+    expect(element().querySelector('button')?.textContent).toContain('Torna a carregar');
   });
 });

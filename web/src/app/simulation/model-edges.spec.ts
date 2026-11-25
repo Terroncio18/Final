@@ -105,6 +105,11 @@ describe('model input boundaries', () => {
       expect(() => decodeFuels({ ...valid, sources }, bounds, 2)).toThrow();
     for (const warnings of [null, [2]])
       expect(() => decodeFuels({ ...valid, warnings }, bounds, 2)).toThrow();
+    // An answer from before the flag existed asks for no retry.
+    expect(decoded.retry).toBe(false);
+    expect(decodeFuels({ ...valid, retry: true }, bounds, 2).retry).toBe(true);
+    for (const retry of [null, 'yes', 1])
+      expect(() => decodeFuels({ ...valid, retry }, bounds, 2)).toThrow();
     for (const raw of [
       null,
       {},

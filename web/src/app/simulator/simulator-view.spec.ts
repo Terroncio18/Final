@@ -72,6 +72,7 @@ const fuelGrid = (): FuelGrid => ({
   counts: [{ id: 1, cells: GRID * GRID }],
   sources: [],
   warnings: [],
+  retry: false,
 });
 function resultFor(patch: Partial<SpreadResult> = {}): SpreadResult {
   const arrival = new Float32Array(GRID * GRID).fill(Infinity);

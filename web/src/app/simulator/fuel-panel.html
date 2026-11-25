@@ -23,7 +23,7 @@
   @if (fuels.error(); as error) {
     <p role="alert">{{ error }}</p>
   }
-  @if (fuels.error() || fuels.grid()?.unknownCells) {
+  @if (fuels.error() || fuels.grid()?.retry) {
     <button type="button" (click)="retryFuels()" [disabled]="fuels.reading()">
       Torna a carregar
     </button>
